@@ -1,36 +1,78 @@
-// Example model schema from the Drizzle docs
-// https://orm.drizzle.team/docs/sql-schema-declaration
-
-import { sql } from "drizzle-orm";
 import {
-  index,
-  pgTableCreator,
-  serial,
+  bigint,
+  doublePrecision,
+  foreignKey,
+  integer,
+  pgSchema,
+  pgTable,
+  smallint,
   timestamp,
-  varchar,
+  uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 
-/**
- * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
- * database instance for multiple projects.
- *
- * @see https://orm.drizzle.team/docs/goodies#multi-project-schema
- */
-export const createTable = pgTableCreator((name) => `poker_${name}`);
+const authSchema = pgSchema("auth");
 
-export const posts = createTable(
-  "post",
+const users = authSchema.table("users", {
+  id: uuid("id").primaryKey(),
+});
+
+export const publicTables = pgTable("public_tables", {
+  id: bigint("id", { mode: "number" })
+    .primaryKey()
+    .generatedByDefaultAsIdentity(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  pot: doublePrecision("pot").default(0),
+  currentTurn: smallint("current_turn").default(0),
+  button: smallint("button").default(0),
+});
+
+export const privateTableState = pgTable(
+  "private_table_state",
   {
-    id: serial("id").primaryKey(),
-    name: varchar("name", { length: 256 }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .default(sql`CURRENT_TIMESTAMP`)
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).$onUpdate(
-      () => new Date()
-    ),
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedByDefaultAsIdentity(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    remainingDeck: integer("remaining_deck").array().notNull(),
   },
-  (example) => ({
-    nameIndex: index("name_idx").on(example.name),
-  })
+  (table) => {
+    return {
+      privateTableStateIdFkey: foreignKey({
+        columns: [table.id],
+        foreignColumns: [publicTables.id],
+      }).onDelete("cascade"),
+    };
+  },
+);
+
+export const privatePlayerState = pgTable(
+  "private_player_state",
+  {
+    // You can use { mode: "bigint" } if numbers are exceeding js number limitations
+    id: bigint("id", { mode: "number" })
+      .primaryKey()
+      .generatedByDefaultAsIdentity(),
+    userId: uuid("user_id").notNull(),
+    tableId: bigint("table_id", { mode: "number" }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    hand: integer("hand").array(),
+  },
+  (table) => {
+    return {
+      userTableState: uniqueIndex("user_table_state").using(
+        "btree",
+        table.userId.asc().nullsLast(),
+        table.tableId.asc().nullsLast(),
+      ),
+      privatePlayerStateTableIdFkey: foreignKey({
+        columns: [table.tableId],
+        foreignColumns: [publicTables.id],
+      }).onDelete("cascade"),
+      privatePlayerStateUserIdFkey: foreignKey({
+        columns: [table.userId],
+        foreignColumns: [users.id],
+      }).onDelete("restrict"),
+    };
+  },
 );
