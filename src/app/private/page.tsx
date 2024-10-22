@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { createClient } from "~/supabase/server";
+import PokerProbability from "./pokerProbability";
 
 export default async function PrivatePage() {
 	const supabase = createClient();
@@ -10,5 +11,9 @@ export default async function PrivatePage() {
 		redirect("/login");
 	}
 
-	return <p>Hello {data.user.email}</p>;
+	return (
+		<main className="container mx-auto p-6">
+			<PokerProbability />
+		</main>
+	);
 }
