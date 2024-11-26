@@ -5,40 +5,41 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "~/supabase/server";
 
-export async function login(formData: FormData) {
+// Defining TypeScript interface for login and signup inputs
+interface AuthData {
+	email: string;
+	password: string;
+}
+
+export async function login(data: AuthData): Promise<string | null> {
 	const supabase = createClient();
 
-	// type-casting here for convenience
-	// in practice, you should validate your inputs
-	const data = {
-		email: formData.get("email") as string,
-		password: formData.get("password") as string,
-	};
-
-	const { error } = await supabase.auth.signInWithPassword(data);
+	// Directly use the `data` object for sign in
+	const { error } = await supabase.auth.signInWithPassword({
+		email: data.email,
+		password: data.password,
+	});
 
 	if (error) {
-		redirect("/error");
+		return error.message;
 	}
 
+	// Redirect to the home page
 	revalidatePath("/", "layout");
 	redirect("/");
 }
 
-export async function signup(formData: FormData) {
+export async function signup(data: AuthData): Promise<string | null> {
 	const supabase = createClient();
 
-	// type-casting here for convenience
-	// in practice, you should validate your inputs
-	const data = {
-		email: formData.get("email") as string,
-		password: formData.get("password") as string,
-	};
-
-	const { error } = await supabase.auth.signUp(data);
+	// Directly use the `data` object for sign up
+	const { error } = await supabase.auth.signUp({
+		email: data.email,
+		password: data.password,
+	});
 
 	if (error) {
-		redirect("/error");
+		return error.message;
 	}
 
 	revalidatePath("/", "layout");

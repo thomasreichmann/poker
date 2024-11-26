@@ -90,6 +90,11 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
 	const result = await next();
 
 	const end = Date.now();
+	// Prevent logging if the procedure is the test 'sanity' procedure
+	// this is not really a test and more of a sanity check, because for some reason without it
+	// SSR fails to render the page
+	if (path == "sanity.hello") return result;
+
 	console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
 
 	return result;
