@@ -1,3 +1,4 @@
+import { relations } from "drizzle-orm";
 import {
 	bigint,
 	doublePrecision,
@@ -25,6 +26,12 @@ export const publicTables = pgTable("public_tables", {
 	button: smallint("button").default(0),
 });
 
+export type SelectPublicTable = typeof publicTables.$inferSelect;
+
+export const publicTableRelations = relations(publicTables, ({ many }) => ({
+	privatePlayerState: many(privatePlayerState),
+}));
+
 export const privateTableState = pgTable(
 	"private_table_state",
 	{
@@ -41,6 +48,8 @@ export const privateTableState = pgTable(
 		};
 	},
 );
+
+export type SelectPrivateTableState = typeof privateTableState.$inferSelect;
 
 export const privatePlayerState = pgTable(
 	"private_player_state",
@@ -70,3 +79,12 @@ export const privatePlayerState = pgTable(
 		};
 	},
 );
+
+export type SelectPrivatePlayerState = typeof privatePlayerState.$inferSelect;
+
+export const privatePlayerStateRelations = relations(privatePlayerState, ({ one }) => ({
+	publicTable: one(publicTables, {
+		fields: [privatePlayerState.tableId],
+		references: [publicTables.id],
+	}),
+}));

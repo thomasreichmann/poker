@@ -6,11 +6,12 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { db } from "~/server/db";
+import { createClient } from "~/supabase/server";
 
 /**
  * 1. CONTEXT
@@ -25,8 +26,14 @@ import { db } from "~/server/db";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
+	const supabase = createClient();
+	const { data, error } = await supabase.auth.getUser();
+	if (error) throw error;
+	const user = data.user;
+
 	return {
 		db,
+		user,
 		...opts,
 	};
 };
@@ -108,3 +115,20 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
  * are logged in.
  */
 export const publicProcedure = t.procedure.use(timingMiddleware);
+
+/**
+ * Private (authenticated) procedure using supabase auth
+ *
+ * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
+ * guarantee that a user querying is authorized, but you can still access user session data if they
+ * are logged in.
+ */
+
+const protectedMiddleware = t.middleware(async ({ ctx, next }) => {
+	if (!ctx.user) {
+		throw new TRPCError({ code: "UNAUTHORIZED" });
+	}
+	return next();
+});
+
+export const privateProcedure = t.procedure.use(protectedMiddleware);
