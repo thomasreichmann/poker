@@ -9,21 +9,18 @@ import {
 import { Suspense } from "react";
 import { createClient } from "~/supabase/server";
 import { api } from "~/trpc/server";
+import { PrivateTables } from "./_components/PrivateTables";
 import { PublicTables } from "./_components/PublicTables";
 import { RealtimeTest } from "./_components/realtime";
-import { UnsafeCode } from "./_components/unsafeCode";
 
 const supabase = createClient();
 
 export default async function Home() {
 	const { data, error } = await supabase.auth.getUser();
 	const user = data ? data.user : null;
-	const tables = await api.table.getAllPublic();
-	const privateTableStates = await api.table.playerTables();
 
-	function isPlayerNotInTable(table: Awaited<ReturnType<typeof api.table.getAllPublic>>[number]) {
-		return !privateTableStates.some((state) => state.tableId === table.id);
-	}
+	void api.table.getAllPublic.prefetch({ notJoined: true });
+	void api.table.playerTables.prefetch();
 
 	return (
 		<main className="flex h-screen flex-col items-center justify-center gap-4">
@@ -42,19 +39,16 @@ export default async function Home() {
 
 			<Divider flexItem />
 
-			<section>
-				{privateTableStates.length > 0 ? (
-					<h1>You are playing the following tables:</h1>
-				) : (
-					<h1>You are not playing any tables</h1>
-				)}
-			</section>
-
+			<Suspense fallback={<p>Loading...</p>}>
+				<PrivateTables />
+			</Suspense>
 			<Divider flexItem />
 
 			<Paper elevation={1} className="p-4">
 				<Typography>Public Tables</Typography>
-				<PublicTables tables={tables.filter(isPlayerNotInTable)} />
+				<Suspense fallback={<p>Loading...</p>}>
+					<PublicTables />
+				</Suspense>
 			</Paper>
 
 			<Divider flexItem />
@@ -68,7 +62,6 @@ export default async function Home() {
 						<Suspense fallback={<p>Loading...</p>}>
 							<RealtimeTest />
 						</Suspense>
-						<UnsafeCode />
 					</AccordionDetails>
 				</Accordion>
 			</section>

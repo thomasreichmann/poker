@@ -1,4 +1,5 @@
 "use client";
+
 import {
 	Button,
 	Paper,
@@ -9,22 +10,21 @@ import {
 	TableHead,
 	TableRow,
 } from "@mui/material";
-import { SelectPublicTable } from "~/server/db/schema";
+import { SelectPrivatePlayerState } from "~/server/db/schema";
 import { api } from "~/trpc/react";
 
-export function PublicTables() {
+export function PrivateTables() {
 	const utils = api.useUtils();
-	const [tables] = api.table.getAllPublic.useSuspenseQuery({ notJoined: true });
+	const [tables] = api.table.playerTables.useSuspenseQuery();
 
-	const joinTableMutation = api.table.joinTable.useMutation({
+	const leaveMutation = api.table.leaveTable.useMutation({
 		onSuccess: () => {
 			utils.table.invalidate();
 		},
 	});
 
-	const joinTable = async (table: SelectPublicTable) => {
-		const res = await joinTableMutation.mutateAsync({ tableId: table.id });
-		console.log(res);
+	const leaveTable = async (table: SelectPrivatePlayerState) => {
+		leaveMutation.mutateAsync({ tableId: table.tableId });
 	};
 
 	return (
@@ -33,10 +33,9 @@ export function PublicTables() {
 				<TableHead>
 					<TableRow>
 						<TableCell>ID</TableCell>
+						<TableCell>Table ID</TableCell>
 						<TableCell>Created At</TableCell>
-						<TableCell>Pot</TableCell>
-						<TableCell>Current Turn</TableCell>
-						<TableCell>Button</TableCell>
+						<TableCell>Hand</TableCell>
 						<TableCell />
 					</TableRow>
 				</TableHead>
@@ -44,17 +43,16 @@ export function PublicTables() {
 					{tables.map((table) => (
 						<TableRow key={table.id}>
 							<TableCell>{table.id}</TableCell>
+							<TableCell>{table.tableId}</TableCell>
 							<TableCell>{table.createdAt.toISOString()}</TableCell>
-							<TableCell>{table.pot}</TableCell>
-							<TableCell>{table.currentTurn}</TableCell>
-							<TableCell>{table.button}</TableCell>
+							<TableCell>{table.hand}</TableCell>
 							<TableCell>
 								<Button
 									variant="outlined"
-									onClick={() => joinTable?.(table)}
-									disabled={joinTableMutation.isPending}
+									onClick={() => leaveTable(table)}
+									disabled={leaveMutation.isPending}
 								>
-									Join
+									Leave
 								</Button>
 							</TableCell>
 						</TableRow>

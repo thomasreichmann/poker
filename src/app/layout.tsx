@@ -10,7 +10,7 @@ import { theme } from "~/app/_components/theme";
 
 import { Roboto } from "next/font/google";
 import { ErrorBoundary } from "react-error-boundary";
-import { api } from "~/trpc/server";
+import { HydrateClient } from "~/trpc/server";
 
 const roboto = Roboto({
 	weight: ["300", "400", "500", "700"],
@@ -24,20 +24,20 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-	await api.sanity.hello();
-
 	return (
 		<html lang="en" className={roboto.className}>
 			<body>
 				<TRPCReactProvider>
-					<AppRouterCacheProvider>
-						<ThemeProvider theme={theme}>
-							<ErrorBoundary fallback={<p>Error</p>}>
-								<CssBaseline />
-								{children}
-							</ErrorBoundary>
-						</ThemeProvider>
-					</AppRouterCacheProvider>
+					<HydrateClient>
+						<AppRouterCacheProvider>
+							<ThemeProvider theme={theme}>
+								<ErrorBoundary fallback={<p>Error</p>}>
+									<CssBaseline />
+									{children}
+								</ErrorBoundary>
+							</ThemeProvider>
+						</AppRouterCacheProvider>
+					</HydrateClient>
 				</TRPCReactProvider>
 			</body>
 		</html>

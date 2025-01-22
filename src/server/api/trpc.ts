@@ -12,7 +12,6 @@ import { ZodError } from "zod";
 
 import { db } from "~/server/db";
 import { createClient } from "~/supabase/server";
-
 /**
  * 1. CONTEXT
  *
@@ -27,6 +26,7 @@ import { createClient } from "~/supabase/server";
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
 	const supabase = createClient();
+
 	const { data, error } = await supabase.auth.getUser();
 	if (error) throw error;
 	const user = data.user;
