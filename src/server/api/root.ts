@@ -1,5 +1,5 @@
 import { createCallerFactory, createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { tableRouter } from "./routers/table";
+import { oldTableRouter, tableRouter } from "./routers/table";
 
 export const sanityRouter = createTRPCRouter({
 	hello: publicProcedure.query(async () => {
@@ -7,7 +7,11 @@ export const sanityRouter = createTRPCRouter({
 	}),
 });
 
-export const appRouter = createTRPCRouter({ sanity: sanityRouter, table: tableRouter });
+export const appRouter = createTRPCRouter({
+	sanity: sanityRouter,
+	_old_table: oldTableRouter,
+	table: tableRouter,
+});
 
 // export type definition of API
 export type AppRouter = typeof appRouter;

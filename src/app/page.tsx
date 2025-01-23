@@ -8,9 +8,7 @@ import {
 } from "@mui/material";
 import { Suspense } from "react";
 import { createClient } from "~/supabase/server";
-import { api } from "~/trpc/server";
-import { PrivateTables } from "./_components/PrivateTables";
-import { PublicTables } from "./_components/PublicTables";
+import PublicTables from "./_components/PublicTables";
 import { RealtimeTest } from "./_components/realtime";
 
 const supabase = createClient();
@@ -18,9 +16,6 @@ const supabase = createClient();
 export default async function Home() {
 	const { data, error } = await supabase.auth.getUser();
 	const user = data ? data.user : null;
-
-	void api.table.getAllPublic.prefetch({ notJoined: true });
-	void api.table.playerTables.prefetch();
 
 	return (
 		<main className="flex h-screen flex-col items-center justify-center gap-4">
@@ -39,16 +34,9 @@ export default async function Home() {
 
 			<Divider flexItem />
 
-			<Suspense fallback={<p>Loading...</p>}>
-				<PrivateTables />
-			</Suspense>
-			<Divider flexItem />
-
 			<Paper elevation={1} className="p-4">
 				<Typography>Public Tables</Typography>
-				<Suspense fallback={<p>Loading...</p>}>
-					<PublicTables />
-				</Suspense>
+				<PublicTables />
 			</Paper>
 
 			<Divider flexItem />

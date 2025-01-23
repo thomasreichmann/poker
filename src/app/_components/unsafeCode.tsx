@@ -8,7 +8,7 @@ import { api } from "~/trpc/react";
 export const UnsafeCode = () => {
 	const [unsafeEvalCode, setUnsafeEvalCode] = useState<string>("");
 	const [unsafeEvalResult, setUnsafeEvalResult] = useState<any>(null);
-	const a = api.table.hello.useQuery();
+	const a = api._old_table.hello.useQuery();
 
 	const b = api.useUtils();
 

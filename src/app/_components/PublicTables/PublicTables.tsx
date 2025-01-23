@@ -12,13 +12,13 @@ import {
 import { SelectPublicTable } from "~/server/db/schema";
 import { api } from "~/trpc/react";
 
-export function PublicTables() {
+export function PublicTablesComponent() {
 	const utils = api.useUtils();
-	const [tables] = api.table.getAllPublic.useSuspenseQuery({ notJoined: true });
+	const [tables] = api.table.get.useSuspenseQuery();
 
-	const joinTableMutation = api.table.joinTable.useMutation({
+	const joinTableMutation = api._old_table.joinTable.useMutation({
 		onSuccess: () => {
-			utils.table.invalidate();
+			utils._old_table.invalidate();
 		},
 	});
 
@@ -37,6 +37,7 @@ export function PublicTables() {
 						<TableCell>Pot</TableCell>
 						<TableCell>Current Turn</TableCell>
 						<TableCell>Button</TableCell>
+						<TableCell>In/Out</TableCell>
 						<TableCell />
 					</TableRow>
 				</TableHead>
@@ -48,6 +49,7 @@ export function PublicTables() {
 							<TableCell>{table.pot}</TableCell>
 							<TableCell>{table.currentTurn}</TableCell>
 							<TableCell>{table.button}</TableCell>
+							<TableCell>{table.isUserInTable ? "In" : "Out"}</TableCell>
 							<TableCell>
 								<Button
 									variant="outlined"

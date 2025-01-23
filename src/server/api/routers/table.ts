@@ -1,9 +1,30 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, getTableColumns, sql } from "drizzle-orm";
 import { z } from "zod";
-import { privatePlayerState } from "~/server/db/schema";
+import { privatePlayerState, publicTables } from "~/server/db/schema";
 import { createTRPCRouter, privateProcedure, publicProcedure } from "../trpc";
 
 export const tableRouter = createTRPCRouter({
+	get: privateProcedure.query(async ({ ctx }) => {
+		return await ctx.db
+			.select({
+				...getTableColumns(publicTables),
+				isUserInTable:
+					sql<boolean>`CASE WHEN ${privatePlayerState.userId} IS NOT NULL THEN TRUE ELSE FALSE END`.as(
+						"isUserInTable",
+					),
+			})
+			.from(publicTables)
+			.leftJoin(
+				privatePlayerState,
+				and(
+					eq(privatePlayerState.tableId, publicTables.id),
+					eq(privatePlayerState.userId, ctx.user.id),
+				),
+			);
+	}),
+});
+
+export const oldTableRouter = createTRPCRouter({
 	hello: publicProcedure.query(async ({ ctx }) => {
 		return "world";
 	}),
