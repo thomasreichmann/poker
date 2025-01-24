@@ -6,10 +6,9 @@ import {
 	Paper,
 	Typography,
 } from "@mui/material";
-import { Suspense } from "react";
 import { createClient } from "~/supabase/server";
 import PublicTables from "./_components/PublicTables";
-import { RealtimeTest } from "./_components/realtime";
+import Realtime from "./_components/Realtime";
 
 const supabase = createClient();
 
@@ -18,7 +17,7 @@ export default async function Home() {
 	const user = data ? data.user : null;
 
 	return (
-		<main className="flex h-screen flex-col items-center justify-center gap-4">
+		<main className="flex flex-col items-center justify-center gap-4 pt-4">
 			<section>
 				{error ? (
 					<h1>There was an error fetching user data.</h1>
@@ -44,12 +43,10 @@ export default async function Home() {
 			<section>
 				<Accordion>
 					<AccordionSummary expandIcon={<h1>▶</h1>}>
-						<Typography>Real-time and Unsafe Code</Typography>
+						<Typography>Real-time</Typography>
 					</AccordionSummary>
 					<AccordionDetails>
-						<Suspense fallback={<p>Loading...</p>}>
-							<RealtimeTest />
-						</Suspense>
+						<Realtime />
 					</AccordionDetails>
 				</Accordion>
 			</section>

@@ -1,16 +1,9 @@
+import { AppBar, Button, Toolbar } from "@mui/material";
 import { type Metadata } from "next";
-import "~/styles/globals.css";
-
-import { TRPCReactProvider } from "~/trpc/react";
-
-import { CssBaseline, ThemeProvider } from "@mui/material";
-import { AppRouterCacheProvider } from "@mui/material-nextjs/v14-appRouter";
-import React from "react";
-import { theme } from "~/app/_components/theme";
-
 import { Roboto } from "next/font/google";
-import { ErrorBoundary } from "react-error-boundary";
-import { HydrateClient } from "~/trpc/server";
+import Link from "next/link";
+import "~/styles/globals.css";
+import Providers from "./_components/Providers";
 
 const roboto = Roboto({
 	weight: ["300", "400", "500", "700"],
@@ -23,22 +16,27 @@ export const metadata: Metadata = {
 	icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+const navItems = [
+	{ label: "Home", href: "/" },
+	{ label: "Game", href: "/game" },
+];
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
 	return (
 		<html lang="en" className={roboto.className}>
 			<body>
-				<TRPCReactProvider>
-					<HydrateClient>
-						<AppRouterCacheProvider>
-							<ThemeProvider theme={theme}>
-								<ErrorBoundary fallback={<p>Error</p>}>
-									<CssBaseline />
-									{children}
-								</ErrorBoundary>
-							</ThemeProvider>
-						</AppRouterCacheProvider>
-					</HydrateClient>
-				</TRPCReactProvider>
+				<Providers>
+					<AppBar position="static">
+						<Toolbar>
+							{navItems.map(({ label, href }) => (
+								<Link key={href} href={href} prefetch={true}>
+									<Button>{label}</Button>
+								</Link>
+							))}
+						</Toolbar>
+					</AppBar>
+					{children}
+				</Providers>
 			</body>
 		</html>
 	);
