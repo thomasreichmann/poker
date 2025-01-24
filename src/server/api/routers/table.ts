@@ -22,6 +22,39 @@ export const tableRouter = createTRPCRouter({
 				),
 			);
 	}),
+	create: publicProcedure
+		.mutation(async ({ ctx }) => {
+			return await ctx.db.insert(publicTables).values({
+				pot: 0,
+				currentTurn: 0,
+				button: 0
+			}).returning();
+		}),
+	join: privateProcedure.input(z.object({ tableId: z.number() })).mutation(async ({ ctx, input }) => {
+		try {
+			return await ctx.db.insert(privatePlayerState).values({
+				userId: ctx.user.id,
+				tableId: input.tableId,
+			}).returning();
+		} catch (error) {
+			throw error;
+		}
+	}),
+	leave: privateProcedure.input(z.object({ tableId: z.number() })).mutation(async ({ ctx, input }) => {
+		try {
+			return await ctx.db
+				.delete(privatePlayerState)
+				.where(
+					and(
+						eq(privatePlayerState.userId, ctx.user.id),
+						eq(privatePlayerState.tableId, input.tableId)
+					)
+				)
+				.returning();
+		} catch (error) {
+			throw error;
+		}
+	}),
 });
 
 export const oldTableRouter = createTRPCRouter({
