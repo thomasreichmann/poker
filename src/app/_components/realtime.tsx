@@ -12,7 +12,6 @@ export const RealtimeTest = () => {
 	const [messages, setMessages] = useState<RealtimePayload[]>([]);
 
 	useEffect(() => {
-		console.log("setting up realtime");
 		const channel = supabase
 			.channel("schema-db-changes")
 			.on(
@@ -22,14 +21,12 @@ export const RealtimeTest = () => {
 					schema: "public",
 				},
 				(payload: RealtimePayload) => {
-					console.log("got a payload", payload);
 					setMessages((prev) => [...prev, payload]);
 				},
 			)
 			.subscribe();
 
 		return () => {
-			console.log("tearing down realtime");
 			void channel.unsubscribe();
 		};
 	}, []);

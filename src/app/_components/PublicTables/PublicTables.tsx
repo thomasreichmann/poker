@@ -2,66 +2,28 @@
 import {
 	Button,
 	Paper,
+	Stack,
 	Table,
 	TableBody,
 	TableCell,
 	TableContainer,
 	TableHead,
 	TableRow,
-	Stack,
 } from "@mui/material";
-import { SelectPublicTable } from "~/server/db/schema";
 import { api } from "~/trpc/react";
+import { useTableMutations } from "./useTableMutations";
 
 export function PublicTablesComponent() {
-	const utils = api.useUtils();
 	const [tables] = api.table.get.useSuspenseQuery();
-
-	const createTableMutation = api.table.create.useMutation({
-		onSuccess: async () => {
-			await utils.table.get.invalidate();
-		},
-	});
-
-	const joinTableMutation = api.table.join.useMutation({
-		onSuccess: async () => {
-			await utils.table.get.invalidate();
-		},
-	});
-
-	const leaveTableMutation = api.table.leave.useMutation({
-		onSuccess: async () => {
-			await utils.table.get.invalidate();
-		},
-	});
-
-	const handleTableAction = async (table: SelectPublicTable & { isUserInTable: boolean }) => {
-		if (table.isUserInTable) {
-			await leaveTableMutation.mutateAsync({ tableId: table.id });
-		} else {
-			await joinTableMutation.mutateAsync({ tableId: table.id });
-		}
-	};
-
-	const handleCreateTable = async () => {
-		await createTableMutation.mutateAsync();
-	};
-
-	const isTableActionDisabled = (table: SelectPublicTable & { isUserInTable: boolean }) => {
-		if (table.isUserInTable) {
-			return (
-				leaveTableMutation.isPending && leaveTableMutation.variables?.tableId === table.id
-			);
-		}
-		return joinTableMutation.isPending && joinTableMutation.variables?.tableId === table.id;
-	};
+	const { createTable, handleJoinTable, handleLeaveTable, isTableBeingModified } =
+		useTableMutations();
 
 	return (
 		<Stack spacing={2}>
 			<Button
 				variant="contained"
-				onClick={handleCreateTable}
-				disabled={createTableMutation.isPending}
+				onClick={() => createTable.mutateAsync()}
+				disabled={createTable.isPending}
 			>
 				Create New Table
 			</Button>
@@ -91,8 +53,12 @@ export function PublicTablesComponent() {
 								<TableCell>
 									<Button
 										variant="outlined"
-										onClick={() => handleTableAction(table)}
-										disabled={isTableActionDisabled(table)}
+										onClick={() =>
+											table.isUserInTable
+												? handleLeaveTable(table.id)
+												: handleJoinTable(table.id)
+										}
+										disabled={isTableBeingModified(table.id)}
 									>
 										{table.isUserInTable ? "Leave" : "Join"}
 									</Button>
