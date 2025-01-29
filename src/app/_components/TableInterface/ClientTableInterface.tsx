@@ -1,7 +1,9 @@
 "use client";
 
-import { Box, Paper, Tab, Tabs, Typography } from "@mui/material";
+import { Box, Paper, Tab, Tabs } from "@mui/material";
 import { useState } from "react";
+import { api } from "~/trpc/react";
+import Game from "./Game";
 
 interface TabPanelProps {
 	children?: React.ReactNode;
@@ -20,31 +22,26 @@ function TabPanel(props: TabPanelProps) {
 			aria-labelledby={`table-tab-${index}`}
 			{...other}
 		>
-			{value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+			{value === index && (
+				<Paper elevation={2} className="flex justify-center p-4">
+					{children}
+				</Paper>
+			)}
 		</div>
 	);
 }
 
-// Mock data for tables - replace with real data later
-const mockTables = [
-	{ id: 1, name: "Table 1", players: 6 },
-	{ id: 2, name: "Table 2", players: 4 },
-	{ id: 3, name: "Table 3", players: 8 },
-];
-
 export function ClientTableInterface() {
 	const [currentTable, setCurrentTable] = useState(0);
+	const [playerStates] = api.player.tables.useSuspenseQuery();
+	const tables = playerStates.map((state) => state.publicTable);
 
 	const handleTableChange = (event: React.SyntheticEvent, newValue: number) => {
 		setCurrentTable(newValue);
 	};
 
 	return (
-		<Paper elevation={1} className="m-5 p-5">
-			<Typography variant="h4" className="mb-4">
-				Poker Tables
-			</Typography>
-
+		<Box className="flex flex-col">
 			<Box sx={{ borderBottom: 1, borderColor: "divider" }}>
 				<Tabs
 					value={currentTable}
@@ -53,10 +50,10 @@ export function ClientTableInterface() {
 					variant="scrollable"
 					scrollButtons="auto"
 				>
-					{mockTables.map((table, index) => (
+					{tables.map((table, index) => (
 						<Tab
 							key={table.id}
-							label={`${table.name} (${table.players} players)`}
+							label={`${table.id} (N/A players)`}
 							id={`table-tab-${index}`}
 							aria-controls={`table-tabpanel-${index}`}
 						/>
@@ -64,15 +61,17 @@ export function ClientTableInterface() {
 				</Tabs>
 			</Box>
 
-			{mockTables.map((table, index) => (
-				<TabPanel key={table.id} value={currentTable} index={index}>
-					<Box className="flex min-h-[400px] w-full items-center justify-center rounded-lg bg-green-800">
-						<Typography color="white">
-							Poker Table {table.id} - {table.players} players
-						</Typography>
-					</Box>
-				</TabPanel>
-			))}
-		</Paper>
+			<Box className="flex-1">
+				{tables.map((table, index) => (
+					<TabPanel key={table.id} value={currentTable} index={index}>
+						<Game
+							playerState={
+								playerStates.find((state) => state.publicTable.id === table.id)!
+							}
+						/>
+					</TabPanel>
+				))}
+			</Box>
+		</Box>
 	);
 }

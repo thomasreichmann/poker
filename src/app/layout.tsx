@@ -1,8 +1,7 @@
-import { AppBar, Button, Toolbar } from "@mui/material";
 import { type Metadata } from "next";
 import { Roboto } from "next/font/google";
-import Link from "next/link";
 import "~/styles/globals.css";
+import DevDashboard from "./_components/DevDashboard";
 import Providers from "./_components/Providers";
 
 const roboto = Roboto({
@@ -16,25 +15,12 @@ export const metadata: Metadata = {
 	icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-const navItems = [
-	{ label: "Home", href: "/" },
-	{ label: "Game", href: "/game" },
-];
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
 	return (
 		<html lang="en" className={roboto.className}>
 			<body>
 				<Providers>
-					<AppBar position="static">
-						<Toolbar>
-							{navItems.map(({ label, href }) => (
-								<Link key={href} href={href} prefetch={true}>
-									<Button>{label}</Button>
-								</Link>
-							))}
-						</Toolbar>
-					</AppBar>
+					<DevDashboard />
 					{children}
 				</Providers>
 			</body>

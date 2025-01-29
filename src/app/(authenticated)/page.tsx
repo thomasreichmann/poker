@@ -6,9 +6,9 @@ import {
 	Paper,
 	Typography,
 } from "@mui/material";
+import PublicTables from "~/app/_components/PublicTables";
+import Realtime from "~/app/_components/Realtime";
 import { createClient } from "~/supabase/server";
-import PublicTables from "./_components/PublicTables";
-import Realtime from "./_components/Realtime";
 
 const supabase = createClient();
 

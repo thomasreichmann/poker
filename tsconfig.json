@@ -36,7 +36,8 @@
 		"**/*.tsx",
 		"**/*.cjs",
 		"**/*.js",
-		".next/types/**/*.ts"
+		".next/types/**/*.ts",
+		"src/app/login/oldlay.tsx"
 	],
 	"exclude": ["node_modules"]
 }

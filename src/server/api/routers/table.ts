@@ -1,4 +1,4 @@
-import { and, eq, getTableColumns, sql } from "drizzle-orm";
+import { and, eq, getTableColumns, max, sql } from "drizzle-orm";
 import { z } from "zod";
 import { privatePlayerState, publicTables } from "~/server/db/schema";
 import { createTRPCRouter, privateProcedure, publicProcedure } from "../trpc";
@@ -22,39 +22,59 @@ export const tableRouter = createTRPCRouter({
 				),
 			);
 	}),
-	create: publicProcedure
-		.mutation(async ({ ctx }) => {
-			return await ctx.db.insert(publicTables).values({
+	getWithPlayers: publicProcedure
+		.input(z.object({ tableId: z.number() }))
+		.query(async ({ ctx, input }) => {
+			return await ctx.db.query.publicTables.findFirst({
+				with: {
+					privatePlayerState: true,
+				},
+				where: (publicTable, { eq }) => eq(publicTable.id, input.tableId),
+			});
+		}),
+	create: publicProcedure.mutation(async ({ ctx }) => {
+		return await ctx.db
+			.insert(publicTables)
+			.values({
 				pot: 0,
 				currentTurn: 0,
-				button: 0
-			}).returning();
-		}),
-	join: privateProcedure.input(z.object({ tableId: z.number() })).mutation(async ({ ctx, input }) => {
-		try {
+				button: 0,
+			})
+			.returning();
+	}),
+	join: privateProcedure
+		.input(z.object({ tableId: z.number() }))
+		.mutation(async ({ ctx, input }) => {
+			const maxPositionResult = await ctx.db
+				.select({ maxPosition: sql<number>`COALESCE(MAX(position), -1)` })
+				.from(privatePlayerState)
+				.where(eq(privatePlayerState.tableId, input.tableId));
+
+			const newPosition = (maxPositionResult[0]?.maxPosition ?? -1) + 1;
+
 			return await ctx.db.insert(privatePlayerState).values({
-				userId: ctx.user.id,
 				tableId: input.tableId,
-			}).returning();
-		} catch (error) {
-			throw error;
-		}
-	}),
-	leave: privateProcedure.input(z.object({ tableId: z.number() })).mutation(async ({ ctx, input }) => {
-		try {
-			return await ctx.db
-				.delete(privatePlayerState)
-				.where(
-					and(
-						eq(privatePlayerState.userId, ctx.user.id),
-						eq(privatePlayerState.tableId, input.tableId)
+				userId: ctx.user.id,
+				position: newPosition,
+			});
+		}),
+	leave: privateProcedure
+		.input(z.object({ tableId: z.number() }))
+		.mutation(async ({ ctx, input }) => {
+			try {
+				return await ctx.db
+					.delete(privatePlayerState)
+					.where(
+						and(
+							eq(privatePlayerState.userId, ctx.user.id),
+							eq(privatePlayerState.tableId, input.tableId),
+						),
 					)
-				)
-				.returning();
-		} catch (error) {
-			throw error;
-		}
-	}),
+					.returning();
+			} catch (error) {
+				throw error;
+			}
+		}),
 });
 
 export const oldTableRouter = createTRPCRouter({
@@ -103,11 +123,20 @@ export const oldTableRouter = createTRPCRouter({
 	joinTable: privateProcedure
 		.input(z.object({ tableId: z.number() }))
 		.mutation(async ({ ctx, input }) => {
+			// First, find the highest position currently used at this table
+			const result = await ctx.db
+				.select({ maxPosition: max(privatePlayerState.position) })
+				.from(privatePlayerState)
+				.where(eq(privatePlayerState.tableId, input.tableId));
+
+			const nextPosition = (result[0]?.maxPosition ?? -1) + 1;
+
 			return await ctx.db
 				.insert(privatePlayerState)
 				.values({
 					userId: ctx.user.id,
 					tableId: input.tableId,
+					position: nextPosition,
 				})
 				.returning();
 		}),
