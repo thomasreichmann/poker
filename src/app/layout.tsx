@@ -1,7 +1,6 @@
 import { type Metadata } from "next";
 import { Roboto } from "next/font/google";
 import "~/styles/globals.css";
-import DevDashboard from "./_components/DevDashboard";
 import Providers from "./_components/Providers";
 
 const roboto = Roboto({
@@ -20,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 		<html lang="en" className={roboto.className}>
 			<body>
 				<Providers>
-					<DevDashboard />
+					{/* <DevDashboard /> */}
 					{children}
 				</Providers>
 			</body>

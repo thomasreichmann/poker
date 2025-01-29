@@ -1,5 +1,6 @@
-import { AppBar, Button, Toolbar } from "@mui/material";
+import { AppBar, Box, Button, Toolbar } from "@mui/material";
 import Link from "next/link";
+import SignOutButton from "~/app/_components/SignOutButton";
 import Providers from "../_components/Providers";
 
 const navItems = [
@@ -12,11 +13,16 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
 		<Providers>
 			<AppBar position="static">
 				<Toolbar>
-					{navItems.map(({ label, href }) => (
-						<Link key={href} href={href} prefetch={true}>
-							<Button>{label}</Button>
-						</Link>
-					))}
+					<Box className="flex grow gap-2">
+						{navItems.map(({ label, href }) => (
+							<Link key={href} href={href} prefetch={true}>
+								<Button>{label}</Button>
+							</Link>
+						))}
+					</Box>
+					<Box className="flex grow-0">
+						<SignOutButton />
+					</Box>
 				</Toolbar>
 			</AppBar>
 			{children}
