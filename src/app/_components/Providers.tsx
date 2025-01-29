@@ -10,7 +10,7 @@ import { theme } from "./theme";
 const Providers = React.memo(({ children }: { children: React.ReactNode }) => {
 	return (
 		<TRPCReactProvider>
-			<AppRouterCacheProvider>
+			<AppRouterCacheProvider options={{ enableCssLayer: true }}>
 				<ThemeProvider theme={theme}>
 					<ErrorBoundary fallback={<p>Error</p>}>
 						<CssBaseline />
