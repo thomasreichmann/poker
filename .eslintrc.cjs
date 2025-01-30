@@ -23,10 +23,11 @@ const config = {
 		"@typescript-eslint/no-unused-vars": [
 			"warn",
 			{
-				argsIgnorePattern: "^_",
+				argsIgnorePattern: "^_|^(props|ctx)$",
 			},
 		],
 		"@typescript-eslint/require-await": "off",
+		"@typescript-eslint/no-empty-object-type": "off",
 		"@typescript-eslint/no-misused-promises": [
 			"error",
 			{

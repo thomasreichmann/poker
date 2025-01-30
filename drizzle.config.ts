@@ -1,11 +1,14 @@
 import { type Config } from "drizzle-kit";
 
-import { env } from "~/env";
+import { loadEnvConfig } from "@next/env";
+
+const projectDir = process.cwd();
+loadEnvConfig(projectDir);
 
 export default {
 	schema: "./src/server/db/schema.ts",
 	dialect: "postgresql",
 	dbCredentials: {
-		url: env.DATABASE_URL,
+		url: process.env.DATABASE_URL!,
 	},
 } satisfies Config;

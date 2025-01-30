@@ -6,12 +6,12 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { db } from "~/server/db";
-
+import { createClient } from "~/supabase/server";
 /**
  * 1. CONTEXT
  *
@@ -25,8 +25,15 @@ import { db } from "~/server/db";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
+	const supabase = createClient();
+
+	const { data, error } = await supabase.auth.getUser();
+	if (error) throw error;
+	const user = data.user;
+
 	return {
 		db,
+		user,
 		...opts,
 	};
 };
@@ -81,7 +88,7 @@ export const createTRPCRouter = t.router;
 const timingMiddleware = t.middleware(async ({ next, path }) => {
 	const start = Date.now();
 
-	if (t._config.isDev) {
+	if (t._config.isDev && path == "not_in_use") {
 		// artificial delay in dev
 		const waitMs = Math.floor(Math.random() * 400) + 100;
 		await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -90,6 +97,11 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
 	const result = await next();
 
 	const end = Date.now();
+	// Prevent logging if the procedure is the test 'sanity' procedure
+	// this is not really a test and more of a sanity check, because for some reason without it
+	// SSR fails to render the page
+	if (path == "sanity.hello") return result;
+
 	console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
 
 	return result;
@@ -103,3 +115,20 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
  * are logged in.
  */
 export const publicProcedure = t.procedure.use(timingMiddleware);
+
+/**
+ * Private (authenticated) procedure using supabase auth
+ *
+ * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
+ * guarantee that a user querying is authorized, but you can still access user session data if they
+ * are logged in.
+ */
+
+const protectedMiddleware = t.middleware(async ({ ctx, next }) => {
+	if (!ctx.user) {
+		throw new TRPCError({ code: "UNAUTHORIZED" });
+	}
+	return next();
+});
+
+export const privateProcedure = t.procedure.use(protectedMiddleware);

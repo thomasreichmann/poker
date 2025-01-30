@@ -1,16 +1,8 @@
 import { type Metadata } from "next";
-import "~/styles/globals.css";
-
-import { TRPCReactProvider } from "~/trpc/react";
-
-import { CssBaseline, ThemeProvider } from "@mui/material";
-import { AppRouterCacheProvider } from "@mui/material-nextjs/v14-appRouter";
-import React from "react";
-import { theme } from "~/app/_components/theme";
-
 import { Roboto } from "next/font/google";
-import { ErrorBoundary } from "react-error-boundary";
-import { api } from "~/trpc/server";
+import DevDashboard from "~/app/_components/DevDashboard";
+import "~/styles/globals.css";
+import Providers from "./_components/Providers";
 
 const roboto = Roboto({
 	weight: ["300", "400", "500", "700"],
@@ -23,22 +15,14 @@ export const metadata: Metadata = {
 	icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-	await api.sanity.hello();
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
 	return (
 		<html lang="en" className={roboto.className}>
 			<body>
-				<TRPCReactProvider>
-					<AppRouterCacheProvider>
-						<ThemeProvider theme={theme}>
-							<ErrorBoundary fallback={<p>Error</p>}>
-								<CssBaseline />
-								{children}
-							</ErrorBoundary>
-						</ThemeProvider>
-					</AppRouterCacheProvider>
-				</TRPCReactProvider>
+				<Providers>
+					<DevDashboard />
+					{children}
+				</Providers>
 			</body>
 		</html>
 	);
