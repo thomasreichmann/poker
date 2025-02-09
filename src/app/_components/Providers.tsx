@@ -12,7 +12,7 @@ const Providers = React.memo(({ children }: { children: React.ReactNode }) => {
 		<TRPCReactProvider>
 			<AppRouterCacheProvider options={{ enableCssLayer: true }}>
 				<ThemeProvider theme={theme}>
-					<ErrorBoundary fallback={<p>Error</p>}>
+					<ErrorBoundary fallback={<p>Error from error boundary</p>}>
 						<CssBaseline />
 						{children}
 					</ErrorBoundary>
