@@ -14,6 +14,33 @@ export const adminRouter = createTRPCRouter({
 
 		return data.users;
 	}),
+	loginAsUser: devProcedure
+		.input(
+			z.object({
+				email: z.string(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			const { data, error } = await supabase.auth.admin.generateLink({
+				email: input.email,
+				type: "magiclink",
+			});
+
+			if (error) {
+				throw new Error("Failed to generate link", { cause: error });
+			}
+
+			const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
+				token_hash: data.properties.hashed_token,
+				type: "email",
+			});
+
+			if (sessionError || !sessionData.session) {
+				throw new Error("Failed to verify link", { cause: sessionError });
+			}
+
+			return sessionData.session;
+		}),
 	getMagicLink: devProcedure
 		.input(
 			z.object({

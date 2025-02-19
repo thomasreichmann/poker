@@ -1,6 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { env } from "~/env";
 
 export async function updateSession(request: NextRequest) {
 	let supabaseResponse = NextResponse.next({
@@ -41,7 +40,7 @@ export async function updateSession(request: NextRequest) {
 		!user &&
 		!request.nextUrl.pathname.startsWith("/login") &&
 		!request.nextUrl.pathname.startsWith("/auth") &&
-		!(env.APP_ENV === "local" || env.APP_ENV === "development")
+		!request.nextUrl.pathname.startsWith("/api/trpc/admin.loginAsUser")
 	) {
 		// no user, potentially respond by redirecting the user to the login page
 		const url = request.nextUrl.clone();
