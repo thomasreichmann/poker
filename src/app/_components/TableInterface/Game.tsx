@@ -21,7 +21,7 @@ const ActionButton = styled((props: ButtonProps) => <Button fullWidth {...props}
 
 export default function Game({ playerState }: GameProps) {
 	return (
-		<Card elevation={3}>
+		<Card elevation={4}>
 			<CardHeader title={`Game ${playerState.publicTable.id}`} />
 			<CardContent>
 				<Typography variant="h6">Pot: {playerState.publicTable.pot}</Typography>

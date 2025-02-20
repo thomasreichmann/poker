@@ -9,6 +9,7 @@ interface TabPanelProps {
 	children?: React.ReactNode;
 	index: number;
 	value: number;
+	className?: string;
 }
 
 function TabPanel(props: TabPanelProps) {
@@ -20,10 +21,14 @@ function TabPanel(props: TabPanelProps) {
 			hidden={value !== index}
 			id={`table-tabpanel-${index}`}
 			aria-labelledby={`table-tab-${index}`}
+			className={`flex flex-col ${value === index ? "h-full" : ""}`}
 			{...other}
 		>
 			{value === index && (
-				<Paper elevation={2} className="flex justify-center p-4">
+				<Paper
+					elevation={2}
+					className={`flex h-full flex-col items-center justify-center p-3 ${props.className}`}
+				>
 					{children}
 				</Paper>
 			)}
@@ -41,7 +46,7 @@ export function ClientTableInterface() {
 	};
 
 	return (
-		<Box className="flex flex-col">
+		<Box className="flex grow flex-col">
 			<Box sx={{ borderBottom: 1, borderColor: "divider" }}>
 				<Tabs
 					value={currentTable}
@@ -61,17 +66,15 @@ export function ClientTableInterface() {
 				</Tabs>
 			</Box>
 
-			<Box className="flex-1">
-				{tables.map((table, index) => (
-					<TabPanel key={table.id} value={currentTable} index={index}>
-						<Game
-							playerState={
-								playerStates.find((state) => state.publicTable.id === table.id)!
-							}
-						/>
-					</TabPanel>
-				))}
-			</Box>
+			{tables.map((table, index) => (
+				<TabPanel key={table.id} value={currentTable} index={index}>
+					<Game
+						playerState={
+							playerStates.find((state) => state.publicTable.id === table.id)!
+						}
+					/>
+				</TabPanel>
+			))}
 		</Box>
 	);
 }

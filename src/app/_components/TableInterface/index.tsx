@@ -23,7 +23,7 @@ export default function TableInterface() {
 
 	return (
 		<HydrateClient>
-			<Paper elevation={1} className="m-5 flex-1 p-5">
+			<Paper elevation={1} className="m-5 flex h-full flex-col p-5">
 				<Typography variant="h4" className="mb-4">
 					Poker Tables
 				</Typography>
