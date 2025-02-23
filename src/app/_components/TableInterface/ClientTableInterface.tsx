@@ -39,6 +39,7 @@ function TabPanel(props: TabPanelProps) {
 export function ClientTableInterface() {
 	const [currentTable, setCurrentTable] = useState(0);
 	const [playerStates] = api.player.tables.useSuspenseQuery();
+	const [tableViews] = api.player.playerViews.useSuspenseQuery();
 	const tables = playerStates.map((state) => state.publicTable);
 
 	const handleTableChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -72,6 +73,7 @@ export function ClientTableInterface() {
 						playerState={
 							playerStates.find((state) => state.publicTable.id === table.id)!
 						}
+						tableView={tableViews.find((view) => view.id === table.id)!}
 					/>
 				</TabPanel>
 			))}

@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
 	bigint,
+	boolean,
 	doublePrecision,
 	foreignKey,
 	integer,
@@ -21,9 +22,9 @@ const users = authSchema.table("users", {
 export const publicTables = pgTable("public_tables", {
 	id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
-	pot: doublePrecision("pot").default(0),
-	currentTurn: smallint("current_turn").default(0),
-	button: smallint("button").default(0),
+	pot: doublePrecision("pot").default(0).notNull(),
+	currentTurn: smallint("current_turn").default(0).notNull(),
+	button: smallint("button").default(0).notNull(),
 });
 
 export type SelectPublicTable = typeof publicTables.$inferSelect;
@@ -60,6 +61,7 @@ export const privatePlayerState = pgTable(
 		createdAt: timestamp("created_at").defaultNow().notNull(),
 		hand: integer("hand").array(),
 		position: smallint("position").notNull(),
+		folded: boolean("folded").default(false),
 	},
 	(table) => {
 		return [

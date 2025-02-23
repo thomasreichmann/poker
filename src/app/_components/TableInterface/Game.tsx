@@ -11,15 +11,40 @@ import {
 	styled,
 	Typography,
 } from "@mui/material";
+import { useState } from "react";
+import { type Action } from "~/server/api/routers/player/action";
+import { type PlayerView } from "~/server/api/routers/player/player";
 import { type SelectPrivatePlayerStateWithTable } from "~/server/db/schema";
+import { api } from "~/trpc/react";
 
 export interface GameProps {
 	playerState: SelectPrivatePlayerStateWithTable;
+	tableView: PlayerView;
 }
 
 const ActionButton = styled((props: ButtonProps) => <Button fullWidth {...props} />)({});
+export default function Game({ playerState, tableView }: GameProps) {
+	const utils = api.useUtils();
+	const mutation = api.player.action.act.useMutation({
+		onSuccess: () => {
+			void utils.player.tables.invalidate();
+		},
+	});
 
-export default function Game({ playerState }: GameProps) {
+	const [lastResult, setLastResult] = useState<string | null>(null);
+
+	const handleAct = async (actionData: Action) => {
+		const result = await mutation.mutateAsync({
+			tableId: playerState.publicTable.id,
+			...actionData,
+		});
+		setLastResult(result);
+	};
+
+	const currentPlayer = (table: PlayerView) => {
+		return "123";
+	};
+
 	return (
 		<Card elevation={4}>
 			<CardHeader title={`Game ${playerState.publicTable.id}`} />
@@ -30,17 +55,34 @@ export default function Game({ playerState }: GameProps) {
 				</Typography>
 				<Typography variant="h6">Your seat: {playerState.position}</Typography>
 				<Typography variant="h6">Button: {playerState.publicTable.button}</Typography>
+				<Typography variant="h6">Current Player: {currentPlayer(tableView)}</Typography>
+				{lastResult && <Typography variant="h6">{lastResult}</Typography>}
 			</CardContent>
 			<CardActions>
 				<Grid2 container spacing={2}>
 					<Grid2 size={6}>
-						<ActionButton variant="contained">Check</ActionButton>
+						<ActionButton
+							variant="contained"
+							onClick={() => handleAct({ action: "check" })}
+						>
+							Check
+						</ActionButton>
 					</Grid2>
 					<Grid2 size={6}>
-						<ActionButton variant="contained">Bet</ActionButton>
+						<ActionButton
+							variant="contained"
+							onClick={() => handleAct({ action: "bet", amount: 10 })}
+						>
+							Bet
+						</ActionButton>
 					</Grid2>
 					<Grid2 size={12}>
-						<ActionButton variant="contained">Fold</ActionButton>
+						<ActionButton
+							variant="contained"
+							onClick={() => handleAct({ action: "fold" })}
+						>
+							Fold
+						</ActionButton>
 					</Grid2>
 				</Grid2>
 			</CardActions>

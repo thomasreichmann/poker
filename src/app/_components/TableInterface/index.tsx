@@ -20,6 +20,7 @@ function LoadingSkeleton() {
 
 export default function TableInterface() {
 	void api.player.tables.prefetch();
+	void api.player.playerViews.prefetch();
 
 	return (
 		<HydrateClient>

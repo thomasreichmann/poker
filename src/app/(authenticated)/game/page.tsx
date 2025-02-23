@@ -1,12 +1,9 @@
-import { Suspense } from "react";
 import TableInterface from "~/app/_components/TableInterface";
 
 export default function GamePage() {
 	return (
 		<main className="flex h-full flex-col">
-			<Suspense fallback={<LoadingSkeleton />}>
-				<TableInterface />
-			</Suspense>
+			<TableInterface />
 		</main>
 	);
 }

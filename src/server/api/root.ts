@@ -1,6 +1,6 @@
 import { createCallerFactory, createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 import { adminRouter } from "./routers/admin";
-import { playerRouter } from "./routers/player";
+import { playerRouter } from "./routers/player/player";
 import { oldTableRouter, tableRouter } from "./routers/table";
 export const sanityRouter = createTRPCRouter({
 	hello: publicProcedure.query(async () => {
