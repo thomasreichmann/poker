@@ -5,13 +5,17 @@ import {
 	doublePrecision,
 	foreignKey,
 	integer,
+	pgEnum,
 	pgSchema,
 	pgTable,
 	smallint,
+	text,
 	timestamp,
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
+
+export const actions = pgEnum("actions", ["fold", "call", "bet", "check"]);
 
 const authSchema = pgSchema("auth");
 
@@ -22,9 +26,16 @@ const users = authSchema.table("users", {
 export const publicTables = pgTable("public_tables", {
 	id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
 	createdAt: timestamp("created_at").defaultNow().notNull(),
+	seatCount: smallint("seat_count").default(9).notNull(),
 	pot: doublePrecision("pot").default(0).notNull(),
 	currentTurn: smallint("current_turn").default(0).notNull(),
 	button: smallint("button").default(0).notNull(),
+	actions: actions().array().notNull(),
+	bets: doublePrecision("bets").array().notNull(),
+	stacks: doublePrecision("stacks").array().notNull(),
+	communityCards: text("community_cards").array().notNull(),
+	smallBlind: doublePrecision("small_blind").default(0).notNull(),
+	bigBlind: doublePrecision("big_blind").default(0).notNull(),
 });
 
 export type SelectPublicTable = typeof publicTables.$inferSelect;

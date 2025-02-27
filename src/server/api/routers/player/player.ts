@@ -19,6 +19,8 @@ export const playerRouter = createTRPCRouter({
 					where: (pPlayerState, { eq }) => eq(pPlayerState.tableId, publicTables.id),
 					columns: {
 						userId: true,
+						folded: true,
+						position: true,
 					},
 				},
 			},
