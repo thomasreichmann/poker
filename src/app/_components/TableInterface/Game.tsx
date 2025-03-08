@@ -57,6 +57,27 @@ export default function Game({ playerState, tableView }: GameProps) {
 				<Typography variant="h6">Button: {playerState.publicTable.button}</Typography>
 				<Typography variant="h6">Current Player: {currentPlayer(tableView)}</Typography>
 				{lastResult && <Typography variant="h6">{lastResult}</Typography>}
+				<Typography variant="h6">
+					Community Cards: {playerState.publicTable.communityCards.join(", ")}
+				</Typography>
+				<Typography variant="h6">
+					Small Blind: {playerState.publicTable.smallBlind}
+				</Typography>
+				<Typography variant="h6">Big Blind: {playerState.publicTable.bigBlind}</Typography>
+				<Typography variant="h6">
+					Stacks:{" "}
+					{playerState.publicTable.stacks.map((stack, i) => (
+						<Typography key={i} component="span">
+							{i > 0 && ", "}
+							<Typography
+								color={i === playerState.position ? "primary" : "inherit"}
+								component="span"
+							>
+								{stack}
+							</Typography>
+						</Typography>
+					))}
+				</Typography>
 			</CardContent>
 			<CardActions>
 				<Grid2 container spacing={2}>
@@ -71,7 +92,7 @@ export default function Game({ playerState, tableView }: GameProps) {
 					<Grid2 size={6}>
 						<ActionButton
 							variant="contained"
-							onClick={() => handleAct({ action: "bet", amount: 10 })}
+							onClick={() => handleAct({ action: "bet", amount: 100 })}
 						>
 							Bet
 						</ActionButton>

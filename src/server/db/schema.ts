@@ -14,8 +14,10 @@ import {
 	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
+import { z } from "zod";
 
 export const actions = pgEnum("actions", ["fold", "call", "bet", "check"]);
+export const ActionsEnum = z.enum(actions.enumValues);
 
 const authSchema = pgSchema("auth");
 

@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { and, eq, getTableColumns, max, sql } from "drizzle-orm";
 import { z } from "zod";
 import { privatePlayerState, publicTables } from "~/server/db/schema";
@@ -39,6 +40,13 @@ export const tableRouter = createTRPCRouter({
 				pot: 0,
 				currentTurn: 0,
 				button: 0,
+				seatCount: 9,
+				actions: Array(9).fill(null),
+				bets: Array(9).fill(0),
+				stacks: Array(9).fill(null),
+				communityCards: Array(5).fill(null),
+				smallBlind: 10,
+				bigBlind: 20,
 			})
 			.returning();
 	}),
@@ -52,11 +60,29 @@ export const tableRouter = createTRPCRouter({
 
 			const newPosition = (maxPositionResult[0]?.maxPosition ?? -1) + 1;
 
-			return await ctx.db.insert(privatePlayerState).values({
+			await ctx.db.insert(privatePlayerState).values({
 				tableId: input.tableId,
 				userId: ctx.user.id,
 				position: newPosition,
 			});
+
+			// update the stack of the new player
+			const publicTable = await ctx.db.query.publicTables.findFirst({
+				where: (publicTable, { eq }) => eq(publicTable.id, input.tableId),
+			});
+
+			if (!publicTable) {
+				throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Table not found" });
+			}
+
+			await ctx.db
+				.update(publicTables)
+				.set({
+					stacks: publicTable.stacks.map((stack, index) =>
+						index === newPosition ? 1000 : stack,
+					),
+				})
+				.where(eq(publicTables.id, input.tableId));
 		}),
 	leave: privateProcedure
 		.input(z.object({ tableId: z.number() }))

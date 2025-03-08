@@ -22,5 +22,4 @@ async function DevDashboard() {
 		</DevDashboardModal>
 	);
 }
-
 export default withDevOnly(DevDashboard);
