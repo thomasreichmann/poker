@@ -179,7 +179,7 @@ export default function Game({ playerState, tableView }: GameProps) {
 				</TableContainer>
 			</CardContent>
 			<CardActions>
-				<Grid2 container spacing={2}>
+				<Grid2 container spacing={2} className="w-full">
 					<Grid2 size={6}>
 						<ActionButton
 							variant="contained"

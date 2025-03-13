@@ -71,7 +71,7 @@ function getNextPlayerPosition(table: Table): number {
 	while (nextIndex !== startIndex) {
 		if (!sortedPlayers[nextIndex]?.folded) {
 			const position = sortedPlayers[nextIndex]?.position;
-			if (!position) {
+			if (position === undefined) {
 				throw new TRPCError({
 					code: "INTERNAL_SERVER_ERROR",
 					message: "Player position not found",
@@ -83,7 +83,7 @@ function getNextPlayerPosition(table: Table): number {
 
 	if (!sortedPlayers[startIndex]?.folded) {
 		const position = sortedPlayers[startIndex]?.position;
-		if (!position) {
+		if (position === undefined) {
 			throw new TRPCError({
 				code: "INTERNAL_SERVER_ERROR",
 				message: "Player position not found",
@@ -101,19 +101,6 @@ export const actionRouter = createTRPCRouter({
 		.mutation(async ({ ctx, input }) => {
 			switch (input.action) {
 				case ActionsEnum.enum.bet:
-					/**
-					 * A Bet will be a raise if the amount is greater than the highest bet in the table + 1 BB
-					 * A Bet will be a call if the amount is equal to the highest bet in the table
-					 * A Bet will be a check if the ammount is equal to 0 and the table bet is 0
-					 */
-
-					/**
-					 * 1. Verify if player's stack is enough to bet the amount
-					 * 2. Verify if bet is valid, it must either be, 0 (but only if the table bet is 0)
-					 * or the ammount is equal to the table bet, or the ammount is greater than the table bet + 1 BB
-					 * 3. Update the table bet, and the player's stack, and the seat's bet
-					 */
-
 					const table = await getTable(ctx, input.tableId);
 					const player = getPlayer(table, ctx.user.id);
 
@@ -162,8 +149,12 @@ export const actionRouter = createTRPCRouter({
 						await ctx.db
 							.update(publicTables)
 							.set({
-								actions: table.actions.map((action, index) =>
-									index === player.position ? action : action,
+								actions: table.actions.map((oldAction, index) =>
+									index === player.position
+										? action
+										: (oldAction as string) === "NULL"
+											? null!
+											: oldAction,
 								),
 								bets: table.bets.map((bet, index) =>
 									index === player.position ? input.amount : bet,
@@ -199,8 +190,8 @@ export const actionRouter = createTRPCRouter({
 							await ctx.db
 								.update(publicTables)
 								.set({
-									actions: [],
-									bets: [],
+									actions: Array(updatedTable.seatCount).fill(null),
+									bets: Array(updatedTable.seatCount).fill(null),
 								})
 								.where(eq(publicTables.id, updatedTable.id))
 								.returning()

@@ -12,7 +12,7 @@ function DevDashboardModal({ children }: { children: React.ReactNode }) {
 	useCheatCode(cheatCode, () => setIsOpen(true));
 
 	return (
-		<ModalBase open={isOpen} showCloseButton>
+		<ModalBase open={isOpen} showCloseButton onClose={() => setIsOpen(false)}>
 			{children}
 		</ModalBase>
 	);

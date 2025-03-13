@@ -22,8 +22,9 @@ function UserActions({ user }: { user: User }) {
 				access_token: data.access_token,
 				refresh_token: data.refresh_token,
 			});
-
-			router.push("/");
+			if (window.location.pathname === "/login") {
+				router.push("/");
+			}
 			router.refresh();
 		},
 	});

@@ -1,6 +1,5 @@
 import { eq } from "drizzle-orm";
 import { actionRouter } from "~/server/api/routers/player/action";
-import { publicTables } from "~/server/db/schema";
 import { createTRPCRouter, privateProcedure } from "../../trpc";
 
 export const playerRouter = createTRPCRouter({
@@ -16,7 +15,9 @@ export const playerRouter = createTRPCRouter({
 		const tables = await ctx.db.query.publicTables.findMany({
 			with: {
 				privatePlayerState: {
-					where: (pPlayerState, { eq }) => eq(pPlayerState.tableId, publicTables.id),
+					with: {
+						user: true,
+					},
 					columns: {
 						userId: true,
 						folded: true,

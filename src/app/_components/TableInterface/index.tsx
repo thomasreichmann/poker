@@ -1,4 +1,4 @@
-import { Box, Paper, Skeleton, Typography } from "@mui/material";
+import { Box, Paper, Skeleton } from "@mui/material";
 import { Suspense } from "react";
 import { api, HydrateClient } from "~/trpc/server";
 import { ClientTableInterface } from "./ClientTableInterface";
@@ -25,9 +25,6 @@ export default function TableInterface() {
 	return (
 		<HydrateClient>
 			<Paper elevation={1} className="m-5 flex h-full flex-col p-5">
-				<Typography variant="h4" className="mb-4">
-					Poker Tables
-				</Typography>
 				<Suspense fallback={<LoadingSkeleton />}>
 					<ClientTableInterface />
 				</Suspense>

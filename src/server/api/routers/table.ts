@@ -42,9 +42,9 @@ export const tableRouter = createTRPCRouter({
 				button: 0,
 				seatCount: 9,
 				actions: Array(9).fill(null),
-				bets: Array(9).fill(0),
+				bets: Array(9).fill(null),
 				stacks: Array(9).fill(null),
-				communityCards: Array(5).fill(null),
+				communityCards: [],
 				smallBlind: 10,
 				bigBlind: 20,
 			})

@@ -21,8 +21,9 @@ export const ActionsEnum = z.enum(actions.enumValues);
 
 const authSchema = pgSchema("auth");
 
-const users = authSchema.table("users", {
+export const users = authSchema.table("users", {
 	id: uuid("id").primaryKey(),
+	email: text("email").notNull(),
 });
 
 export const publicTables = pgTable("public_tables", {
@@ -106,6 +107,10 @@ export type SelectPrivatePlayerStateWithTable = typeof privatePlayerState.$infer
 };
 
 export const privatePlayerStateRelations = relations(privatePlayerState, ({ one }) => ({
+	user: one(users, {
+		fields: [privatePlayerState.userId],
+		references: [users.id],
+	}),
 	publicTable: one(publicTables, {
 		fields: [privatePlayerState.tableId],
 		references: [publicTables.id],
