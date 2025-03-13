@@ -1,14 +1,23 @@
 "use client";
 
 import {
+	Box,
 	Button,
 	type ButtonProps,
 	Card,
 	CardActions,
 	CardContent,
 	CardHeader,
+	Chip,
 	Grid2,
+	Paper,
 	styled,
+	Table,
+	TableBody,
+	TableCell,
+	TableContainer,
+	TableHead,
+	TableRow,
 	Typography,
 } from "@mui/material";
 import { useState } from "react";
@@ -23,6 +32,20 @@ export interface GameProps {
 }
 
 const ActionButton = styled((props: ButtonProps) => <Button fullWidth {...props} />)({});
+
+const CommunityCard = styled(Chip)({
+	margin: "0 4px",
+	fontWeight: "bold",
+	fontSize: "1rem",
+	height: "36px",
+	minWidth: "48px",
+});
+
+const InfoChip = styled(Chip)({
+	height: "32px",
+	fontSize: "1rem",
+});
+
 export default function Game({ playerState, tableView }: GameProps) {
 	const utils = api.useUtils();
 	const mutation = api.player.action.act.useMutation({
@@ -38,7 +61,7 @@ export default function Game({ playerState, tableView }: GameProps) {
 			tableId: playerState.publicTable.id,
 			...actionData,
 		});
-		setLastResult(result);
+		setLastResult(JSON.stringify(result));
 	};
 
 	const currentPlayer = (table: PlayerView) => {
@@ -49,35 +72,111 @@ export default function Game({ playerState, tableView }: GameProps) {
 		<Card elevation={4}>
 			<CardHeader title={`Game ${playerState.publicTable.id}`} />
 			<CardContent>
-				<Typography variant="h6">Pot: {playerState.publicTable.pot}</Typography>
-				<Typography variant="h6">
-					Current Turn: {playerState.publicTable.currentTurn}
-				</Typography>
-				<Typography variant="h6">Your seat: {playerState.position}</Typography>
-				<Typography variant="h6">Button: {playerState.publicTable.button}</Typography>
-				<Typography variant="h6">Current Player: {currentPlayer(tableView)}</Typography>
-				{lastResult && <Typography variant="h6">{lastResult}</Typography>}
-				<Typography variant="h6">
-					Community Cards: {playerState.publicTable.communityCards.join(", ")}
-				</Typography>
-				<Typography variant="h6">
-					Small Blind: {playerState.publicTable.smallBlind}
-				</Typography>
-				<Typography variant="h6">Big Blind: {playerState.publicTable.bigBlind}</Typography>
-				<Typography variant="h6">
-					Stacks:{" "}
-					{playerState.publicTable.stacks.map((stack, i) => (
-						<Typography key={i} component="span">
-							{i > 0 && ", "}
-							<Typography
-								color={i === playerState.position ? "primary" : "inherit"}
-								component="span"
-							>
-								{stack}
-							</Typography>
-						</Typography>
-					))}
-				</Typography>
+				<TableContainer component={Paper} sx={{ mt: 2 }}>
+					<Table size="small">
+						<TableHead>
+							<TableRow>
+								<TableCell colSpan={4} sx={{ borderBottom: "none" }}>
+									<Box sx={{ display: "flex", justifyContent: "center" }}>
+										<InfoChip
+											label={`Pot: $${playerState.publicTable.pot.toLocaleString()}`}
+											color="success"
+											variant="filled"
+										/>
+									</Box>
+								</TableCell>
+							</TableRow>
+							<TableRow>
+								<TableCell
+									colSpan={4}
+									sx={{ borderBottom: "none", textAlign: "center" }}
+								>
+									<Box
+										sx={{
+											display: "flex",
+											justifyContent: "center",
+											gap: 1,
+											my: 1,
+										}}
+									>
+										{playerState.publicTable.communityCards.length === 0 ? (
+											<Typography variant="subtitle1" color="text.secondary">
+												No community cards
+											</Typography>
+										) : (
+											playerState.publicTable.communityCards.map(
+												(card, index) => (
+													<CommunityCard
+														key={index}
+														label={card}
+														color={
+															card.endsWith("♥") ||
+															card.endsWith("♦")
+																? "error"
+																: "default"
+														}
+														variant="filled"
+													/>
+												),
+											)
+										)}
+									</Box>
+								</TableCell>
+							</TableRow>
+							<TableRow>
+								<TableCell>Seat</TableCell>
+								<TableCell align="right">Stack</TableCell>
+								<TableCell align="right">Current Bet</TableCell>
+								<TableCell align="center">Position</TableCell>
+							</TableRow>
+						</TableHead>
+						<TableBody>
+							{playerState.publicTable.stacks.map((stack, i) => {
+								const isVacant = stack === null || Number.isNaN(stack);
+								return (
+									<TableRow
+										key={i}
+										sx={{
+											backgroundColor:
+												i === playerState.position
+													? "primary.main"
+													: i === playerState.publicTable.currentTurn
+														? "success.main"
+														: "inherit",
+											color:
+												i === playerState.position ||
+												i === playerState.publicTable.currentTurn
+													? "secondary.contrastText"
+													: isVacant
+														? "text.disabled"
+														: "inherit",
+											fontStyle: isVacant ? "italic" : "normal",
+										}}
+									>
+										<TableCell className="text-inherit">
+											{i}
+											{i === playerState.position && " (You)"}
+											{i === playerState.publicTable.currentTurn &&
+												" (Active)"}
+											{isVacant && " (Vacant)"}
+										</TableCell>
+										<TableCell className="text-inherit" align="right">
+											{isVacant ? "—" : `$${stack.toLocaleString()}`}
+										</TableCell>
+										<TableCell className="text-inherit" align="right">
+											{isVacant
+												? "—"
+												: `$${(playerState.publicTable.bets[i] ?? 0).toLocaleString()}`}
+										</TableCell>
+										<TableCell className="text-inherit" align="center">
+											{i === playerState.publicTable.button && "🎯 Button"}
+										</TableCell>
+									</TableRow>
+								);
+							})}
+						</TableBody>
+					</Table>
+				</TableContainer>
 			</CardContent>
 			<CardActions>
 				<Grid2 container spacing={2}>
