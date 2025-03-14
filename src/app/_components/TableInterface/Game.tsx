@@ -8,7 +8,9 @@ import {
 	CardActions,
 	CardContent,
 	CardHeader,
+	Checkbox,
 	Chip,
+	FormControlLabel,
 	Grid2,
 	Paper,
 	styled,
@@ -25,7 +27,7 @@ import { type Action } from "~/server/api/routers/player/action";
 import { type PlayerView } from "~/server/api/routers/player/player";
 import { type SelectPrivatePlayerStateWithTable } from "~/server/db/schema";
 import { api } from "~/trpc/react";
-
+import useDevGameActions from "../DevDashboard/useDevGameActions";
 export interface GameProps {
 	playerState: SelectPrivatePlayerStateWithTable;
 	tableView: PlayerView;
@@ -46,93 +48,136 @@ const InfoChip = styled(Chip)({
 	fontSize: "1rem",
 });
 
+function getNextPlayerPosition(table: PlayerView): number {
+	const players = table.privatePlayerState;
+	if (players.length === 0) return 0;
+
+	const sortedPlayers = [...players].sort((a, b) => a.position - b.position);
+	const currentIndex = sortedPlayers.findIndex((player) => player.position === table.currentTurn);
+	const startIndex = currentIndex >= 0 ? currentIndex : 0;
+	const nextIndex = (startIndex + 1) % sortedPlayers.length;
+
+	while (nextIndex !== startIndex) {
+		if (!sortedPlayers[nextIndex]?.folded) {
+			const position = sortedPlayers[nextIndex]?.position;
+			if (position === undefined) {
+				throw new Error("Player position not found");
+			}
+			return position;
+		}
+	}
+
+	if (!sortedPlayers[startIndex]?.folded) {
+		const position = sortedPlayers[startIndex]?.position;
+		if (position === undefined) {
+			throw new Error("Player position not found");
+		}
+		return position;
+	}
+
+	return 0;
+}
+
 export default function Game({ playerState, tableView }: GameProps) {
 	const utils = api.useUtils();
 	const mutation = api.player.action.act.useMutation({
 		onSuccess: () => {
 			void utils.player.tables.invalidate();
 		},
+		onError: (error) => {
+			if (error.message === "Not your turn") {
+				console.log("Not your turn");
+			}
+		},
 	});
 
-	const [lastResult, setLastResult] = useState<string | null>(null);
+	const { loginAsUser } = useDevGameActions();
+
+	const [devSwitchUserAfterAction, setDevSwitchUserAfterAction] = useState(true);
 
 	const handleAct = async (actionData: Action) => {
-		const result = await mutation.mutateAsync({
+		await mutation.mutateAsync({
 			tableId: playerState.publicTable.id,
 			...actionData,
 		});
-		setLastResult(JSON.stringify(result));
-	};
 
-	const currentPlayer = (table: PlayerView) => {
-		return "123";
+		if (devSwitchUserAfterAction) {
+			// Next player will be the one after the current player, or the first player if the current player is the last one
+			const nextPlayer = getNextPlayerPosition(tableView);
+			if (nextPlayer !== playerState.position) {
+				const nextPlayerEmail = tableView.privatePlayerState[nextPlayer]?.user.email;
+				if (nextPlayerEmail) {
+					await loginAsUser(nextPlayerEmail);
+				} else {
+					throw new Error("Next player email not found");
+				}
+			}
+		}
 	};
 
 	return (
 		<Card elevation={4}>
 			<CardHeader title={`Game ${playerState.publicTable.id}`} />
 			<CardContent>
-				<TableContainer component={Paper} sx={{ mt: 2 }}>
+				<Box className="mb-8 flex flex-col gap-4">
+					<Box className="flex justify-center gap-2">
+						<FormControlLabel
+							control={
+								<Checkbox
+									checked={devSwitchUserAfterAction}
+									onChange={(e) => setDevSwitchUserAfterAction(e.target.checked)}
+								/>
+							}
+							label="Switch user after action"
+						/>
+					</Box>
+					<Box className="flex justify-center">
+						<InfoChip
+							label={`Pot: $${playerState.publicTable.pot.toLocaleString()}`}
+							color="success"
+							variant="filled"
+						/>
+					</Box>
+					<Box className="flex justify-center gap-4">
+						{playerState.publicTable.communityCards.length === 0 ? (
+							<Typography variant="subtitle1" color="text.secondary">
+								No community cards
+							</Typography>
+						) : (
+							playerState.publicTable.communityCards.map((card, index) => (
+								<CommunityCard
+									key={index}
+									label={card}
+									color={
+										card.endsWith("♥") || card.endsWith("♦")
+											? "error"
+											: "default"
+									}
+									variant="filled"
+								/>
+							))
+						)}
+					</Box>
+				</Box>
+
+				<TableContainer component={Paper}>
 					<Table size="small">
 						<TableHead>
 							<TableRow>
-								<TableCell colSpan={4} sx={{ borderBottom: "none" }}>
-									<Box sx={{ display: "flex", justifyContent: "center" }}>
-										<InfoChip
-											label={`Pot: $${playerState.publicTable.pot.toLocaleString()}`}
-											color="success"
-											variant="filled"
-										/>
-									</Box>
-								</TableCell>
-							</TableRow>
-							<TableRow>
-								<TableCell
-									colSpan={4}
-									sx={{ borderBottom: "none", textAlign: "center" }}
-								>
-									<Box
-										sx={{
-											display: "flex",
-											justifyContent: "center",
-											gap: 1,
-											my: 1,
-										}}
-									>
-										{playerState.publicTable.communityCards.length === 0 ? (
-											<Typography variant="subtitle1" color="text.secondary">
-												No community cards
-											</Typography>
-										) : (
-											playerState.publicTable.communityCards.map(
-												(card, index) => (
-													<CommunityCard
-														key={index}
-														label={card}
-														color={
-															card.endsWith("♥") ||
-															card.endsWith("♦")
-																? "error"
-																: "default"
-														}
-														variant="filled"
-													/>
-												),
-											)
-										)}
-									</Box>
-								</TableCell>
-							</TableRow>
-							<TableRow>
 								<TableCell>Seat</TableCell>
-								<TableCell align="right">Stack</TableCell>
-								<TableCell align="right">Current Bet</TableCell>
-								<TableCell align="center">Position</TableCell>
+								<TableCell>Name</TableCell>
+								<TableCell className="text-right">Stack</TableCell>
+								<TableCell className="text-right">Current Bet</TableCell>
+								<TableCell className="text-center">Position</TableCell>
 							</TableRow>
 						</TableHead>
 						<TableBody>
 							{playerState.publicTable.stacks.map((stack, i) => {
 								const isVacant = stack === null || Number.isNaN(stack);
+								const isHighlighted =
+									i === playerState.position ||
+									i === playerState.publicTable.currentTurn;
+
 								return (
 									<TableRow
 										key={i}
@@ -160,15 +205,20 @@ export default function Game({ playerState, tableView }: GameProps) {
 												" (Active)"}
 											{isVacant && " (Vacant)"}
 										</TableCell>
-										<TableCell className="text-inherit" align="right">
+										<TableCell className="text-inherit">
+											{tableView.privatePlayerState[i]?.user.email.split(
+												"@",
+											)[0] ?? "(Vacant)"}
+										</TableCell>
+										<TableCell className="text-right text-inherit">
 											{isVacant ? "—" : `$${stack.toLocaleString()}`}
 										</TableCell>
-										<TableCell className="text-inherit" align="right">
+										<TableCell className="text-right text-inherit">
 											{isVacant
 												? "—"
-												: `$${(playerState.publicTable.bets[i] ?? 0).toLocaleString()}`}
+												: `$${(playerState.publicTable.bets[i] ?? NaN).toLocaleString()}`}
 										</TableCell>
-										<TableCell className="text-inherit" align="center">
+										<TableCell className="text-center text-inherit">
 											{i === playerState.publicTable.button && "🎯 Button"}
 										</TableCell>
 									</TableRow>

@@ -2,9 +2,8 @@
 
 import Button from "@mui/material/Button";
 import { type User } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
 import { createClient } from "~/supabase/client";
-import { api } from "~/trpc/react";
+import useDevGameActions from "./useDevGameActions";
 
 const client = createClient();
 
@@ -14,29 +13,16 @@ if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
 }
 
 function UserActions({ user }: { user: User }) {
-	const router = useRouter();
-
-	const loginAsUser = api.admin.loginAsUser.useMutation({
-		async onSuccess(data) {
-			await client.auth.setSession({
-				access_token: data.access_token,
-				refresh_token: data.refresh_token,
-			});
-			if (window.location.pathname === "/login") {
-				router.push("/");
-			}
-			router.refresh();
-		},
-	});
+	const { loginAsUser } = useDevGameActions();
 
 	return (
 		<form
 			onSubmit={async (e) => {
 				e.preventDefault();
-				await loginAsUser.mutateAsync({ email: user.email! });
+				await loginAsUser(user.email!);
 			}}
 		>
-			<Button variant="outlined" loading={loginAsUser.isPending} type="submit">
+			<Button variant="outlined" type="submit">
 				Login as user
 			</Button>
 		</form>

@@ -1,20 +1,15 @@
-import { AppBar, Box, Button, Toolbar, Typography } from "@mui/material";
+import { AppBar, Box, Button, Toolbar } from "@mui/material";
 import Link from "next/link";
 import SignOutButton from "~/app/_components/SignOutButton";
-import { createClient } from "~/supabase/server";
 import Providers from "../_components/Providers";
+import UserName from "./UserName";
 
 const navItems = [
 	{ label: "Home", href: "/" },
 	{ label: "Game", href: "/game" },
 ];
 
-const supabase = createClient();
-
 async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
-	const {
-		data: { user },
-	} = await supabase.auth.getUser();
 	return (
 		<Providers>
 			<Box className="flex h-screen flex-col">
@@ -28,9 +23,7 @@ async function AuthenticatedLayout({ children }: { children: React.ReactNode }) 
 							))}
 						</Box>
 						<Box className="flex grow-0">
-							<Typography variant="h6" className="mr-2" color="textDisabled">
-								{user?.email}
-							</Typography>
+							<UserName />
 							<SignOutButton />
 						</Box>
 					</Toolbar>

@@ -54,12 +54,13 @@ function getPlayer(table: Table, userId: string) {
 
 function isBettingRoundComplete(table: Table) {
 	const playersNotFolded = table.privatePlayerState.filter((player) => !player.folded);
-	const highestBet = Math.max(...table.bets);
+	const bets = table.bets.filter((bet) => !Number.isNaN(bet));
+	const highestBet = Math.max(...bets);
 
 	return playersNotFolded.every((player) => table.bets[player.position] == highestBet);
 }
 
-function getNextPlayerPosition(table: Table): number {
+export function getNextPlayerPosition(table: Table): number {
 	const players = table.privatePlayerState;
 	if (players.length === 0) return 0;
 
@@ -112,6 +113,13 @@ export const actionRouter = createTRPCRouter({
 						});
 					}
 
+					if (table.currentTurn !== player.position) {
+						throw new TRPCError({
+							code: "BAD_REQUEST",
+							message: "Not your turn",
+						});
+					}
+
 					if (input.amount > stack) {
 						throw new TRPCError({
 							code: "BAD_REQUEST",
@@ -133,7 +141,7 @@ export const actionRouter = createTRPCRouter({
 						}
 					} else {
 						const highestBet = Math.max(...table.bets);
-						if (input.amount > highestBet + table.bigBlind) {
+						if (input.amount > (highestBet || 0) + table.bigBlind) {
 							action = "bet";
 						} else if (input.amount === highestBet) {
 							action = "call";

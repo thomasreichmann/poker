@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { and, eq, getTableColumns, max, sql } from "drizzle-orm";
 import { z } from "zod";
+import { getNextPlayerPosition } from "~/server/api/routers/player/action";
 import { privatePlayerState, publicTables } from "~/server/db/schema";
 import { createTRPCRouter, privateProcedure, publicProcedure } from "../trpc";
 
@@ -88,15 +89,59 @@ export const tableRouter = createTRPCRouter({
 		.input(z.object({ tableId: z.number() }))
 		.mutation(async ({ ctx, input }) => {
 			try {
-				return await ctx.db
-					.delete(privatePlayerState)
-					.where(
-						and(
-							eq(privatePlayerState.userId, ctx.user.id),
-							eq(privatePlayerState.tableId, input.tableId),
-						),
-					)
-					.returning();
+				const result = (
+					await ctx.db
+						.delete(privatePlayerState)
+						.where(
+							and(
+								eq(privatePlayerState.userId, ctx.user.id),
+								eq(privatePlayerState.tableId, input.tableId),
+							),
+						)
+						.returning()
+				)[0]!;
+
+				const table = await ctx.db.query.publicTables.findFirst({
+					where: (publicTable, { eq }) => eq(publicTable.id, input.tableId),
+					with: {
+						privatePlayerState: true,
+					},
+				});
+
+				if (!table) {
+					throw new TRPCError({
+						code: "INTERNAL_SERVER_ERROR",
+						message: "Table not found",
+					});
+				}
+
+				const newActions = table.actions.map((action) =>
+					(action as string) === "NULL" ? null! : action,
+				);
+				newActions[result.position] = null!;
+
+				const newBets = [...table.bets];
+				newBets[result.position] = null!;
+
+				const newStacks = [...table.stacks];
+				newStacks[result.position] = null!;
+
+				const newCurrentTurn =
+					table.currentTurn === result.position
+						? getNextPlayerPosition(table)
+						: table.currentTurn;
+
+				const updatedTable = {
+					bets: newBets,
+					actions: newActions,
+					stacks: newStacks,
+					currentTurn: newCurrentTurn,
+				};
+
+				await ctx.db
+					.update(publicTables)
+					.set(updatedTable)
+					.where(eq(publicTables.id, input.tableId));
 			} catch (error) {
 				throw error;
 			}
