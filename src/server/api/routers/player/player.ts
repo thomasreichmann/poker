@@ -1,29 +1,27 @@
 import { eq } from "drizzle-orm";
 import { actionRouter } from "~/server/api/routers/player/action";
+import { type SelectGameWithPlayers } from "~/server/db/schema";
 import { createTRPCRouter, privateProcedure } from "../../trpc";
 
 export const playerRouter = createTRPCRouter({
 	tables: privateProcedure.query(async ({ ctx }) => {
-		return await ctx.db.query.privatePlayerState.findMany({
-			where: (state) => eq(state.userId, ctx.user.id),
+		const tables = await ctx.db.query.players.findMany({
+			where: (player) => eq(player.userId, ctx.user.id),
 			with: {
-				publicTable: true,
+				game: true,
 			},
 		});
+
+		return tables;
 	}),
 	playerViews: privateProcedure.query(async ({ ctx }) => {
-		const tables = await ctx.db.query.publicTables.findMany({
+		const tables = await ctx.db.query.games.findMany({
 			with: {
-				privatePlayerState: {
-					with: {
-						user: true,
-					},
-					columns: {
-						userId: true,
-						folded: true,
-						position: true,
-					},
-				},
+				players: true,
+			},
+			where: (game) => {
+				const typed = game as unknown as SelectGameWithPlayers;
+				return eq(typed.players.find((p) => p.userId === ctx.user.id)!.userId, ctx.user.id);
 			},
 		});
 
