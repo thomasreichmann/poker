@@ -133,6 +133,14 @@ export function evaluateHand(cards: Card[]): HandRank {
 
 	// Check for straight
 	if (isStraight(cards)) {
+		// For Ace-low straight, use 5 as the value
+		if (values.includes(14) && [2, 3, 4, 5].every((val) => values.includes(val))) {
+			return {
+				rank: 4,
+				value: 5,
+				name: "Straight",
+			};
+		}
 		return {
 			rank: 4,
 			value: Math.max(...values),

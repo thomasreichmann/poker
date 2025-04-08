@@ -23,7 +23,7 @@ import {
 	Typography,
 } from "@mui/material";
 import { useState } from "react";
-import { type Action } from "~/server/api/routers/player/action";
+import { type Act } from "~/server/api/routers/player/action";
 import { type PlayerView } from "~/server/api/routers/player/player";
 import { type SelectPrivatePlayerStateWithTable } from "~/server/db/schema";
 import { api } from "~/trpc/react";
@@ -95,7 +95,7 @@ export default function Game({ playerState, tableView }: GameProps) {
 
 	const [devSwitchUserAfterAction, setDevSwitchUserAfterAction] = useState(true);
 
-	const handleAct = async (actionData: Action) => {
+	const handleAct = async (actionData: Act) => {
 		await mutation.mutateAsync({
 			tableId: playerState.publicTable.id,
 			...actionData,

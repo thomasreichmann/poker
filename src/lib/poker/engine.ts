@@ -13,7 +13,7 @@ import {
 	type Player,
 	players,
 	type roundTypeEnum,
-} from "~/server/db/schema";
+} from "../../../src/server/db/schema";
 
 export async function handleAction(ctx: Context, input: ActInput) {
 	const [action] = await ctx.db
@@ -35,7 +35,7 @@ export async function handleAction(ctx: Context, input: ActInput) {
 	return await advanceGameState(ctx, game);
 }
 
-async function handleActionType(ctx: Context, action: Action): Promise<Game> {
+export async function handleActionType(ctx: Context, action: Action): Promise<Game> {
 	switch (action.actionType) {
 		case ActionsEnum.enum.bet:
 			return handleBet(ctx, action);
@@ -49,7 +49,7 @@ async function handleActionType(ctx: Context, action: Action): Promise<Game> {
 	}
 }
 
-async function handleBet(ctx: Context, action: Action): Promise<Game> {
+export async function handleBet(ctx: Context, action: Action): Promise<Game> {
 	if (!action.amount) {
 		throw new TRPCError({ code: "BAD_REQUEST", message: "Bet amount is required" });
 	}
@@ -80,7 +80,7 @@ async function handleBet(ctx: Context, action: Action): Promise<Game> {
 	return game;
 }
 
-async function handleFold(ctx: Context, action: Action): Promise<Game> {
+export async function handleFold(ctx: Context, action: Action): Promise<Game> {
 	await ctx.db
 		.update(players)
 		.set({
@@ -106,9 +106,9 @@ async function handleFold(ctx: Context, action: Action): Promise<Game> {
 	return game;
 }
 
-type RoundType = (typeof roundTypeEnum.enumValues)[number];
+export type RoundType = (typeof roundTypeEnum.enumValues)[number];
 
-const ROUND_PROGRESSION: Record<RoundType, RoundType | null> = {
+export const ROUND_PROGRESSION: Record<RoundType, RoundType | null> = {
 	"pre-flop": "flop",
 	flop: "turn",
 	turn: "river",
@@ -196,7 +196,7 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 	return updatedGame;
 }
 
-async function nextPlayer(ctx: Context, game: Game): Promise<Game> {
+export async function nextPlayer(ctx: Context, game: Game): Promise<Game> {
 	// Get all active players in the game
 	const activePlayers = await ctx.db
 		.select()
@@ -240,7 +240,7 @@ async function nextPlayer(ctx: Context, game: Game): Promise<Game> {
  * Finds the winner or winners of the game
  * by comparing the highest hand of each player
  */
-async function findWinners(game: Game, activePlayers: Player[]): Promise<Player[]> {
+export async function findWinners(game: Game, activePlayers: Player[]): Promise<Player[]> {
 	if (activePlayers.length === 0) {
 		throw new Error("No active players to find winners");
 	}
