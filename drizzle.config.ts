@@ -6,7 +6,7 @@ const projectDir = process.cwd();
 loadEnvConfig(projectDir);
 
 export default {
-	schema: "./src/server/db/schema.ts",
+	schema: "./src/server/db/schema",
 	dialect: "postgresql",
 	dbCredentials: {
 		url: process.env.DATABASE_URL!,

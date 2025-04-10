@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Player } from "~/server/db/schema";
+import { type Player } from "~/server/db/players";
 import { createTestGame, createTestPlayer } from "~/test/fixtures";
 import { findWinners } from "./engine";
 

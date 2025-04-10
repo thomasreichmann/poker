@@ -1,4 +1,5 @@
-import type { Game, Player } from "~/server/db/schema";
+import type { Game } from "~/server/db/games";
+import type { Player } from "~/server/db/players";
 
 export const createTestGame = (overrides: Partial<Game> = {}): Game => ({
 	id: "test-game-id",

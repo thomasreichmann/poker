@@ -4,16 +4,10 @@ import { type ActInput } from "~/server/api/routers/player/action";
 import { type AuthenticatedTRPCContext as Context } from "~/server/api/trpc";
 import { type Card, evaluateHand } from "./cards";
 
-import {
-	type Action,
-	actions,
-	ActionsEnum,
-	type Game,
-	games,
-	type Player,
-	players,
-	type roundTypeEnum,
-} from "../../../src/server/db/schema";
+import { type Action, actions, ActionTypeSchema } from "~/server/db/actions";
+import { type Game, games } from "~/server/db/games";
+import { type Player, players } from "~/server/db/players";
+import { type roundTypeEnum } from "~/server/db/roundTypeEnum";
 
 export async function handleAction(ctx: Context, input: ActInput) {
 	const [action] = await ctx.db
@@ -22,7 +16,7 @@ export async function handleAction(ctx: Context, input: ActInput) {
 			gameId: input.tableId,
 			playerId: ctx.user.id,
 			actionType: input.action,
-			amount: input.action === ActionsEnum.enum.bet ? input.amount : undefined,
+			amount: input.action === ActionTypeSchema.enum.bet ? input.amount : null,
 		})
 		.returning();
 
@@ -37,9 +31,9 @@ export async function handleAction(ctx: Context, input: ActInput) {
 
 export async function handleActionType(ctx: Context, action: Action): Promise<Game> {
 	switch (action.actionType) {
-		case ActionsEnum.enum.bet:
+		case ActionTypeSchema.enum.bet:
 			return handleBet(ctx, action);
-		case ActionsEnum.enum.fold:
+		case ActionTypeSchema.enum.fold:
 			return handleFold(ctx, action);
 		default:
 			throw new TRPCError({

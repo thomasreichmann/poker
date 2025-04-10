@@ -1,18 +1,18 @@
 import { z } from "zod";
 import { handleAction } from "~/lib/poker/engine";
 import { createTRPCRouter, privateProcedure } from "~/server/api/trpc";
-import { ActionsEnum } from "~/server/db/schema";
+import { ActionTypeSchema } from "~/server/db/actions";
 
 const actSchema = z.discriminatedUnion("action", [
 	z.object({
-		action: z.literal(ActionsEnum.enum.bet),
+		action: z.literal(ActionTypeSchema.enum.bet),
 		amount: z.number(),
 	}),
 	z.object({
-		action: z.literal(ActionsEnum.enum.fold),
+		action: z.literal(ActionTypeSchema.enum.fold),
 	}),
 	z.object({
-		action: z.literal(ActionsEnum.enum.check),
+		action: z.literal(ActionTypeSchema.enum.check),
 	}),
 ]);
 
