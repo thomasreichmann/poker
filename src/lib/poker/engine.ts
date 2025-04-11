@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, not, sql } from "drizzle-orm";
+import { and, asc, eq, not, sql } from "drizzle-orm";
 import { type ActInput } from "~/server/api/routers/player/action";
 import { type AuthenticatedTRPCContext as Context } from "~/server/api/trpc";
+import { getActivePlayersWithCards } from "~/server/db/repos/playerRepository";
 import { evaluateHand } from "./cards";
 
 import { type Action, actions, ActionTypeSchema } from "~/server/db/schema/actions";
@@ -137,19 +138,13 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 
 	if (!nextRound) {
 		// If we're at showdown, complete the game
-
-		// Get all active players in the game
-		const activePlayers = await ctx.db
-			.select()
-			.from(players)
-			.where(and(eq(players.gameId, game.id), eq(players.hasFolded, false)))
-			.orderBy(desc(players.stack));
+		const activePlayers = await getActivePlayersWithCards(ctx, game.id);
 
 		if (activePlayers.length === 0) {
 			throw new Error("No active players found");
 		}
 
-		const winners = findWinners(game, activePlayers);
+		const winners = await findWinners(game, activePlayers);
 		// TODO: Handle winners
 		console.log("winners", winners);
 
