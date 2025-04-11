@@ -1,25 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { type Player } from "~/server/db/players";
-import { createTestGame, createTestPlayer } from "~/test/fixtures";
+import { type Player } from "~/server/db/schema/players";
+import { createTestCards, createTestGame, createTestPlayer } from "~/test/fixtures";
 import { findWinners } from "./engine";
 
 describe("Game Engine", () => {
 	describe("findWinners", () => {
 		it("should find a single winner with the best hand", async () => {
 			const mockGame = createTestGame({
-				communityCards: ["A♠", "K♠", "Q♠", "7♠", "4♠"],
+				cards: createTestCards([
+					["A", "spades"],
+					["K", "spades"],
+					["Q", "spades"],
+					["7", "spades"],
+					["4", "spades"],
+				]),
 			});
 
 			const activePlayers: Player[] = [
 				createTestPlayer({
 					id: "player1",
-					holeCards: ["10♠", "J♠"],
+					cards: createTestCards([
+						["10", "spades"],
+						["J", "spades"],
+					]),
 				}),
 				createTestPlayer({
 					id: "player2",
-					userId: "user2",
-					seat: 2,
-					holeCards: ["2♥", "3♥"],
+					cards: createTestCards([
+						["2", "hearts"],
+						["3", "hearts"],
+					]),
 				}),
 			];
 
@@ -34,20 +44,24 @@ describe("Game Engine", () => {
 			const activePlayers: Player[] = [
 				createTestPlayer({
 					id: "player1",
-					holeCards: ["2♠", "3♠"],
+					cards: createTestCards([
+						["2", "spades"],
+						["3", "spades"],
+					]),
 				}),
 				createTestPlayer({
 					id: "player2",
-					userId: "user2",
-					seat: 2,
-					holeCards: ["2♠", "3♠"],
+					cards: createTestCards([
+						["2", "spades"],
+						["3", "spades"],
+					]),
 				}),
 			];
 
 			const winners = await findWinners(mockGame, activePlayers);
 			expect(winners).toHaveLength(2);
-			expect(winners.map((w) => w.id)).toContain("player1");
-			expect(winners.map((w) => w.id)).toContain("player2");
+			expect(winners.map((winner) => winner.id)).toContain("player1");
+			expect(winners.map((winner) => winner.id)).toContain("player2");
 		});
 
 		it("should throw error for no active players", async () => {
@@ -63,7 +77,7 @@ describe("Game Engine", () => {
 
 			const activePlayers: Player[] = [
 				createTestPlayer({
-					holeCards: null,
+					cards: undefined,
 				}),
 			];
 

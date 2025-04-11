@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm";
-import { integer, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
 import { actions } from "./actions";
-import { cards } from "./cards";
+import { type Card, cards } from "./cards";
 import { players } from "./players";
 import { timeouts } from "./timeouts";
 
@@ -22,7 +22,6 @@ export const games = pgTable("poker_games", {
 	currentHighestBet: integer("current_highest_bet").default(0).notNull(),
 	currentPlayerTurn: uuid("current_player_turn"),
 	pot: integer("pot").default(0).notNull(),
-	communityCards: text("community_cards").array().default([]),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -38,3 +37,5 @@ export const gamesRelations = relations(games, ({ many, one }) => ({
 	timeouts: many(timeouts),
 	cards: many(cards),
 }));
+
+export type GameWithCards = Game & { cards?: Card[] };

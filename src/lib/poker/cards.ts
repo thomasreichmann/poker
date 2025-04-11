@@ -1,16 +1,14 @@
-export type Suit = "♠" | "♥" | "♦" | "♣";
-export type Rank = "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K" | "A";
-export type Card = `${Rank}${Suit}`;
+import { type Card } from "~/server/db/schema/cards";
 
 export type HandRank = {
-	rank: number; // Higher number means better hand
-	value: number; // For comparing hands of the same rank
+	rank: number;
+	value: number;
 	name: string;
 };
 
 // Convert card string to rank value (2-14, where 14 is Ace)
 export function getRankValue(card: Card): number {
-	const rank = card.slice(0, -1);
+	const rank = card.rank;
 	switch (rank) {
 		case "A":
 			return 14;
@@ -26,8 +24,8 @@ export function getRankValue(card: Card): number {
 }
 
 // Get suit from card string
-export function getSuit(card: Card): Suit {
-	return card.slice(-1) as Suit;
+export function getSuit(card: Card) {
+	return card.suit;
 }
 
 // Sort cards by rank (highest to lowest)

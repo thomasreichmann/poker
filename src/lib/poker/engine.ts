@@ -2,12 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq, not, sql } from "drizzle-orm";
 import { type ActInput } from "~/server/api/routers/player/action";
 import { type AuthenticatedTRPCContext as Context } from "~/server/api/trpc";
-import { type Card, evaluateHand } from "./cards";
+import { evaluateHand } from "./cards";
 
-import { type Action, actions, ActionTypeSchema } from "~/server/db/actions";
-import { type Game, games } from "~/server/db/games";
-import { type Player, players } from "~/server/db/players";
-import { type roundTypeEnum } from "~/server/db/roundTypeEnum";
+import { type Action, actions, ActionTypeSchema } from "~/server/db/schema/actions";
+import { type Game, games, type GameWithCards, type roundTypeEnum } from "~/server/db/schema/games";
+import { players, type PlayerWithCards } from "~/server/db/schema/players";
 
 export async function handleAction(ctx: Context, input: ActInput) {
 	const [action] = await ctx.db
@@ -234,7 +233,10 @@ export async function nextPlayer(ctx: Context, game: Game): Promise<Game> {
  * Finds the winner or winners of the game
  * by comparing the highest hand of each player
  */
-export async function findWinners(game: Game, activePlayers: Player[]): Promise<Player[]> {
+export async function findWinners(
+	game: GameWithCards,
+	activePlayers: PlayerWithCards[],
+): Promise<PlayerWithCards[]> {
 	if (activePlayers.length === 0) {
 		throw new Error("No active players to find winners");
 	}
@@ -246,13 +248,13 @@ export async function findWinners(game: Game, activePlayers: Player[]): Promise<
 
 	// Evaluate each player's hand
 	const playerHands = activePlayers.map((player) => {
-		if (!player.holeCards) {
+		if (!player.cards) {
 			throw new Error(`Player ${player.id} has no hole cards`);
 		}
-		const allCards = [...player.holeCards, ...(game.communityCards ?? [])];
+		const allCards = [...player.cards, ...(game.cards ?? [])];
 		return {
 			player,
-			evaluation: evaluateHand(allCards as Card[]),
+			evaluation: evaluateHand(allCards),
 		};
 	});
 

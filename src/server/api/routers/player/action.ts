@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { handleAction } from "~/lib/poker/engine";
 import { createTRPCRouter, privateProcedure } from "~/server/api/trpc";
-import { ActionTypeSchema } from "~/server/db/actions";
+import { ActionTypeSchema } from "~/server/db/schema/actions";
 
 const actSchema = z.discriminatedUnion("action", [
 	z.object({
