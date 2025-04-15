@@ -1,33 +1,35 @@
-import { eq } from "drizzle-orm";
 import { actionRouter } from "~/server/api/routers/player/action";
-import { type SelectGameWithPlayers } from "~/server/db/schema";
 import { createTRPCRouter, privateProcedure } from "../../trpc";
 
 export const playerRouter = createTRPCRouter({
-	tables: privateProcedure.query(async ({ ctx }) => {
-		const tables = await ctx.db.query.players.findMany({
-			where: (player) => eq(player.userId, ctx.user.id),
+	getPlayerGames: privateProcedure.query(async ({ ctx }) => {
+		const games = await ctx.db.query.games.findMany({
 			with: {
-				game: true,
+				players: {
+					where: (players, { eq }) => eq(players.userId, ctx.user.id),
+				},
 			},
 		});
 
-		return tables;
+		return games;
 	}),
-	playerViews: privateProcedure.query(async ({ ctx }) => {
-		const tables = await ctx.db.query.games.findMany({
+	getAllGames: privateProcedure.query(async ({ ctx }) => {
+		const rows = await ctx.db.query.games.findMany({
 			with: {
-				players: true,
-			},
-			where: (game) => {
-				const typed = game as unknown as SelectGameWithPlayers;
-				return eq(typed.players.find((p) => p.userId === ctx.user.id)!.userId, ctx.user.id);
+				players: {
+					where: (players, { eq }) => eq(players.userId, ctx.user.id),
+				},
 			},
 		});
-
-		return tables;
+		return rows.map((row) => {
+			const hasJoined = row.players.find((player) => player.userId === ctx.user.id);
+			return {
+				...row,
+				hasJoined: hasJoined ? true : false,
+			};
+		});
 	}),
 	action: actionRouter,
 });
 
-export type PlayerView = Awaited<ReturnType<typeof playerRouter.playerViews>>[number];
+export type PublicGame = Awaited<ReturnType<typeof playerRouter.getAllGames>>[number];

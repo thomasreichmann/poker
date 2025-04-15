@@ -184,6 +184,9 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 	return updatedGame;
 }
 
+/**
+ * Advances the game state to the next player
+ */
 export async function nextPlayer(ctx: Context, game: Game): Promise<Game> {
 	// Get all active players in the game
 	const activePlayers = await ctx.db

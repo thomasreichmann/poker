@@ -3,7 +3,7 @@ import { api, HydrateClient } from "~/trpc/server";
 import { PublicTablesComponent } from "./PublicTables";
 
 export default async function PublicTables() {
-	void api.table.get.prefetch();
+	void api.player.getAllGames.prefetch();
 
 	return (
 		<HydrateClient>

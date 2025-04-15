@@ -11,12 +11,12 @@ import {
 	TableRow,
 } from "@mui/material";
 import { api } from "~/trpc/react";
-import { useTableMutations } from "./useTableMutations";
+import { useGameMutations } from "./useTableMutations";
 
 export function PublicTablesComponent() {
-	const [tables] = api.table.get.useSuspenseQuery();
+	const [tables] = api.player.getAllGames.useSuspenseQuery();
 	const { createTable, handleJoinTable, handleLeaveTable, isTableBeingModified } =
-		useTableMutations();
+		useGameMutations();
 
 	return (
 		<Stack spacing={2}>
@@ -36,7 +36,6 @@ export function PublicTablesComponent() {
 							<TableCell>Created At</TableCell>
 							<TableCell>Pot</TableCell>
 							<TableCell>Current Turn</TableCell>
-							<TableCell>Button</TableCell>
 							<TableCell>In/Out</TableCell>
 							<TableCell />
 						</TableRow>
@@ -45,22 +44,20 @@ export function PublicTablesComponent() {
 						{tables.map((table) => (
 							<TableRow key={table.id}>
 								<TableCell>{table.id}</TableCell>
-								<TableCell>{table.createdAt.toISOString()}</TableCell>
 								<TableCell>{table.pot}</TableCell>
-								<TableCell>{table.currentTurn}</TableCell>
-								<TableCell>{table.button}</TableCell>
-								<TableCell>{table.isUserInTable ? "In" : "Out"}</TableCell>
+								<TableCell>{table.currentPlayerTurn}</TableCell>
+								<TableCell>{table.hasJoined ? "In" : "Out"}</TableCell>
 								<TableCell>
 									<Button
 										variant="outlined"
 										onClick={() =>
-											table.isUserInTable
+											table.hasJoined
 												? handleLeaveTable(table.id)
 												: handleJoinTable(table.id)
 										}
 										disabled={isTableBeingModified(table.id)}
 									>
-										{table.isUserInTable ? "Leave" : "Join"}
+										{table.hasJoined ? "Leave" : "Join"}
 									</Button>
 								</TableCell>
 							</TableRow>

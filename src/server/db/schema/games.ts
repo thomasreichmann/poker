@@ -17,7 +17,7 @@ export const gameStatusEnum = pgEnum("game_status", ["waiting", "active", "compl
 
 export const games = pgTable("poker_games", {
 	id: uuid("id").defaultRandom().primaryKey(),
-	status: gameStatusEnum("status").notNull(),
+	status: gameStatusEnum("status").default("waiting"),
 	currentRound: roundTypeEnum("current_round").default("pre-flop"),
 	currentHighestBet: integer("current_highest_bet").default(0).notNull(),
 	currentPlayerTurn: uuid("current_player_turn"),
