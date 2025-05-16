@@ -91,7 +91,7 @@ describe("Game Engine", () => {
 
 			const activePlayers: Player[] = [
 				createTestPlayer({
-					gameId: null,
+					gameId: undefined,
 				}),
 			];
 

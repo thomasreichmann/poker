@@ -1,7 +1,7 @@
 import { Box, Paper, Skeleton } from "@mui/material";
 import { Suspense } from "react";
 import { api, HydrateClient } from "~/trpc/server";
-import { ClientTableInterface } from "./ClientTableInterface";
+import { ClientGameInterface } from "./ClientGameInterface";
 
 function LoadingSkeleton() {
 	return (
@@ -18,15 +18,14 @@ function LoadingSkeleton() {
 	);
 }
 
-export default function TableInterface() {
-	void api.player.tables.prefetch();
-	void api.player.playerViews.prefetch();
+export default function GameInterface() {
+	void api.player.getAllGames.prefetch({ joinedOnly: true });
 
 	return (
 		<HydrateClient>
 			<Paper elevation={1} className="m-5 flex h-full flex-col p-5">
 				<Suspense fallback={<LoadingSkeleton />}>
-					<ClientTableInterface />
+					<ClientGameInterface />
 				</Suspense>
 			</Paper>
 		</HydrateClient>

@@ -17,10 +17,10 @@ export const ActionTypeSchema = z.enum(ActionType.enumValues);
 export const actions = pgTable("poker_actions", {
 	id: serial("id").primaryKey(),
 	gameId: uuid("game_id")
-		.references(() => games.id)
+		.references(() => games.id, { onDelete: "cascade" })
 		.notNull(),
 	playerId: uuid("player_id")
-		.references(() => players.id)
+		.references(() => players.id, { onDelete: "set null" })
 		.notNull(),
 	actionType: ActionType("action_type").notNull(),
 	amount: integer("amount"),

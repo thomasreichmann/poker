@@ -8,14 +8,19 @@ import { users } from "~/server/db/schema/users";
 
 export const players = pgTable("poker_players", {
 	id: uuid("id").defaultRandom().primaryKey(),
-	userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-	gameId: uuid("game_id").references(() => games.id, { onDelete: "cascade" }),
+	userId: uuid("user_id")
+		.references(() => users.id, { onDelete: "cascade" })
+		.notNull(),
+	gameId: uuid("game_id")
+		.references(() => games.id, { onDelete: "cascade" })
+		.notNull(),
 	seat: integer("seat").notNull(),
-	stack: integer("stack").default(1000),
+	stack: integer("stack").notNull().default(1000),
 	currentBet: integer("current_bet"),
 	hasFolded: boolean("has_folded").default(false),
 	isConnected: boolean("is_connected").default(true),
 	lastSeen: timestamp("last_seen").defaultNow(),
+	isButton: boolean("is_button").default(false),
 });
 
 export type Player = typeof players.$inferSelect;

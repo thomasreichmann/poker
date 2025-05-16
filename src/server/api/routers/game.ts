@@ -19,20 +19,25 @@ export const gameRouter = createTRPCRouter({
 	create: privateProcedure.mutation(async ({ ctx }) => {
 		return await ctx.db.insert(games).values({}).returning();
 	}),
+	delete: privateProcedure
+		.input(z.object({ id: z.string() }))
+		.mutation(async ({ ctx, input }) => {
+			return await ctx.db.delete(games).where(eq(games.id, input.id));
+		}),
 	join: privateProcedure
-		.input(z.object({ tableId: z.string(), stack: z.number().default(1000) }))
+		.input(z.object({ gameId: z.string(), stack: z.number().default(1000) }))
 		.mutation(async ({ ctx, input }) => {
 			const maxPositionResult = await ctx.db
 				.select({ maxPosition: sql<number>`COALESCE(MAX(${players.seat}), -1)` })
 				.from(players)
-				.where(eq(players.gameId, input.tableId));
+				.where(eq(players.gameId, input.gameId));
 
 			const newPosition = (maxPositionResult[0]?.maxPosition ?? -1) + 1;
 
 			return await ctx.db
 				.insert(players)
 				.values({
-					gameId: input.tableId,
+					gameId: input.gameId,
 					userId: ctx.user.id,
 					seat: newPosition,
 					stack: input.stack,
@@ -40,10 +45,10 @@ export const gameRouter = createTRPCRouter({
 				.returning();
 		}),
 	leave: privateProcedure
-		.input(z.object({ tableId: z.string() }))
+		.input(z.object({ gameId: z.string() }))
 		.mutation(async ({ ctx, input }) => {
 			const game = await ctx.db.query.games.findFirst({
-				where: (g, { eq }) => eq(g.id, input.tableId),
+				where: (g, { eq }) => eq(g.id, input.gameId),
 				with: {
 					players: true,
 				},
@@ -55,6 +60,6 @@ export const gameRouter = createTRPCRouter({
 
 			await ctx.db
 				.delete(players)
-				.where(and(eq(players.userId, ctx.user.id), eq(players.gameId, input.tableId)));
+				.where(and(eq(players.userId, ctx.user.id), eq(players.gameId, input.gameId)));
 		}),
 });

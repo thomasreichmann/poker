@@ -38,9 +38,7 @@ function TabPanel(props: TabPanelProps) {
 
 export function ClientGameInterface() {
 	const [currentGame, setCurrentGame] = useState(0);
-	const [games] = api.player.getAllGames.useSuspenseQuery({
-		joinedOnly: true,
-	});
+	const [games] = api.player.getAllGames.useSuspenseQuery({ joinedOnly: true });
 
 	const handleGameChange = (event: React.SyntheticEvent, newValue: number) => {
 		setCurrentGame(newValue);

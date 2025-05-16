@@ -11,8 +11,9 @@ import {
 	Checkbox,
 	Chip,
 	FormControlLabel,
-	Grid2,
+	Grid,
 	Paper,
+	Slider,
 	styled,
 	Table,
 	TableBody,
@@ -24,13 +25,13 @@ import {
 } from "@mui/material";
 import { useState } from "react";
 import { type Act } from "~/server/api/routers/player/action";
-import { type PlayerView } from "~/server/api/routers/player/player";
-import { type SelectPrivatePlayerStateWithTable } from "~/server/db/schema";
+import { type PublicGame } from "~/server/api/routers/player/player";
+import { createClient } from "~/supabase/client";
 import { api } from "~/trpc/react";
 import useDevGameActions from "../DevDashboard/useDevGameActions";
+
 export interface GameProps {
-	playerState: SelectPrivatePlayerStateWithTable;
-	tableView: PlayerView;
+	game: PublicGame;
 }
 
 const ActionButton = styled((props: ButtonProps) => <Button fullWidth {...props} />)({});
@@ -48,41 +49,24 @@ const InfoChip = styled(Chip)({
 	fontSize: "1rem",
 });
 
-function getNextPlayerPosition(table: PlayerView): number {
-	const players = table.privatePlayerState;
-	if (players.length === 0) return 0;
+function getNextPlayer(game: PublicGame) {
+	const activePlayers = game.players.filter((p) => !p.hasFolded);
 
-	const sortedPlayers = [...players].sort((a, b) => a.position - b.position);
-	const currentIndex = sortedPlayers.findIndex((player) => player.position === table.currentTurn);
-	const startIndex = currentIndex >= 0 ? currentIndex : 0;
-	const nextIndex = (startIndex + 1) % sortedPlayers.length;
+	const currentPlayerIndex = activePlayers.findIndex((p) => p.id === game.currentPlayerTurn);
 
-	while (nextIndex !== startIndex) {
-		if (!sortedPlayers[nextIndex]?.folded) {
-			const position = sortedPlayers[nextIndex]?.position;
-			if (position === undefined) {
-				throw new Error("Player position not found");
-			}
-			return position;
-		}
-	}
+	const nextPlayerIndex = (currentPlayerIndex + 1) % activePlayers.length;
+	const nextPlayer = activePlayers[nextPlayerIndex];
 
-	if (!sortedPlayers[startIndex]?.folded) {
-		const position = sortedPlayers[startIndex]?.position;
-		if (position === undefined) {
-			throw new Error("Player position not found");
-		}
-		return position;
-	}
-
-	return 0;
+	return nextPlayer;
 }
 
-export default function Game({ playerState, tableView }: GameProps) {
+const supabase = createClient();
+
+export default function Game({ game }: GameProps) {
 	const utils = api.useUtils();
 	const mutation = api.player.action.act.useMutation({
 		onSuccess: () => {
-			void utils.player.tables.invalidate();
+			void utils.player.getAllGames.invalidate();
 		},
 		onError: (error) => {
 			if (error.message === "Not your turn") {
@@ -91,68 +75,50 @@ export default function Game({ playerState, tableView }: GameProps) {
 		},
 	});
 
+	const [betAmount, setBetAmount] = useState(100);
+
 	const { loginAsUser } = useDevGameActions();
 
 	const [devSwitchUserAfterAction, setDevSwitchUserAfterAction] = useState(true);
 
 	const handleAct = async (actionData: Act) => {
 		await mutation.mutateAsync({
-			tableId: playerState.publicTable.id,
+			gameId: game.id,
+			playerId: game.callerPlayer!.userId,
 			...actionData,
 		});
 
 		if (devSwitchUserAfterAction) {
-			// Next player will be the one after the current player, or the first player if the current player is the last one
-			const nextPlayer = getNextPlayerPosition(tableView);
-			if (nextPlayer !== playerState.position) {
-				const nextPlayerEmail = tableView.privatePlayerState[nextPlayer]?.user.email;
-				if (nextPlayerEmail) {
-					await loginAsUser(nextPlayerEmail);
-				} else {
-					throw new Error("Next player email not found");
-				}
+			const nextPlayer = getNextPlayer(game);
+			if (nextPlayer) {
+				await loginAsUser(nextPlayer.userId);
 			}
 		}
 	};
 
 	return (
 		<Card elevation={4}>
-			<CardHeader title={`Game ${playerState.publicTable.id}`} />
+			<CardHeader title={`Game ${game.id}`} />
 			<CardContent>
 				<Box className="mb-8 flex flex-col gap-4">
-					<Box className="flex justify-center gap-2">
-						<FormControlLabel
-							control={
-								<Checkbox
-									checked={devSwitchUserAfterAction}
-									onChange={(e) => setDevSwitchUserAfterAction(e.target.checked)}
-								/>
-							}
-							label="Switch user after action"
-						/>
-					</Box>
 					<Box className="flex justify-center">
 						<InfoChip
-							label={`Pot: $${playerState.publicTable.pot.toLocaleString()}`}
+							label={`Pot: $${game.pot.toLocaleString()}`}
 							color="success"
 							variant="filled"
 						/>
 					</Box>
 					<Box className="flex justify-center gap-4">
-						{playerState.publicTable.communityCards.length === 0 ? (
+						{game.communityCards.length === 0 ? (
 							<Typography variant="subtitle1" color="text.secondary">
 								No community cards
 							</Typography>
 						) : (
-							playerState.publicTable.communityCards.map((card, index) => (
+							game.communityCards.map((card, index) => (
 								<CommunityCard
 									key={index}
-									label={card}
-									color={
-										card.endsWith("♥") || card.endsWith("♦")
-											? "error"
-											: "default"
-									}
+									label={`${card.rank} of ${card.suit}`}
+									color="primary"
 									variant="filled"
 								/>
 							))
@@ -161,65 +127,54 @@ export default function Game({ playerState, tableView }: GameProps) {
 				</Box>
 
 				<TableContainer component={Paper}>
-					<Table size="small">
+					<Table>
 						<TableHead>
 							<TableRow>
-								<TableCell>Seat</TableCell>
-								<TableCell>Name</TableCell>
-								<TableCell className="text-right">Stack</TableCell>
-								<TableCell className="text-right">Current Bet</TableCell>
-								<TableCell className="text-center">Position</TableCell>
+								<TableCell>Position</TableCell>
+								<TableCell>Player</TableCell>
+								<TableCell align="right">Stack</TableCell>
+								<TableCell align="center">Status</TableCell>
 							</TableRow>
 						</TableHead>
 						<TableBody>
-							{playerState.publicTable.stacks.map((stack, i) => {
-								const isVacant = stack === null || Number.isNaN(stack);
+							{game.players.map((player, i) => {
+								const isVacant = player.userId === null;
+								const isCurrentPlayer = player.userId === game.callerPlayer?.userId;
 								const isHighlighted =
-									i === playerState.position ||
-									i === playerState.publicTable.currentTurn;
+									isCurrentPlayer || i === Number(game.currentPlayerTurn);
 
 								return (
 									<TableRow
 										key={i}
 										sx={{
-											backgroundColor:
-												i === playerState.position
-													? "primary.main"
-													: i === playerState.publicTable.currentTurn
-														? "success.main"
-														: "inherit",
-											color:
-												i === playerState.position ||
-												i === playerState.publicTable.currentTurn
-													? "secondary.contrastText"
-													: isVacant
-														? "text.disabled"
-														: "inherit",
-											fontStyle: isVacant ? "italic" : "normal",
+											backgroundColor: isCurrentPlayer
+												? "primary.main"
+												: isHighlighted
+													? "success.main"
+													: "inherit",
+											color: isCurrentPlayer
+												? "secondary.contrastText"
+												: isVacant
+													? "text.secondary"
+													: "inherit",
 										}}
 									>
 										<TableCell className="text-inherit">
 											{i}
-											{i === playerState.position && " (You)"}
-											{i === playerState.publicTable.currentTurn &&
-												" (Active)"}
+											{isCurrentPlayer && " (You)"}
+											{isHighlighted && " (Active)"}
 											{isVacant && " (Vacant)"}
 										</TableCell>
 										<TableCell className="text-inherit">
-											{tableView.privatePlayerState[i]?.user.email.split(
-												"@",
-											)[0] ?? "(Vacant)"}
-										</TableCell>
-										<TableCell className="text-right text-inherit">
-											{isVacant ? "—" : `$${stack.toLocaleString()}`}
+											{player.userId?.split("@")[0] ?? "(Vacant)"}
 										</TableCell>
 										<TableCell className="text-right text-inherit">
 											{isVacant
 												? "—"
-												: `$${(playerState.publicTable.bets[i] ?? NaN).toLocaleString()}`}
+												: `$${(player.currentBet ?? NaN).toLocaleString()}`}
 										</TableCell>
 										<TableCell className="text-center text-inherit">
-											{i === playerState.publicTable.button && "🎯 Button"}
+											{player.isButton && "🎯 Button"}
 										</TableCell>
 									</TableRow>
 								);
@@ -229,32 +184,56 @@ export default function Game({ playerState, tableView }: GameProps) {
 				</TableContainer>
 			</CardContent>
 			<CardActions>
-				<Grid2 container spacing={2} className="w-full">
-					<Grid2 size={6}>
+				<Grid container spacing={2} className="w-full">
+					<Grid size={4}>
 						<ActionButton
 							variant="contained"
+							color="primary"
 							onClick={() => handleAct({ action: "check" })}
 						>
 							Check
 						</ActionButton>
-					</Grid2>
-					<Grid2 size={6}>
+					</Grid>
+					<Grid size={4}>
 						<ActionButton
 							variant="contained"
-							onClick={() => handleAct({ action: "bet", amount: 100 })}
-						>
-							Bet
-						</ActionButton>
-					</Grid2>
-					<Grid2 size={12}>
-						<ActionButton
-							variant="contained"
+							color="error"
 							onClick={() => handleAct({ action: "fold" })}
 						>
 							Fold
 						</ActionButton>
-					</Grid2>
-				</Grid2>
+					</Grid>
+					<Grid size={4}>
+						<ActionButton
+							variant="contained"
+							color="warning"
+							onClick={() => handleAct({ action: "bet", amount: betAmount })}
+						>
+							Bet {betAmount}
+						</ActionButton>
+					</Grid>
+					<Grid size={4} className="flex w-full gap-4 text-nowrap">
+						<Typography>Your stack: ${game.callerPlayer?.stack}</Typography>
+						<Typography>Current bet: ${game.currentHighestBet}</Typography>
+						<Slider
+							min={0}
+							max={game.callerPlayer?.stack}
+							value={betAmount}
+							onChange={(e, value) => setBetAmount(value)}
+						/>
+					</Grid>
+				</Grid>
+			</CardActions>
+			<CardActions>
+				<FormControlLabel
+					control={
+						<Checkbox
+							checked={devSwitchUserAfterAction}
+							onChange={(e) => setDevSwitchUserAfterAction(e.target.checked)}
+						/>
+					}
+					label="Switch user after action"
+				/>
 			</CardActions>
 		</Card>
 	);

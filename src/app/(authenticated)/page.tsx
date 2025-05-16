@@ -6,7 +6,7 @@ import {
 	Paper,
 	Typography,
 } from "@mui/material";
-import PublicTables from "~/app/_components/PublicTables";
+import PublicGames from "~/app/_components/PublicGames";
 import Realtime from "~/app/_components/Realtime";
 import { createClient } from "~/supabase/server";
 
@@ -35,7 +35,7 @@ export default async function Home() {
 
 			<Paper elevation={1} className="p-4">
 				<Typography>Public Tables</Typography>
-				<PublicTables />
+				<PublicGames />
 			</Paper>
 
 			<Divider flexItem />

@@ -29,23 +29,25 @@ export const createTestPlayer = (overrides: Partial<PlayerWithCards> = {}): Play
 	currentBet: 100,
 	hasFolded: false,
 	isConnected: true,
+	isButton: false,
 	lastSeen: new Date(),
 	...overrides,
 });
 
 type CardTuple = [Card["rank"], Card["suit"]];
 
-export const createTestCards = (
-	cards: CardTuple[],
-	options: { gameId?: string | null; playerId?: string | null } = {},
-): Card[] => {
-	const { gameId, playerId } = options;
+type CardOptions = { gameId?: string | null; playerId?: string | null };
 
-	return cards.map(([rank, suit]) => ({
+export const createTestCards = (cards: CardTuple[], options: CardOptions = {}): Card[] => {
+	return cards.map(([rank, suit]) => createTestCard([rank, suit], options));
+};
+
+const createTestCard = ([rank, suit]: CardTuple, { gameId, playerId }: CardOptions = {}): Card => {
+	return {
 		id: 1,
 		gameId: (gameId ?? gameId === null) ? gameId : "test-game-id",
 		playerId: (playerId ?? playerId === null) ? playerId : "player1",
 		rank,
 		suit,
-	}));
+	};
 };

@@ -18,7 +18,8 @@ const actSchema = z.discriminatedUnion("action", [
 
 export type Act = z.infer<typeof actSchema>;
 
-const actInput = z.object({ tableId: z.string() }).and(actSchema);
+// TODO: Remove playerId from input (unsafe), use ctx.user.id to get the playerId instead
+const actInput = z.object({ gameId: z.string(), playerId: z.string() }).and(actSchema);
 export type ActInput = z.infer<typeof actInput>;
 
 export const actionRouter = createTRPCRouter({

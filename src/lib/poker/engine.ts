@@ -13,8 +13,8 @@ export async function handleAction(ctx: Context, input: ActInput) {
 	const [action] = await ctx.db
 		.insert(actions)
 		.values({
-			gameId: input.tableId,
-			playerId: ctx.user.id,
+			gameId: input.gameId,
+			playerId: input.playerId,
 			actionType: input.action,
 			amount: input.action === ActionTypeSchema.enum.bet ? input.amount : null,
 		})
