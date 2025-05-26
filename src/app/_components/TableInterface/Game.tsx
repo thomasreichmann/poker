@@ -8,9 +8,7 @@ import {
 	CardActions,
 	CardContent,
 	CardHeader,
-	Checkbox,
 	Chip,
-	FormControlLabel,
 	Grid,
 	Paper,
 	Slider,
@@ -23,12 +21,12 @@ import {
 	TableRow,
 	Typography,
 } from "@mui/material";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { type Act } from "~/server/api/routers/player/action";
 import { type PublicGame } from "~/server/api/routers/player/player";
 import { createClient } from "~/supabase/client";
 import { api } from "~/trpc/react";
-import useDevGameActions from "../DevDashboard/useDevGameActions";
+import DevControls, { type DevControlsRef } from "./DevControls";
 
 export interface GameProps {
 	game: PublicGame;
@@ -64,9 +62,11 @@ const supabase = createClient();
 
 export default function Game({ game }: GameProps) {
 	const utils = api.useUtils();
+	const devControlsRef = useRef<DevControlsRef>(null);
 	const mutation = api.player.action.act.useMutation({
-		onSuccess: () => {
-			void utils.player.getAllGames.invalidate();
+		onSuccess: async () => {
+			await utils.player.getAllGames.invalidate();
+			await devControlsRef.current?.handleActionComplete();
 		},
 		onError: (error) => {
 			if (error.message === "Not your turn") {
@@ -76,11 +76,6 @@ export default function Game({ game }: GameProps) {
 	});
 
 	const [betAmount, setBetAmount] = useState(100);
-
-	const { loginAsUser } = useDevGameActions();
-
-	const [devSwitchUserAfterAction, setDevSwitchUserAfterAction] = useState(false);
-
 	const isOurTurn = game.currentPlayerTurn === game.callerPlayer?.id;
 
 	const handleAct = async (actionData: Act) => {
@@ -95,13 +90,10 @@ export default function Game({ game }: GameProps) {
 			playerId: game.callerPlayer!.id,
 			...actionData,
 		});
+	};
 
-		if (devSwitchUserAfterAction) {
-			const nextPlayer = getNextPlayer(game);
-			if (nextPlayer) {
-				await loginAsUser(nextPlayer.userId);
-			}
-		}
+	const handleActionComplete = async () => {
+		await utils.player.getAllGames.invalidate();
 	};
 
 	return (
@@ -239,14 +231,10 @@ export default function Game({ game }: GameProps) {
 				</Grid>
 			</CardActions>
 			<CardActions>
-				<FormControlLabel
-					control={
-						<Checkbox
-							checked={devSwitchUserAfterAction}
-							onChange={(e) => setDevSwitchUserAfterAction(e.target.checked)}
-						/>
-					}
-					label="Switch user after action"
+				<DevControls
+					ref={devControlsRef}
+					game={game}
+					onActionComplete={handleActionComplete}
 				/>
 			</CardActions>
 		</Card>

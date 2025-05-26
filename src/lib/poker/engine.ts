@@ -379,3 +379,33 @@ export async function findWinners(
 
 	return winners;
 }
+
+export async function resetGame(ctx: Context, gameId: string) {
+	const [game] = await ctx.db
+		.update(games)
+		.set({
+			status: "waiting",
+			currentRound: "pre-flop",
+			currentHighestBet: 0,
+			pot: 0,
+			currentPlayerTurn: null,
+		})
+		.where(eq(games.id, gameId))
+		.returning();
+
+	const updatedPlayers = await ctx.db
+		.update(players)
+		.set({
+			hasFolded: false,
+			currentBet: null,
+			isButton: false,
+		})
+		.where(eq(players.gameId, gameId))
+		.returning();
+
+	if (updatedPlayers.length > 1) {
+		await startGame(ctx, gameId);
+	}
+
+	return game;
+}
