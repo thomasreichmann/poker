@@ -399,6 +399,7 @@ export async function resetGame(ctx: Context, gameId: string) {
 			hasFolded: false,
 			currentBet: null,
 			isButton: false,
+			stack: 1000,
 		})
 		.where(eq(players.gameId, gameId))
 		.returning();

@@ -8,7 +8,9 @@ import {
 	CardActions,
 	CardContent,
 	CardHeader,
+	Checkbox,
 	Chip,
+	FormControlLabel,
 	Grid,
 	Paper,
 	Slider,
@@ -21,12 +23,12 @@ import {
 	TableRow,
 	Typography,
 } from "@mui/material";
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { type Act } from "~/server/api/routers/player/action";
 import { type PublicGame } from "~/server/api/routers/player/player";
 import { createClient } from "~/supabase/client";
 import { api } from "~/trpc/react";
-import DevControls, { type DevControlsRef } from "./DevControls";
+import useDevGameActions from "../DevDashboard/useDevGameActions";
 
 export interface GameProps {
 	game: PublicGame;
@@ -62,11 +64,13 @@ const supabase = createClient();
 
 export default function Game({ game }: GameProps) {
 	const utils = api.useUtils();
-	const devControlsRef = useRef<DevControlsRef>(null);
+	const { loginAsUser } = useDevGameActions();
+	const [devSwitchUserAfterAction, setDevSwitchUserAfterAction] = useState<boolean>(false);
+	const resetGameMutation = api.admin.resetGame.useMutation();
 	const mutation = api.player.action.act.useMutation({
 		onSuccess: async () => {
 			await utils.player.getAllGames.invalidate();
-			await devControlsRef.current?.handleActionComplete();
+			await handleActionComplete();
 		},
 		onError: (error) => {
 			if (error.message === "Not your turn") {
@@ -74,6 +78,11 @@ export default function Game({ game }: GameProps) {
 			}
 		},
 	});
+
+	useEffect(() => {
+		const saved = localStorage.getItem("devSwitchUserAfterAction");
+		setDevSwitchUserAfterAction(saved ? (JSON.parse(saved) as boolean) : false);
+	}, []);
 
 	const [betAmount, setBetAmount] = useState(100);
 	const isOurTurn = game.currentPlayerTurn === game.callerPlayer?.id;
@@ -93,7 +102,22 @@ export default function Game({ game }: GameProps) {
 	};
 
 	const handleActionComplete = async () => {
+		if (devSwitchUserAfterAction) {
+			const nextPlayer = getNextPlayer(game);
+			if (nextPlayer) {
+				await loginAsUser(nextPlayer.userId);
+			}
+		}
 		await utils.player.getAllGames.invalidate();
+	};
+
+	const handleResetGame = async () => {
+		try {
+			await resetGameMutation.mutateAsync({ gameId: game.id });
+			await handleActionComplete();
+		} catch (error) {
+			console.error("Failed to reset game:", error);
+		}
 	};
 
 	return (
@@ -136,52 +160,59 @@ export default function Game({ game }: GameProps) {
 							<TableRow>
 								<TableCell>Position</TableCell>
 								<TableCell>Player</TableCell>
+								<TableCell>Stack</TableCell>
 								<TableCell align="right">Bet</TableCell>
 								<TableCell align="center">Status</TableCell>
 							</TableRow>
 						</TableHead>
 						<TableBody>
-							{game.players.map((player, i) => {
-								const isVacant = player.userId === null;
-								const isCurrentPlayer = player.userId === game.callerPlayer?.userId;
-								const isHighlighted = player.id === game.currentPlayerTurn;
+							{game.players
+								.sort((a, b) => a.seat - b.seat)
+								.map((player, i) => {
+									const isVacant = player.userId === null;
+									const isCurrentPlayer =
+										player.userId === game.callerPlayer?.userId;
+									const isHighlighted = player.id === game.currentPlayerTurn;
 
-								return (
-									<TableRow
-										key={i}
-										sx={{
-											backgroundColor: isCurrentPlayer
-												? "primary.main"
-												: isHighlighted
-													? "success.main"
-													: "inherit",
-											color: isCurrentPlayer
-												? "secondary.contrastText"
-												: isVacant
-													? "text.secondary"
-													: "inherit",
-										}}
-									>
-										<TableCell className="text-inherit">
-											{i}
-											{isCurrentPlayer && " (You)"}
-											{isHighlighted && " (Active)"}
-											{isVacant && " (Vacant)"}
-										</TableCell>
-										<TableCell className="text-inherit">
-											{player.userId?.split("-")[0] ?? "(Vacant)"}
-										</TableCell>
-										<TableCell className="text-right text-inherit">
-											{isVacant
-												? "—"
-												: `$${(player.currentBet ?? NaN).toLocaleString()}`}
-										</TableCell>
-										<TableCell className="text-center text-inherit">
-											{player.isButton && "🎯 Button"}
-										</TableCell>
-									</TableRow>
-								);
-							})}
+									return (
+										<TableRow
+											key={i}
+											sx={{
+												backgroundColor: isCurrentPlayer
+													? "primary.main"
+													: isHighlighted
+														? "success.main"
+														: "inherit",
+												color: isCurrentPlayer
+													? "secondary.contrastText"
+													: isVacant
+														? "text.secondary"
+														: "inherit",
+											}}
+										>
+											<TableCell className="text-inherit">
+												{player.seat}
+												{isCurrentPlayer && " (You)"}
+												{isHighlighted && " (Active)"}
+												{isVacant && " (Vacant)"}
+											</TableCell>
+											<TableCell className="text-inherit">
+												{player.userId?.split("-")[0] ?? "(Vacant)"}
+											</TableCell>
+											<TableCell className="text-inherit">
+												${player.stack?.toLocaleString()}
+											</TableCell>
+											<TableCell className="text-right text-inherit">
+												{isVacant
+													? "—"
+													: `$${(player.currentBet ?? 0).toLocaleString()}`}
+											</TableCell>
+											<TableCell className="text-center text-inherit">
+												{player.isButton && "🎯 Button"}
+											</TableCell>
+										</TableRow>
+									);
+								})}
 						</TableBody>
 					</Table>
 				</TableContainer>
@@ -231,11 +262,39 @@ export default function Game({ game }: GameProps) {
 				</Grid>
 			</CardActions>
 			<CardActions>
-				<DevControls
-					ref={devControlsRef}
-					game={game}
-					onActionComplete={handleActionComplete}
-				/>
+				<div className="flex gap-2">
+					<FormControlLabel
+						control={
+							<Checkbox
+								checked={devSwitchUserAfterAction}
+								onChange={(e) => {
+									setDevSwitchUserAfterAction(e.target.checked);
+									localStorage.setItem(
+										"devSwitchUserAfterAction",
+										JSON.stringify(e.target.checked),
+									);
+								}}
+							/>
+						}
+						label="Switch user after action"
+					/>
+					<Button
+						variant="contained"
+						color="warning"
+						onClick={handleResetGame}
+						disabled={resetGameMutation.isPending}
+					>
+						{resetGameMutation.isPending ? "Resetting..." : "Reset Game"}
+					</Button>
+					<Button
+						variant="contained"
+						color="primary"
+						disabled={!game.currentPlayerTurn}
+						onClick={() => loginAsUser(game.currentPlayerTurn!)}
+					>
+						Switch to active player
+					</Button>
+				</div>
 			</CardActions>
 		</Card>
 	);
