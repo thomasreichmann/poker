@@ -3,9 +3,10 @@ import { and, asc, eq, isNull, not, or, sql } from "drizzle-orm";
 import { type ActInput } from "~/server/api/routers/player/action";
 import { type AuthenticatedTRPCContext as Context } from "~/server/api/trpc";
 import { createPlayer, getActivePlayersWithCards } from "~/server/db/repos/playerRepository";
-import { evaluateHand } from "./cards";
+import { evaluateHand, generateDeck, getAvailableCards, getRandomCards } from "./cards";
 
 import { type Action, actions, ActionTypeSchema } from "~/server/db/schema/actions";
+import { cards } from "~/server/db/schema/cards";
 import { type Game, games, type GameWithCards, type roundTypeEnum } from "~/server/db/schema/games";
 import { type Player, players, type PlayerWithCards } from "~/server/db/schema/players";
 
@@ -58,6 +59,8 @@ export async function startGame(ctx: Context, gameId: string) {
 			message: "Failed to start game, game not returned from update",
 		});
 	}
+
+	await dealCards(ctx, game);
 
 	return game;
 }
@@ -211,8 +214,88 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 		throw new Error("Failed to update game state");
 	}
 
+	await dealCards(ctx, updatedGame);
+
 	// Set the next player to act in the new round
 	return nextPlayer(ctx, updatedGame);
+}
+
+/**
+ * Handles all card dealing, including the community cards and hole cards.
+ * @param ctx - The context object
+ * @param game - The game object
+ */
+async function dealCards(ctx: Context, game: Game) {
+	const activePlayers = await getActivePlayersWithCards(ctx, game.id);
+
+	if (activePlayers.length === 0) {
+		throw new Error("No active players found");
+	}
+
+	// Get all cards already dealt in this game
+	const dealtCards = await ctx.db.query.cards.findMany({
+		where: eq(cards.gameId, game.id),
+	});
+
+	// Generate a full deck and get available cards
+	const deck = generateDeck();
+	const availableCards = getAvailableCards(deck, dealtCards);
+
+	// Deal cards based on the current round
+	switch (game.currentRound) {
+		case "pre-flop":
+			// Deal 2 hole cards to each player
+			for (const player of activePlayers) {
+				const holeCards = getRandomCards(availableCards, 2);
+				await ctx.db.insert(cards).values(
+					holeCards.map((card) => ({
+						...card,
+						gameId: game.id,
+						playerId: player.id,
+					})),
+				);
+			}
+			break;
+
+		case "flop":
+			// Deal 3 community cards
+			const flopCards = getRandomCards(availableCards, 3);
+			await ctx.db.insert(cards).values(
+				flopCards.map((card) => ({
+					...card,
+					gameId: game.id,
+					playerId: null,
+				})),
+			);
+			break;
+
+		case "turn":
+			// Deal 1 community card
+			const turnCard = getRandomCards(availableCards, 1)[0];
+			if (turnCard) {
+				await ctx.db.insert(cards).values({
+					...turnCard,
+					gameId: game.id,
+					playerId: null,
+				});
+			}
+			break;
+
+		case "river":
+			// Deal 1 community card
+			const riverCard = getRandomCards(availableCards, 1)[0];
+			if (riverCard) {
+				await ctx.db.insert(cards).values({
+					...riverCard,
+					gameId: game.id,
+					playerId: null,
+				});
+			}
+			break;
+
+		default:
+			throw new Error(`Invalid round for dealing cards: ${game.currentRound}`);
+	}
 }
 
 async function handleShowdown(ctx: Context, game: Game) {
@@ -403,6 +486,8 @@ export async function resetGame(ctx: Context, gameId: string) {
 		})
 		.where(eq(players.gameId, gameId))
 		.returning();
+
+	await ctx.db.delete(cards).where(eq(cards.gameId, gameId));
 
 	if (updatedPlayers.length > 1) {
 		await startGame(ctx, gameId);

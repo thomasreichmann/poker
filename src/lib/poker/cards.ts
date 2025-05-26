@@ -1,4 +1,4 @@
-import { type Card } from "~/server/db/schema/cards";
+import { Rank, Suit, type Card } from "~/server/db/schema/cards";
 
 export type HandRank = {
 	rank: number;
@@ -195,4 +195,39 @@ export function compareHands(hand1: Card[], hand2: Card[]): number {
 	}
 
 	return evaluation1.value - evaluation2.value;
+}
+
+export type CardBase = Omit<Card, "id" | "gameId" | "playerId">;
+
+// Generate a full deck of cards
+export function generateDeck(): CardBase[] {
+	const ranks = Rank.enumValues;
+	const suits = Suit.enumValues;
+	const deck: Omit<Card, "id" | "gameId" | "playerId">[] = [];
+
+	for (const rank of ranks) {
+		for (const suit of suits) {
+			deck.push({
+				rank,
+				suit,
+			});
+		}
+	}
+
+	return deck;
+}
+
+// Get available cards by removing already dealt cards
+export function getAvailableCards(deck: CardBase[], dealtCards: CardBase[]): CardBase[] {
+	return deck.filter((card) => {
+		return !dealtCards.some(
+			(dealtCard) => dealtCard.rank === card.rank && dealtCard.suit === card.suit,
+		);
+	});
+}
+
+// Get random cards from available cards
+export function getRandomCards(availableCards: CardBase[], count: number): CardBase[] {
+	const shuffled = [...availableCards].sort(() => Math.random() - 0.5);
+	return shuffled.slice(0, count);
 }

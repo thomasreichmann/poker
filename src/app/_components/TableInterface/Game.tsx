@@ -152,6 +152,23 @@ export default function Game({ game }: GameProps) {
 							))
 						)}
 					</Box>
+					{(game.callerPlayer?.cards.length ?? 0) > 0 && (
+						<Box className="flex flex-col items-center gap-2">
+							<Typography variant="subtitle1" color="text.secondary">
+								Your cards:
+							</Typography>
+							<Box className="flex gap-2">
+								{game.callerPlayer?.cards.map((card) => (
+									<CommunityCard
+										key={card.id}
+										label={`${card.rank} of ${card.suit}`}
+										color="primary"
+										variant="filled"
+									/>
+								))}
+							</Box>
+						</Box>
+					)}
 				</Box>
 
 				<TableContainer component={Paper}>

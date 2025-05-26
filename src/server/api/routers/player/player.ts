@@ -30,7 +30,9 @@ export const playerRouter = createTRPCRouter({
 							cards: true,
 						},
 					},
-					cards: true,
+					cards: {
+						where: (cards, { isNull }) => isNull(cards.playerId),
+					},
 				},
 			});
 
