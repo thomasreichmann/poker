@@ -18,7 +18,7 @@ function LoadingSkeleton() {
 	);
 }
 
-export default function GameInterface() {
+export default async function GameInterface() {
 	void api.player.getAllGames.prefetch({ joinedOnly: true });
 
 	return (

@@ -24,6 +24,7 @@ export const players = pgTable("poker_players", {
 });
 
 export type Player = typeof players.$inferSelect;
+export type InsertPlayer = typeof players.$inferInsert;
 
 export const playersRelations = relations(players, ({ one, many }) => ({
 	game: one(games, {

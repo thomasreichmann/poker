@@ -21,8 +21,28 @@ export const adminRouter = createTRPCRouter({
 			}),
 		)
 		.mutation(async ({ input }) => {
+			let email: string = input.email;
+
+			// If input doesn't contain '@', assume it's a userId and fetch the email
+			if (!email.includes("@")) {
+				const { data: userData, error: userError } =
+					await supabase.auth.admin.getUserById(email);
+
+				if (userError || !userData.user) {
+					throw new Error("Failed to fetch user", { cause: userError });
+				}
+
+				const userEmail = userData.user.email;
+
+				if (!userEmail) {
+					throw new Error("User has no email address");
+				}
+
+				email = userEmail;
+			}
+
 			const { data, error } = await supabase.auth.admin.generateLink({
-				email: input.email,
+				email,
 				type: "magiclink",
 			});
 

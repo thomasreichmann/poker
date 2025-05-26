@@ -1,6 +1,6 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { nextPlayer } from "~/lib/poker/engine";
+import { handleJoinGame, nextPlayer } from "~/lib/poker/engine";
 import { createTRPCRouter, privateProcedure } from "~/server/api/trpc";
 import { games } from "~/server/db/schema/games";
 import { players } from "~/server/db/schema/players";
@@ -27,22 +27,7 @@ export const gameRouter = createTRPCRouter({
 	join: privateProcedure
 		.input(z.object({ gameId: z.string(), stack: z.number().default(1000) }))
 		.mutation(async ({ ctx, input }) => {
-			const maxPositionResult = await ctx.db
-				.select({ maxPosition: sql<number>`COALESCE(MAX(${players.seat}), -1)` })
-				.from(players)
-				.where(eq(players.gameId, input.gameId));
-
-			const newPosition = (maxPositionResult[0]?.maxPosition ?? -1) + 1;
-
-			return await ctx.db
-				.insert(players)
-				.values({
-					gameId: input.gameId,
-					userId: ctx.user.id,
-					seat: newPosition,
-					stack: input.stack,
-				})
-				.returning();
+			return await handleJoinGame(ctx, input.gameId, input.stack);
 		}),
 	leave: privateProcedure
 		.input(z.object({ gameId: z.string() }))

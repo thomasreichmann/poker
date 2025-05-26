@@ -1,15 +1,68 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, not, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, not, or, sql } from "drizzle-orm";
 import { type ActInput } from "~/server/api/routers/player/action";
 import { type AuthenticatedTRPCContext as Context } from "~/server/api/trpc";
-import { getActivePlayersWithCards } from "~/server/db/repos/playerRepository";
+import { createPlayer, getActivePlayersWithCards } from "~/server/db/repos/playerRepository";
 import { evaluateHand } from "./cards";
 
 import { type Action, actions, ActionTypeSchema } from "~/server/db/schema/actions";
 import { type Game, games, type GameWithCards, type roundTypeEnum } from "~/server/db/schema/games";
-import { players, type PlayerWithCards } from "~/server/db/schema/players";
+import { type Player, players, type PlayerWithCards } from "~/server/db/schema/players";
 
-export async function handleAction(ctx: Context, input: ActInput) {
+export async function handleJoinGame(ctx: Context, gameId: string, stack: number): Promise<Player> {
+	const maxPositionResult = await ctx.db
+		.select({ maxPosition: sql<number>`COALESCE(MAX(${players.seat}), -1)` })
+		.from(players)
+		.where(eq(players.gameId, gameId));
+
+	const newPosition = (maxPositionResult[0]?.maxPosition ?? -1) + 1;
+
+	const player = await createPlayer(ctx, {
+		gameId,
+		userId: ctx.user.id,
+		seat: newPosition,
+		stack,
+	});
+
+	const [playersInGameResult] = await ctx.db
+		.select({ count: sql<number>`COUNT(*)` })
+		.from(players)
+		.where(eq(players.gameId, gameId));
+
+	if (playersInGameResult?.count == 2) {
+		await startGame(ctx, gameId);
+	}
+
+	return player;
+}
+
+export async function startGame(ctx: Context, gameId: string) {
+	let game = await ctx.db.query.games.findFirst({
+		where: eq(games.id, gameId),
+	});
+
+	if (!game) {
+		throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Game not found" });
+	}
+
+	game = await nextPlayer(ctx, game, {
+		status: "active",
+		currentRound: "pre-flop",
+		currentHighestBet: 0,
+		pot: 0,
+	});
+
+	if (!game) {
+		throw new TRPCError({
+			code: "INTERNAL_SERVER_ERROR",
+			message: "Failed to start game, game not returned from update",
+		});
+	}
+
+	return game;
+}
+
+export async function handleAction(ctx: Context, input: ActInput): Promise<Game> {
 	const [action] = await ctx.db
 		.insert(actions)
 		.values({
@@ -51,8 +104,8 @@ export async function handleBet(ctx: Context, action: Action): Promise<Game> {
 	await ctx.db
 		.update(players)
 		.set({
-			stack: sql`${players.currentBet} - ${players.stack} - ${action.amount}`,
-			currentBet: sql`${players.currentBet} + ${action.amount}`,
+			stack: sql`${players.stack} - ${action.amount}`,
+			currentBet: sql`COALESCE(${players.currentBet}, 0) + ${action.amount}`,
 		})
 		.where(eq(players.id, action.playerId));
 
@@ -119,7 +172,7 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 			and(
 				eq(players.gameId, game.id),
 				eq(players.hasFolded, false),
-				not(eq(players.currentBet, game.currentHighestBet)),
+				or(isNull(players.currentBet), not(eq(players.currentBet, game.currentHighestBet))),
 			),
 		);
 
@@ -136,32 +189,9 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 
 	const nextRound = ROUND_PROGRESSION[game.currentRound];
 
+	// If there's no next round, we're at showdown
 	if (!nextRound) {
-		// If we're at showdown, complete the game
-		const activePlayers = await getActivePlayersWithCards(ctx, game.id);
-
-		if (activePlayers.length === 0) {
-			throw new Error("No active players found");
-		}
-
-		const winners = await findWinners(game, activePlayers);
-		// TODO: Handle winners
-		console.log("winners", winners);
-
-		const [completedGame] = await ctx.db
-			.update(games)
-			.set({
-				status: "completed",
-				updatedAt: new Date(),
-			})
-			.where(eq(games.id, game.id))
-			.returning();
-
-		if (!completedGame) {
-			throw new Error("Failed to complete game");
-		}
-
-		return completedGame;
+		return handleShowdown(ctx, game);
 	}
 
 	// Reset current bets for the new round
@@ -181,13 +211,81 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 		throw new Error("Failed to update game state");
 	}
 
-	return updatedGame;
+	// Set the next player to act in the new round
+	return nextPlayer(ctx, updatedGame);
+}
+
+async function handleShowdown(ctx: Context, game: Game) {
+	// If we're at showdown, complete the game
+	const activePlayers = await getActivePlayersWithCards(ctx, game.id);
+
+	if (activePlayers.length === 0) {
+		throw new Error("No active players found");
+	}
+
+	const winners = await findWinners(game, activePlayers);
+	// TODO: Handle winners
+	console.log("winners", winners);
+
+	const [completedGame] = await ctx.db
+		.update(games)
+		.set({
+			status: "completed",
+			updatedAt: new Date(),
+		})
+		.where(eq(games.id, game.id))
+		.returning();
+
+	if (!completedGame) {
+		throw new Error("Failed to complete game");
+	}
+
+	return completedGame;
+}
+
+/**
+ * Gets the first player to act in a new game (player to the left of the button)
+ */
+async function getFirstPlayer(
+	ctx: Context,
+	game: Game,
+	activePlayers: PlayerWithCards[],
+): Promise<PlayerWithCards> {
+	let buttonPlayer = activePlayers.find((p) => p.isButton);
+	if (!buttonPlayer) {
+		// Assign the first player to be the button player
+
+		const firstPlayer = activePlayers[0];
+		if (!firstPlayer) {
+			throw new Error("No first player found for button assignment");
+		}
+
+		await ctx.db.update(players).set({ isButton: true }).where(eq(players.id, firstPlayer.id));
+
+		buttonPlayer = firstPlayer;
+	}
+
+	// Find the index of the button player
+	const buttonIndex = activePlayers.findIndex((p) => p.id === buttonPlayer.id);
+	// The player to the left of the button (small blind) is the next player
+	const nextPlayerIndex = (buttonIndex + 1) % activePlayers.length;
+	const nextPlayer = activePlayers[nextPlayerIndex];
+
+	if (!nextPlayer) {
+		throw new Error("No next player found");
+	}
+
+	return nextPlayer;
 }
 
 /**
  * Advances the game state to the next player
  */
-export async function nextPlayer(ctx: Context, game: Game): Promise<Game> {
+export async function nextPlayer(
+	ctx: Context,
+	game: Game,
+	extraGameUpdate?: Partial<Game>,
+): Promise<Game> {
 	// Get all active players in the game
 	const activePlayers = await ctx.db
 		.select()
@@ -199,12 +297,13 @@ export async function nextPlayer(ctx: Context, game: Game): Promise<Game> {
 		throw new Error("No active players found");
 	}
 
-	// Find the current player's index
-	const currentPlayerIndex = activePlayers.findIndex((p) => p.id === game.currentPlayerTurn);
-
-	// Get the next player's index (wrap around to start if at end)
-	const nextPlayerIndex = (currentPlayerIndex + 1) % activePlayers.length;
-	const nextPlayer = activePlayers[nextPlayerIndex];
+	// Get the next player based on whether this is the first turn or not
+	const nextPlayer = !game.currentPlayerTurn
+		? await getFirstPlayer(ctx, game, activePlayers)
+		: activePlayers[
+				(activePlayers.findIndex((p) => p.id === game.currentPlayerTurn) + 1) %
+					activePlayers.length
+			];
 
 	if (!nextPlayer) {
 		throw new Error("No next player found");
@@ -216,6 +315,7 @@ export async function nextPlayer(ctx: Context, game: Game): Promise<Game> {
 		.set({
 			currentPlayerTurn: nextPlayer.id,
 			updatedAt: new Date(),
+			...extraGameUpdate,
 		})
 		.where(eq(games.id, game.id))
 		.returning();

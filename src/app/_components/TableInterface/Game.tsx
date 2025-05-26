@@ -79,12 +79,20 @@ export default function Game({ game }: GameProps) {
 
 	const { loginAsUser } = useDevGameActions();
 
-	const [devSwitchUserAfterAction, setDevSwitchUserAfterAction] = useState(true);
+	const [devSwitchUserAfterAction, setDevSwitchUserAfterAction] = useState(false);
+
+	const isOurTurn = game.currentPlayerTurn === game.callerPlayer?.id;
 
 	const handleAct = async (actionData: Act) => {
+		// Check if its our turn
+		if (!isOurTurn) {
+			alert("Not your turn");
+			return;
+		}
+
 		await mutation.mutateAsync({
 			gameId: game.id,
-			playerId: game.callerPlayer!.userId,
+			playerId: game.callerPlayer!.id,
 			...actionData,
 		});
 
@@ -101,7 +109,11 @@ export default function Game({ game }: GameProps) {
 			<CardHeader title={`Game ${game.id}`} />
 			<CardContent>
 				<Box className="mb-8 flex flex-col gap-4">
-					<Box className="flex justify-center">
+					<Box className="flex flex-col items-center gap-2">
+						<Box className="flex gap-2">
+							<InfoChip label={`Round: ${game.currentRound}`} color="primary" />
+							<InfoChip label={`Status: ${game.status}`} color="primary" />
+						</Box>
 						<InfoChip
 							label={`Pot: $${game.pot.toLocaleString()}`}
 							color="success"
@@ -132,7 +144,7 @@ export default function Game({ game }: GameProps) {
 							<TableRow>
 								<TableCell>Position</TableCell>
 								<TableCell>Player</TableCell>
-								<TableCell align="right">Stack</TableCell>
+								<TableCell align="right">Bet</TableCell>
 								<TableCell align="center">Status</TableCell>
 							</TableRow>
 						</TableHead>
@@ -140,8 +152,7 @@ export default function Game({ game }: GameProps) {
 							{game.players.map((player, i) => {
 								const isVacant = player.userId === null;
 								const isCurrentPlayer = player.userId === game.callerPlayer?.userId;
-								const isHighlighted =
-									isCurrentPlayer || i === Number(game.currentPlayerTurn);
+								const isHighlighted = player.id === game.currentPlayerTurn;
 
 								return (
 									<TableRow
@@ -166,7 +177,7 @@ export default function Game({ game }: GameProps) {
 											{isVacant && " (Vacant)"}
 										</TableCell>
 										<TableCell className="text-inherit">
-											{player.userId?.split("@")[0] ?? "(Vacant)"}
+											{player.userId?.split("-")[0] ?? "(Vacant)"}
 										</TableCell>
 										<TableCell className="text-right text-inherit">
 											{isVacant
@@ -190,6 +201,7 @@ export default function Game({ game }: GameProps) {
 							variant="contained"
 							color="primary"
 							onClick={() => handleAct({ action: "check" })}
+							disabled={!isOurTurn}
 						>
 							Check
 						</ActionButton>
@@ -199,6 +211,7 @@ export default function Game({ game }: GameProps) {
 							variant="contained"
 							color="error"
 							onClick={() => handleAct({ action: "fold" })}
+							disabled={!isOurTurn}
 						>
 							Fold
 						</ActionButton>
@@ -208,6 +221,7 @@ export default function Game({ game }: GameProps) {
 							variant="contained"
 							color="warning"
 							onClick={() => handleAct({ action: "bet", amount: betAmount })}
+							disabled={!isOurTurn}
 						>
 							Bet {betAmount}
 						</ActionButton>
@@ -241,11 +255,6 @@ export default function Game({ game }: GameProps) {
 
 /**
  * TODO:
- * - Create endpoints for player actions, this can be a sub-router of the player.
- *  - Bet x
- *  - Fold
- *  - Check
- * - Create a UI for the player to make actions
  * - Integrate realtime updates to update the game state without making extra requests
  * - Create a better UI to display the game state
  */
