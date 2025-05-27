@@ -1,17 +1,9 @@
-import {
-	Accordion,
-	AccordionDetails,
-	AccordionSummary,
-	Divider,
-	Paper,
-	Typography,
-} from "@mui/material";
+import { Divider, Paper, Typography } from "@mui/material";
 import PublicGames from "~/app/_components/PublicGames";
-import Realtime from "~/app/_components/Realtime";
 import { createClient } from "~/supabase/server";
 
 export default async function Home() {
-	const supabase = createClient();
+	const supabase = await createClient();
 	const { data, error } = await supabase.auth.getUser();
 	const user = data ? data.user : null;
 
@@ -39,7 +31,7 @@ export default async function Home() {
 
 			<Divider flexItem />
 
-			<section>
+			{/* <section>
 				<Accordion>
 					<AccordionSummary expandIcon={<h1>▶</h1>}>
 						<Typography>Real-time</Typography>
@@ -48,7 +40,7 @@ export default async function Home() {
 						<Realtime />
 					</AccordionDetails>
 				</Accordion>
-			</section>
+			</section> */}
 		</main>
 	);
 }

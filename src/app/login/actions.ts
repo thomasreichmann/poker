@@ -12,7 +12,7 @@ interface AuthData {
 }
 
 export async function login(data: AuthData): Promise<string | null> {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	// Directly use the `data` object for sign in
 	const { error } = await supabase.auth.signInWithPassword({
@@ -30,7 +30,7 @@ export async function login(data: AuthData): Promise<string | null> {
 }
 
 export async function signup(data: AuthData): Promise<string | null> {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	// Directly use the `data` object for sign up
 	const { error } = await supabase.auth.signUp({
@@ -42,6 +42,6 @@ export async function signup(data: AuthData): Promise<string | null> {
 		return error.message;
 	}
 
-	revalidatePath("/", "layout");
+	revalidatePath("/");
 	redirect("/");
 }

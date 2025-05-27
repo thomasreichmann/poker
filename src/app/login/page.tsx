@@ -24,7 +24,6 @@ export default function LoginPage() {
 		action: (data: LoginSchema) => Promise<string | null>,
 		data: LoginSchema,
 	) => {
-		console.log("data", data);
 		const error = await action(data);
 
 		if (error) return setError("root.server", { message: error });

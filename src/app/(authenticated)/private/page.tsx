@@ -4,7 +4,7 @@ import { createClient } from "~/supabase/server";
 import PokerProbability from "./pokerProbability";
 
 export default async function PrivatePage() {
-	const supabase = createClient();
+	const supabase = await createClient();
 
 	const { data, error } = await supabase.auth.getUser();
 	if (error || !data?.user) {

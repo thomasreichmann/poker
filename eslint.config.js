@@ -21,6 +21,9 @@ export default tseslint.config(
 			parserOptions: {
 				project: true,
 			},
+			globals: {
+				process: "readonly",
+			},
 		},
 		rules: {
 			"@typescript-eslint/array-type": "off",

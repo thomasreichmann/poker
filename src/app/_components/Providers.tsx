@@ -1,7 +1,7 @@
 "use client";
 
 import { CssBaseline, ThemeProvider } from "@mui/material";
-import { AppRouterCacheProvider } from "@mui/material-nextjs/v14-appRouter";
+import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import React from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { TRPCReactProvider } from "~/trpc/react";

@@ -26,12 +26,9 @@ import { createClient } from "~/supabase/server";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
-	const supabase = createClient();
+	const supabase = await createClient();
 
-	const { data, error } = await supabase.auth.getUser();
-	if (error && error?.name !== "AuthSessionMissingError") {
-		throw error;
-	}
+	const { data } = await supabase.auth.getUser();
 	const user = data.user;
 
 	return {

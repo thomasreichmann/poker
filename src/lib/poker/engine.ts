@@ -381,9 +381,8 @@ async function dealCards(ctx: Context, game: Game) {
 
 		case "flop":
 			// Deal 3 community cards
-			const flopCards = getRandomCards(availableCards, 3);
 			await ctx.db.insert(cards).values(
-				flopCards.map((card) => ({
+				getRandomCards(availableCards, 3).map((card) => ({
 					...card,
 					gameId: game.id,
 					playerId: null,
@@ -393,26 +392,24 @@ async function dealCards(ctx: Context, game: Game) {
 
 		case "turn":
 			// Deal 1 community card
-			const turnCard = getRandomCards(availableCards, 1)[0];
-			if (turnCard) {
-				await ctx.db.insert(cards).values({
-					...turnCard,
+			await ctx.db.insert(cards).values(
+				getRandomCards(availableCards, 1).map((card) => ({
+					...card,
 					gameId: game.id,
 					playerId: null,
-				});
-			}
+				})),
+			);
 			break;
 
 		case "river":
 			// Deal 1 community card
-			const riverCard = getRandomCards(availableCards, 1)[0];
-			if (riverCard) {
-				await ctx.db.insert(cards).values({
-					...riverCard,
+			await ctx.db.insert(cards).values(
+				getRandomCards(availableCards, 1).map((card) => ({
+					...card,
 					gameId: game.id,
 					playerId: null,
-				});
-			}
+				})),
+			);
 			break;
 
 		default:

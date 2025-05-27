@@ -3,8 +3,8 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { env } from "~/env";
 
-export function createClient() {
-	const cookieStore = cookies();
+export async function createClient() {
+	const cookieStore = await cookies();
 
 	return createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
 		cookies: {
@@ -14,7 +14,6 @@ export function createClient() {
 			setAll(cookiesToSet) {
 				try {
 					cookiesToSet.forEach(({ name, value, options }) =>
-						// eslint-disable-next-line @typescript-eslint/no-unsafe-argument
 						cookieStore.set(name, value, options),
 					);
 				} catch {

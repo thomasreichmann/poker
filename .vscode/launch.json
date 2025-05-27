@@ -7,9 +7,8 @@
 			"request": "launch",
 			"program": "${workspaceFolder}/node_modules/next/dist/bin/next",
 			"args": ["dev", "--turbopack"],
+			"sourceMaps": true,
 			"internalConsoleOptions": "openOnSessionStart",
-			"cwd": "${workspaceFolder}",
-			"skipFiles": ["<node_internals>/**"],
 			"env": {
 				"APP_ENV": "local"
 			},
@@ -17,12 +16,7 @@
 				"pattern": "- Local:.+(https?://.+)",
 				"uriFormat": "%s",
 				"action": "openExternally"
-			},
-			"resolveSourceMapLocations": [
-				"${workspaceFolder}/**",
-				"!**/node_modules/**",
-				"!**/.next/**"
-			]
+			}
 		},
 		{
 			"name": "Next.js: Development",
