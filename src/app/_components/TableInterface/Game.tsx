@@ -28,6 +28,7 @@ import { type Act } from "~/server/api/routers/player/action";
 import { type PublicGame } from "~/server/api/routers/player/player";
 import { api } from "~/trpc/react";
 import useDevGameActions from "../DevDashboard/useDevGameActions";
+import PlayingCard from "./PlayingCard";
 
 export interface GameProps {
 	game: PublicGame;
@@ -138,37 +139,15 @@ export default function Game({ game }: GameProps) {
 							variant="filled"
 						/>
 					</Box>
-					<Box className="flex justify-center gap-4">
-						{game.communityCards.length === 0 ? (
-							<Typography variant="subtitle1" color="text.secondary">
-								No community cards
-							</Typography>
-						) : (
-							game.communityCards.map((card, index) => (
-								<CommunityCard
-									key={index}
-									label={`${card.rank} of ${card.suit}`}
-									color="primary"
-									variant="filled"
-								/>
-							))
-						)}
-					</Box>
-					{(game.callerPlayer?.cards.length ?? 0) > 0 && (
-						<Box className="flex flex-col items-center gap-2">
-							<Typography variant="subtitle1" color="text.secondary">
-								Your cards:
-							</Typography>
-							<Box className="flex gap-2">
-								{game.callerPlayer?.cards.map((card) => (
-									<CommunityCard
-										key={card.id}
-										label={`${card.rank} of ${card.suit}`}
-										color="primary"
-										variant="filled"
-									/>
-								))}
-							</Box>
+					{game.communityCards.length === 0 ? (
+						<Typography variant="subtitle1" color="text.secondary">
+							No community cards
+						</Typography>
+					) : (
+						<Box className="flex justify-center gap-4">
+							{game.communityCards.map((card, index) => (
+								<PlayingCard key={index} card={card} />
+							))}
 						</Box>
 					)}
 				</Box>
@@ -182,6 +161,10 @@ export default function Game({ game }: GameProps) {
 								<TableCell>Stack</TableCell>
 								<TableCell align="right">Bet</TableCell>
 								<TableCell align="center">Status</TableCell>
+								<TableCell align="center">Hand</TableCell>
+								{game.status === "completed" && (
+									<TableCell align="center">Result</TableCell>
+								)}
 							</TableRow>
 						</TableHead>
 						<TableBody>
@@ -192,6 +175,10 @@ export default function Game({ game }: GameProps) {
 									const isCurrentPlayer =
 										player.userId === game.callerPlayer?.userId;
 									const isHighlighted = player.id === game.currentPlayerTurn;
+									const showCards =
+										game.status === "completed"
+											? player.showCards
+											: isCurrentPlayer;
 
 									return (
 										<TableRow
@@ -228,7 +215,38 @@ export default function Game({ game }: GameProps) {
 											</TableCell>
 											<TableCell className="text-center text-inherit">
 												{player.isButton && "🎯 Button"}
+												{player.hasFolded && "🃏 Folded"}
 											</TableCell>
+											<TableCell className="text-center text-inherit">
+												{showCards ? (
+													<Box className="flex justify-center gap-2">
+														{player.cards?.map((card) => (
+															<PlayingCard
+																key={card.id}
+																card={card}
+															/>
+														))}
+													</Box>
+												) : (
+													<Box className="flex justify-center gap-2">
+														<PlayingCard showBack />
+														<PlayingCard showBack />
+													</Box>
+												)}
+											</TableCell>
+											{game.status === "completed" && (
+												<TableCell className="text-center text-inherit">
+													{player.hasWon && "🏆 Winner"}
+													{showCards && player.handName && (
+														<Typography
+															variant="body2"
+															color="text.secondary"
+														>
+															{player.handName}
+														</Typography>
+													)}
+												</TableCell>
+											)}
 										</TableRow>
 									);
 								})}
@@ -320,6 +338,7 @@ export default function Game({ game }: GameProps) {
 						onClick={() => {
 							advanceGame({ gameId: game.id });
 						}}
+						loading={advanceGameLoading}
 					>
 						Advance Game
 					</Button>
