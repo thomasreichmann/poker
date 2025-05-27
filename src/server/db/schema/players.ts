@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { boolean, integer, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { actions } from "~/server/db/schema/actions";
 import { type Card, cards } from "~/server/db/schema/cards";
 import { games } from "~/server/db/schema/games";
@@ -21,6 +21,11 @@ export const players = pgTable("poker_players", {
 	isConnected: boolean("is_connected").default(true),
 	lastSeen: timestamp("last_seen").defaultNow(),
 	isButton: boolean("is_button").default(false),
+	hasWon: boolean("has_won").default(false),
+	showCards: boolean("show_cards").default(false),
+	handRank: integer("hand_rank"),
+	handValue: integer("hand_value"),
+	handName: text("hand_name"),
 });
 
 export type Player = typeof players.$inferSelect;

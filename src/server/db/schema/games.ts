@@ -22,6 +22,8 @@ export const games = pgTable("poker_games", {
 	currentHighestBet: integer("current_highest_bet").default(0).notNull(),
 	currentPlayerTurn: uuid("current_player_turn"),
 	pot: integer("pot").default(0).notNull(),
+	bigBlind: integer("big_blind").default(20).notNull(),
+	smallBlind: integer("small_blind").default(10).notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

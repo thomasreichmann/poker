@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, isNull, not, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
 import { type ActInput } from "~/server/api/routers/player/action";
 import { type AuthenticatedTRPCContext as Context } from "~/server/api/trpc";
 import { createPlayer, getActivePlayersWithCards } from "~/server/db/repos/playerRepository";
@@ -99,11 +99,82 @@ export async function handleActionType(ctx: Context, action: Action): Promise<Ga
 	}
 }
 
-export async function handleBet(ctx: Context, action: Action): Promise<Game> {
+/**
+ * Validates a bet action against the current game state and player state
+ * @throws {TRPCError} If the bet is invalid
+ */
+async function validateBet(
+	ctx: Context,
+	action: Action,
+	game: Game,
+	player: Player,
+): Promise<void> {
 	if (!action.amount) {
 		throw new TRPCError({ code: "BAD_REQUEST", message: "Bet amount is required" });
 	}
 
+	// Validate the bet amount
+	if (action.amount <= 0) {
+		throw new TRPCError({ code: "BAD_REQUEST", message: "Bet amount must be positive" });
+	}
+
+	if (action.amount > player.stack) {
+		throw new TRPCError({ code: "BAD_REQUEST", message: "Bet amount exceeds player's stack" });
+	}
+
+	// Calculate the minimum valid bet
+	const minValidBet = game.currentHighestBet + game.bigBlind;
+	if (action.amount < game.currentHighestBet) {
+		throw new TRPCError({
+			code: "BAD_REQUEST",
+			message: `Bet must be at least ${game.currentHighestBet} (current highest bet)`,
+		});
+	}
+
+	// If the bet is more than the current highest bet, it must be at least minValidBet
+	if (
+		action.amount > game.currentHighestBet &&
+		action.amount < minValidBet &&
+		action.amount !== player.stack
+	) {
+		throw new TRPCError({
+			code: "BAD_REQUEST",
+			message: `Bet must be at least ${minValidBet} (current highest bet + big blind)`,
+		});
+	}
+
+	// Validate that the bet is a multiple of the big blind
+	if (action.amount % game.bigBlind !== 0 && action.amount !== player.stack) {
+		throw new TRPCError({
+			code: "BAD_REQUEST",
+			message: `Bet must be a multiple of ${game.bigBlind}`,
+		});
+	}
+}
+
+export async function handleBet(ctx: Context, action: Action): Promise<Game> {
+	// Get the current game state
+	const game = await ctx.db.query.games.findFirst({
+		where: eq(games.id, action.gameId),
+	});
+
+	if (!game) {
+		throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Game not found" });
+	}
+
+	// Get the player's current state
+	const player = await ctx.db.query.players.findFirst({
+		where: eq(players.id, action.playerId),
+	});
+
+	if (!player) {
+		throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Player not found" });
+	}
+
+	// Validate the bet
+	await validateBet(ctx, action, game, player);
+
+	// Process the bet
 	await ctx.db
 		.update(players)
 		.set({
@@ -112,7 +183,7 @@ export async function handleBet(ctx: Context, action: Action): Promise<Game> {
 		})
 		.where(eq(players.id, action.playerId));
 
-	const game = (
+	const updatedGame = (
 		await ctx.db
 			.update(games)
 			.set({
@@ -123,11 +194,11 @@ export async function handleBet(ctx: Context, action: Action): Promise<Game> {
 			.returning()
 	)[0];
 
-	if (!game) {
+	if (!updatedGame) {
 		throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update game" });
 	}
 
-	return game;
+	return updatedGame;
 }
 
 export async function handleFold(ctx: Context, action: Action): Promise<Game> {
@@ -166,18 +237,62 @@ export const ROUND_PROGRESSION: Record<RoundType, RoundType | null> = {
 	showdown: null,
 };
 
+/**
+ * Handles the case where only one player remains in the game (everyone else has folded)
+ * @returns The completed game state
+ */
+async function handleSinglePlayerWin(
+	ctx: Context,
+	game: Game,
+	winner: { id: string; stack: number },
+): Promise<Game> {
+	// Update both player and game state in parallel
+	const [completedGame] = await Promise.all([
+		ctx.db
+			.update(games)
+			.set({
+				status: "completed",
+				currentRound: "showdown",
+				updatedAt: new Date(),
+			})
+			.where(eq(games.id, game.id))
+			.returning(),
+		ctx.db
+			.update(players)
+			.set({
+				stack: sql`${players.stack} + ${game.pot}`,
+				hasWon: true,
+			})
+			.where(eq(players.id, winner.id))
+			.returning(),
+	]);
+
+	if (!completedGame?.[0]) {
+		throw new Error("Failed to complete game");
+	}
+
+	return completedGame[0];
+}
+
 export async function advanceGameState(ctx: Context, game: Game): Promise<Game> {
-	// Check if all players have acted in the current round
-	const unactedPlayers = await ctx.db
-		.select()
+	// Get all active players and their current bets in a single query
+	const activePlayers = await ctx.db
+		.select({
+			id: players.id,
+			stack: players.stack,
+			currentBet: players.currentBet,
+		})
 		.from(players)
-		.where(
-			and(
-				eq(players.gameId, game.id),
-				eq(players.hasFolded, false),
-				or(isNull(players.currentBet), not(eq(players.currentBet, game.currentHighestBet))),
-			),
-		);
+		.where(and(eq(players.gameId, game.id), eq(players.hasFolded, false)));
+
+	if (activePlayers.length === 1) {
+		return handleSinglePlayerWin(ctx, game, activePlayers[0]!);
+	}
+
+	// Check if all players have acted in the current round
+	const unactedPlayers = activePlayers.filter(
+		(player) => !player.currentBet || player.currentBet !== game.currentHighestBet,
+	);
 
 	const allPlayersActed = unactedPlayers.length === 0;
 
@@ -200,27 +315,31 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 			return resetGame(ctx, game.id);
 	}
 
-	// Reset current bets for the new round
-	await ctx.db.update(players).set({ currentBet: null }).where(eq(players.gameId, game.id));
+	// Reset current bets for the new round and advance to next round in parallel
+	const [updatedPlayers, updatedGame] = await Promise.all([
+		ctx.db
+			.update(players)
+			.set({ currentBet: null })
+			.where(eq(players.gameId, game.id))
+			.returning(),
+		ctx.db
+			.update(games)
+			.set({
+				currentRound: nextRound,
+				currentHighestBet: 0,
+			})
+			.where(eq(games.id, game.id))
+			.returning(),
+	]);
 
-	// Advance to the next round
-	const [updatedGame] = await ctx.db
-		.update(games)
-		.set({
-			currentRound: nextRound,
-			currentHighestBet: 0,
-		})
-		.where(eq(games.id, game.id))
-		.returning();
-
-	if (!updatedGame) {
+	if (!updatedGame?.[0]) {
 		throw new Error("Failed to update game state");
 	}
 
-	await dealCards(ctx, updatedGame);
+	await dealCards(ctx, updatedGame[0]);
 
 	// Set the next player to act in the new round
-	return nextPlayer(ctx, updatedGame);
+	return nextPlayer(ctx, updatedGame[0]);
 }
 
 /**
@@ -301,6 +420,64 @@ async function dealCards(ctx: Context, game: Game) {
 	}
 }
 
+/**
+ * Finds the winner or winners of the game and their hand evaluations
+ * by comparing the highest hand of each player
+ */
+export async function findWinners(
+	game: GameWithCards,
+	activePlayers: PlayerWithCards[],
+): Promise<{
+	winners: PlayerWithCards[];
+	evaluations: Array<{ player: PlayerWithCards; evaluation: ReturnType<typeof evaluateHand> }>;
+}> {
+	if (activePlayers.length === 0) {
+		throw new Error("No active players to find winners");
+	}
+
+	const firstPlayer = activePlayers[0];
+	if (!firstPlayer?.gameId) {
+		throw new Error("First player has no game ID");
+	}
+
+	// Evaluate each player's hand
+	const playerHands = activePlayers.map((player) => {
+		if (!player.cards) {
+			throw new Error(`Player ${player.id} has no hole cards`);
+		}
+		const allCards = [...player.cards, ...(game.cards ?? [])];
+		return {
+			player,
+			evaluation: evaluateHand(allCards),
+		};
+	});
+
+	// Find the best hand rank
+	const bestRank = Math.max(...playerHands.map((ph) => ph.evaluation.rank));
+
+	// Filter players with the best hand rank
+	const bestHands = playerHands.filter((ph) => ph.evaluation.rank === bestRank);
+
+	// If only one player has the best hand, they win
+	if (bestHands.length === 1) {
+		return {
+			winners: [bestHands[0]!.player],
+			evaluations: playerHands,
+		};
+	}
+
+	// If multiple players have the same hand rank, compare their hand values
+	const bestValue = Math.max(...bestHands.map((ph) => ph.evaluation.value));
+	const winners = bestHands
+		.filter((ph) => ph.evaluation.value === bestValue)
+		.map((ph) => ph.player);
+
+	return {
+		winners,
+		evaluations: playerHands,
+	};
+}
+
 async function handleShowdown(ctx: Context, game: Game) {
 	// If we're at showdown, complete the game
 	const activePlayers = await getActivePlayersWithCards(ctx, game.id);
@@ -322,9 +499,64 @@ async function handleShowdown(ctx: Context, game: Game) {
 		throw new Error("Game with cards not found");
 	}
 
-	const winners = await findWinners(gameWithCards, activePlayers);
-	// TODO: Handle winners
-	console.log("winners", winners);
+	// Find winners and get all hand evaluations
+	const { winners, evaluations } = await findWinners(gameWithCards, activePlayers);
+
+	// Determine which players need to show their cards
+	// 1. All winners must show their cards
+	// 2. Players who bet/raised in the last round must show their cards
+	// 3. Players who called the last bet must show their cards
+	const lastRoundActions = await ctx.db.query.actions.findMany({
+		where: and(
+			eq(actions.gameId, game.id),
+			or(
+				eq(actions.actionType, ActionTypeSchema.enum.bet),
+				eq(actions.actionType, ActionTypeSchema.enum.call),
+			),
+		),
+		orderBy: desc(actions.createdAt),
+	});
+
+	const playersWhoActed = new Set(lastRoundActions.map((action) => action.playerId));
+	const playersToShowCards = new Set([...winners.map((w) => w.id), ...playersWhoActed]);
+
+	// Update player states with hand information and visibility
+	for (const { player, evaluation } of evaluations) {
+		await ctx.db
+			.update(players)
+			.set({
+				hasWon: winners.some((w) => w.id === player.id),
+				showCards: playersToShowCards.has(player.id),
+				handRank: evaluation.rank,
+				handValue: evaluation.value,
+				handName: evaluation.name,
+			})
+			.where(eq(players.id, player.id));
+	}
+
+	// Calculate pot distribution
+	const potPerWinner = Math.floor(game.pot / winners.length);
+	const remainder = game.pot % winners.length;
+
+	// Update winner stacks and log results
+	for (const [index, winner] of winners.entries()) {
+		// Add pot share to winner's stack
+		const extraChip = index < remainder ? 1 : 0; // Distribute remainder chips one by one
+		await ctx.db
+			.update(players)
+			.set({
+				stack: sql`${players.stack} + ${potPerWinner + extraChip}`,
+			})
+			.where(eq(players.id, winner.id));
+
+		// Log winner details
+		const winnerEval = evaluations.find((e) => e.player.id === winner.id);
+		console.log(`Winner ${winner.id}:`);
+		console.log(`- Hand: ${winner.cards?.map((card) => `${card.rank}${card.suit}`).join(" ")}`);
+		console.log(`- Hand Name: ${winnerEval?.evaluation.name}`);
+		console.log(`- Won: ${potPerWinner + extraChip} chips`);
+		console.log(`- New stack: ${winner.stack + potPerWinner + extraChip}`);
+	}
 
 	const [completedGame] = await ctx.db
 		.update(games)
@@ -425,59 +657,6 @@ export async function nextPlayer(
 	}
 
 	return updatedGame;
-}
-
-/**
- * Finds the winner or winners of the game
- * by comparing the highest hand of each player
- */
-export async function findWinners(
-	game: GameWithCards,
-	activePlayers: PlayerWithCards[],
-): Promise<PlayerWithCards[]> {
-	if (activePlayers.length === 0) {
-		throw new Error("No active players to find winners");
-	}
-
-	const firstPlayer = activePlayers[0];
-	if (!firstPlayer?.gameId) {
-		throw new Error("First player has no game ID");
-	}
-
-	// Evaluate each player's hand
-	const playerHands = activePlayers.map((player) => {
-		if (!player.cards) {
-			throw new Error(`Player ${player.id} has no hole cards`);
-		}
-		const allCards = [...player.cards, ...(game.cards ?? [])];
-		return {
-			player,
-			evaluation: evaluateHand(allCards),
-		};
-	});
-
-	// Find the best hand rank
-	const bestRank = Math.max(...playerHands.map((ph) => ph.evaluation.rank));
-
-	// Filter players with the best hand rank
-	const bestHands = playerHands.filter((ph) => ph.evaluation.rank === bestRank);
-
-	// If only one player has the best hand, they win
-	if (bestHands.length === 1) {
-		const winner = bestHands[0]?.player;
-		if (!winner) {
-			throw new Error("No winner found");
-		}
-		return [winner];
-	}
-
-	// If multiple players have the same hand rank, compare their hand values
-	const bestValue = Math.max(...bestHands.map((ph) => ph.evaluation.value));
-	const winners = bestHands
-		.filter((ph) => ph.evaluation.value === bestValue)
-		.map((ph) => ph.player);
-
-	return winners;
 }
 
 export async function resetGame(ctx: Context, gameId: string): Promise<Game> {
