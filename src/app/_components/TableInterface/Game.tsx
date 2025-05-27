@@ -36,14 +36,6 @@ export interface GameProps {
 
 const ActionButton = styled((props: ButtonProps) => <Button fullWidth {...props} />)({});
 
-const CommunityCard = styled(Chip)({
-	margin: "0 4px",
-	fontWeight: "bold",
-	fontSize: "1rem",
-	height: "36px",
-	minWidth: "48px",
-});
-
 const InfoChip = styled(Chip)({
 	height: "32px",
 	fontSize: "1rem",
@@ -177,7 +169,9 @@ export default function Game({ game }: GameProps) {
 									const isHighlighted = player.id === game.currentPlayerTurn;
 									const showCards =
 										game.status === "completed"
-											? player.showCards
+											? isCurrentPlayer
+												? true
+												: player.showCards
 											: isCurrentPlayer;
 
 									return (

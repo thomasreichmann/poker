@@ -679,6 +679,10 @@ export async function resetGame(ctx: Context, gameId: string): Promise<Game> {
 			currentBet: null,
 			isButton: false,
 			stack: 1000,
+			showCards: false,
+			handRank: null,
+			handValue: null,
+			handName: null,
 		})
 		.where(eq(players.gameId, gameId))
 		.returning();

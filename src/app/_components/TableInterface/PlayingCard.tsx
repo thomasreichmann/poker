@@ -8,7 +8,7 @@ const SUIT_SYMBOLS = {
 	spades: "♠",
 } as const;
 
-const CardContainer = styled("div")(({ theme }) => ({
+const CardContainer = styled("div")(() => ({
 	position: "relative",
 	width: "60px",
 	height: "84px",
