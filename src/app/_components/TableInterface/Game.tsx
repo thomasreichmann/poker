@@ -26,7 +26,6 @@ import {
 import { useEffect, useState } from "react";
 import { type Act } from "~/server/api/routers/player/action";
 import { type PublicGame } from "~/server/api/routers/player/player";
-import { createClient } from "~/supabase/client";
 import { api } from "~/trpc/react";
 import useDevGameActions from "../DevDashboard/useDevGameActions";
 
@@ -60,11 +59,14 @@ function getNextPlayer(game: PublicGame) {
 	return nextPlayer;
 }
 
-const supabase = createClient();
-
 export default function Game({ game }: GameProps) {
 	const utils = api.useUtils();
-	const { loginAsUser } = useDevGameActions();
+	const {
+		loginAsUser,
+		loading: loginAsUserLoading,
+		advanceGame,
+		advanceGameLoading,
+	} = useDevGameActions();
 	const [devSwitchUserAfterAction, setDevSwitchUserAfterAction] = useState<boolean>(false);
 	const resetGameMutation = api.admin.resetGame.useMutation();
 	const mutation = api.player.action.act.useMutation({
@@ -307,9 +309,19 @@ export default function Game({ game }: GameProps) {
 						variant="contained"
 						color="primary"
 						disabled={!game.currentPlayerTurn}
+						loading={loginAsUserLoading}
 						onClick={() => loginAsUser(game.currentPlayerTurn!)}
 					>
 						Switch to active player
+					</Button>
+					<Button
+						variant="contained"
+						color="primary"
+						onClick={() => {
+							advanceGame({ gameId: game.id });
+						}}
+					>
+						Advance Game
 					</Button>
 				</div>
 			</CardActions>

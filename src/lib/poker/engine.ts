@@ -192,9 +192,12 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 
 	const nextRound = ROUND_PROGRESSION[game.currentRound];
 
-	// If there's no next round, we're at showdown
-	if (!nextRound) {
-		return handleShowdown(ctx, game);
+	// Handle both special cases first
+	switch (nextRound) {
+		case "showdown":
+			return handleShowdown(ctx, game);
+		case null:
+			return resetGame(ctx, game.id);
 	}
 
 	// Reset current bets for the new round
@@ -306,7 +309,20 @@ async function handleShowdown(ctx: Context, game: Game) {
 		throw new Error("No active players found");
 	}
 
-	const winners = await findWinners(game, activePlayers);
+	const gameWithCards = await ctx.db.query.games.findFirst({
+		where: eq(games.id, game.id),
+		with: {
+			cards: {
+				where: isNull(cards.playerId),
+			},
+		},
+	});
+
+	if (!gameWithCards) {
+		throw new Error("Game with cards not found");
+	}
+
+	const winners = await findWinners(gameWithCards, activePlayers);
 	// TODO: Handle winners
 	console.log("winners", winners);
 
@@ -314,6 +330,7 @@ async function handleShowdown(ctx: Context, game: Game) {
 		.update(games)
 		.set({
 			status: "completed",
+			currentRound: "showdown",
 			updatedAt: new Date(),
 		})
 		.where(eq(games.id, game.id))
@@ -463,7 +480,7 @@ export async function findWinners(
 	return winners;
 }
 
-export async function resetGame(ctx: Context, gameId: string) {
+export async function resetGame(ctx: Context, gameId: string): Promise<Game> {
 	const [game] = await ctx.db
 		.update(games)
 		.set({
@@ -488,6 +505,10 @@ export async function resetGame(ctx: Context, gameId: string) {
 		.returning();
 
 	await ctx.db.delete(cards).where(eq(cards.gameId, gameId));
+
+	if (!game) {
+		throw new Error("Failed to reset game");
+	}
 
 	if (updatedPlayers.length > 1) {
 		await startGame(ctx, gameId);

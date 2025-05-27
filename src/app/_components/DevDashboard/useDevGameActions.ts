@@ -5,7 +5,13 @@ import { api } from "~/trpc/react";
 const client = createClient();
 
 const useDevGameActions = () => {
+	const utils = api.useUtils();
 	const loginMutation = api.admin.loginAsUser.useMutation();
+	const advanceGameMutation = api.admin.advanceGame.useMutation({
+		onSuccess: async () => {
+			await utils.player.getAllGames.invalidate();
+		},
+	});
 	const router = useRouter();
 
 	async function loginAsUser(email: string, redirectTo?: string) {
@@ -26,7 +32,12 @@ const useDevGameActions = () => {
 		);
 	}
 
-	return { loginAsUser };
+	return {
+		loginAsUser,
+		loading: loginMutation.isPending,
+		advanceGame: advanceGameMutation.mutate,
+		advanceGameLoading: advanceGameMutation.isPending,
+	};
 };
 
 export default useDevGameActions;

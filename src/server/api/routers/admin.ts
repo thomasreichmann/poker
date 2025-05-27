@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { resetGame } from "~/lib/poker/engine";
+import { advanceGameState, resetGame } from "~/lib/poker/engine";
 import { type AuthenticatedTRPCContext, createTRPCRouter, devProcedure } from "~/server/api/trpc";
 import { games } from "~/server/db/schema/games";
 import { players } from "~/server/db/schema/players";
@@ -124,5 +124,20 @@ export const adminRouter = createTRPCRouter({
 			}
 
 			await resetGame(ctx as AuthenticatedTRPCContext, input.gameId);
+		}),
+	advanceGame: devProcedure
+		.input(
+			z.object({
+				gameId: z.string(),
+			}),
+		)
+		.mutation(async ({ input, ctx }) => {
+			const [game] = await ctx.db.select().from(games).where(eq(games.id, input.gameId));
+
+			if (!game) {
+				throw new Error("Game not found");
+			}
+
+			await advanceGameState(ctx as AuthenticatedTRPCContext, game);
 		}),
 });
