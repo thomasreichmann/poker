@@ -33,7 +33,7 @@ describe("Game Engine", () => {
 				}),
 			];
 
-			const winners = await findWinners(mockGame, activePlayers);
+			const { winners } = await findWinners(mockGame, activePlayers);
 			expect(winners).toHaveLength(1);
 			expect(winners[0]?.id).toBe("player1"); // Player 1 has a straight flush with 9 high
 		});
@@ -58,7 +58,7 @@ describe("Game Engine", () => {
 				}),
 			];
 
-			const winners = await findWinners(mockGame, activePlayers);
+			const { winners } = await findWinners(mockGame, activePlayers);
 			expect(winners).toHaveLength(2);
 			expect(winners.map((winner) => winner.id)).toContain("player1");
 			expect(winners.map((winner) => winner.id)).toContain("player2");

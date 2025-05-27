@@ -17,6 +17,8 @@ export const createTestGame = (overrides: Partial<GameWithCards> = {}): GameWith
 		["J", "hearts"],
 		["10", "hearts"],
 	]),
+	bigBlind: 20,
+	smallBlind: 10,
 	...overrides,
 });
 
@@ -31,6 +33,11 @@ export const createTestPlayer = (overrides: Partial<PlayerWithCards> = {}): Play
 	isConnected: true,
 	isButton: false,
 	lastSeen: new Date(),
+	hasWon: false,
+	handName: null,
+	showCards: false,
+	handRank: null,
+	handValue: null,
 	...overrides,
 });
 

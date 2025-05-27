@@ -3,7 +3,7 @@ import { type Config } from "drizzle-kit";
 import { loadEnvConfig } from "@next/env";
 
 const projectDir = process.cwd();
-loadEnvConfig(projectDir);
+loadEnvConfig(projectDir, process.env.NODE_ENV === "development");
 
 export default {
 	schema: "./src/server/db/schema",

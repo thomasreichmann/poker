@@ -27,7 +27,7 @@ const navItems: NavItem[] = [
 ];
 
 function DevDashboardComponent() {
-	const [selectedItem, setSelectedItem] = useState<NavItem>(navItems[0]!);
+	const [selectedItem] = useState<NavItem>(navItems[0]!);
 
 	return (
 		<div className="flex">

@@ -10,9 +10,8 @@ import PublicGames from "~/app/_components/PublicGames";
 import Realtime from "~/app/_components/Realtime";
 import { createClient } from "~/supabase/server";
 
-const supabase = createClient();
-
 export default async function Home() {
+	const supabase = createClient();
 	const { data, error } = await supabase.auth.getUser();
 	const user = data ? data.user : null;
 

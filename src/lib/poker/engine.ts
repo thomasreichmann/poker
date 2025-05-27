@@ -316,12 +316,7 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 	}
 
 	// Reset current bets for the new round and advance to next round in parallel
-	const [updatedPlayers, updatedGame] = await Promise.all([
-		ctx.db
-			.update(players)
-			.set({ currentBet: null })
-			.where(eq(players.gameId, game.id))
-			.returning(),
+	const [updatedGame] = await Promise.all([
 		ctx.db
 			.update(games)
 			.set({
@@ -329,6 +324,11 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 				currentHighestBet: 0,
 			})
 			.where(eq(games.id, game.id))
+			.returning(),
+		ctx.db
+			.update(players)
+			.set({ currentBet: null })
+			.where(eq(players.gameId, game.id))
 			.returning(),
 	]);
 
