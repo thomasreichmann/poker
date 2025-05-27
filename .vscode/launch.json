@@ -3,15 +3,26 @@
 	"configurations": [
 		{
 			"name": "Next.js: Local",
-			"type": "node-terminal",
+			"type": "node",
 			"request": "launch",
-			"command": "pnpm dev:local",
+			"program": "${workspaceFolder}/node_modules/next/dist/bin/next",
+			"args": ["dev"],
+			"internalConsoleOptions": "openOnSessionStart",
 			"cwd": "${workspaceFolder}",
 			"skipFiles": ["<node_internals>/**"],
 			"env": {
 				"APP_ENV": "local"
 			},
-			"resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+			"serverReadyAction": {
+				"pattern": "- Local:.+(https?://.+)",
+				"uriFormat": "%s",
+				"action": "openExternally"
+			},
+			"resolveSourceMapLocations": [
+				"${workspaceFolder}/**",
+				"!**/node_modules/**",
+				"!**/.next/**"
+			]
 		},
 		{
 			"name": "Next.js: Development",
@@ -24,18 +35,6 @@
 				"APP_ENV": "development"
 			},
 			"resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
-		},
-		{
-			"name": "Next.js: Debug",
-			"type": "node-terminal",
-			"request": "launch",
-			"command": "pnpm dev",
-			"serverReadyAction": {
-				"pattern": "- Local:.+(https?://.+)",
-				"uriFormat": "%s",
-				"action": "debugWithChrome"
-			},
-			"resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
 		}
 	],
 	"compounds": [
@@ -46,7 +45,8 @@
 				"hidden": false,
 				"group": "Development",
 				"order": 1
-			}
+			},
+			"stopAll": true
 		},
 		{
 			"name": "Full Stack: Development",

@@ -9,6 +9,7 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
+import { env } from "~/env";
 
 import { db } from "~/server/db";
 import { createClient } from "~/supabase/server";
@@ -28,7 +29,9 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 	const supabase = createClient();
 
 	const { data, error } = await supabase.auth.getUser();
-	if (error) throw error;
+	if (error && error?.name !== "AuthSessionMissingError") {
+		throw error;
+	}
 	const user = data.user;
 
 	return {
@@ -36,6 +39,11 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 		user,
 		...opts,
 	};
+};
+
+export type TRPCContext = Awaited<ReturnType<typeof createTRPCContext>>;
+export type AuthenticatedTRPCContext = TRPCContext & {
+	user: NonNullable<TRPCContext["user"]>;
 };
 
 /**
@@ -128,7 +136,22 @@ const protectedMiddleware = t.middleware(async ({ ctx, next }) => {
 	if (!ctx.user) {
 		throw new TRPCError({ code: "UNAUTHORIZED" });
 	}
-	return next();
+	return next({
+		ctx: {
+			...ctx,
+			user: ctx.user,
+		},
+	});
 });
 
 export const privateProcedure = t.procedure.use(protectedMiddleware);
+
+const devMiddleware = t.middleware(async ({ next }) => {
+	if (env.APP_ENV !== "development" && env.APP_ENV !== "local") {
+		throw new TRPCError({ code: "UNAUTHORIZED" });
+	}
+
+	return next();
+});
+
+export const devProcedure = t.procedure.use(devMiddleware);
