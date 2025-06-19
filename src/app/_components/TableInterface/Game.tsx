@@ -91,7 +91,6 @@ export default function Game({ game }: GameProps) {
 
 		await mutation.mutateAsync({
 			gameId: game.id,
-			playerId: game.callerPlayer!.id,
 			...actionData,
 		});
 	};

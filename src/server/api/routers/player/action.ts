@@ -1,7 +1,10 @@
+import { TRPCError } from "@trpc/server";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { handleAction } from "~/lib/poker/engine";
 import { createTRPCRouter, privateProcedure } from "~/server/api/trpc";
 import { ActionTypeSchema } from "~/server/db/schema/actions";
+import { players } from "~/server/db/schema/players";
 
 const actSchema = z.discriminatedUnion("action", [
 	z.object({
@@ -18,12 +21,21 @@ const actSchema = z.discriminatedUnion("action", [
 
 export type Act = z.infer<typeof actSchema>;
 
-// TODO: Remove playerId from input (unsafe), use ctx.user.id to get the playerId instead
-const actInput = z.object({ gameId: z.string(), playerId: z.string() }).and(actSchema);
+const actInput = z.object({ gameId: z.string() }).and(actSchema);
 export type ActInput = z.infer<typeof actInput>;
 
 export const actionRouter = createTRPCRouter({
-	act: privateProcedure.input(actInput).mutation(({ ctx, input }) => {
-		return handleAction(ctx, input);
+	act: privateProcedure.input(actInput).mutation(async ({ ctx, input }) => {
+		const userId = ctx.user.id;
+
+		const player = await ctx.db.query.players.findFirst({
+			where: and(eq(players.userId, userId), eq(players.gameId, input.gameId)),
+		});
+
+		if (!player) {
+			throw new TRPCError({ code: "BAD_REQUEST", message: "Player not in game" });
+		}
+
+		return handleAction(ctx, input, player.id);
 	}),
 });

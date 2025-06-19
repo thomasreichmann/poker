@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { advanceGameState, resetGame } from "~/lib/poker/engine";
@@ -120,7 +121,7 @@ export const adminRouter = createTRPCRouter({
 		.mutation(async ({ input, ctx }) => {
 			const [game] = await ctx.db.select().from(games).where(eq(games.id, input.gameId));
 			if (!game) {
-				throw new Error("Game not found");
+				throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Game not found" });
 			}
 
 			await resetGame(ctx as AuthenticatedTRPCContext, input.gameId);

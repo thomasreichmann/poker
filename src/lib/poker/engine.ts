@@ -65,12 +65,12 @@ export async function startGame(ctx: Context, gameId: string) {
 	return game;
 }
 
-export async function handleAction(ctx: Context, input: ActInput): Promise<Game> {
+export async function handleAction(ctx: Context, input: ActInput, playerId: string): Promise<Game> {
 	const [action] = await ctx.db
 		.insert(actions)
 		.values({
 			gameId: input.gameId,
-			playerId: input.playerId,
+			playerId,
 			actionType: input.action,
 			amount: input.action === ActionTypeSchema.enum.bet ? input.amount : null,
 		})
@@ -124,7 +124,7 @@ async function validateBet(
 
 	// Calculate the minimum valid bet
 	const minValidBet = game.currentHighestBet + game.bigBlind;
-	if (action.amount < game.currentHighestBet) {
+	if (action.amount + (player.currentBet ?? 0) < game.currentHighestBet) {
 		throw new TRPCError({
 			code: "BAD_REQUEST",
 			message: `Bet must be at least ${game.currentHighestBet} (current highest bet)`,
@@ -140,14 +140,6 @@ async function validateBet(
 		throw new TRPCError({
 			code: "BAD_REQUEST",
 			message: `Bet must be at least ${minValidBet} (current highest bet + big blind)`,
-		});
-	}
-
-	// Validate that the bet is a multiple of the big blind
-	if (action.amount % game.bigBlind !== 0 && action.amount !== player.stack) {
-		throw new TRPCError({
-			code: "BAD_REQUEST",
-			message: `Bet must be a multiple of ${game.bigBlind}`,
 		});
 	}
 }
@@ -202,26 +194,24 @@ export async function handleBet(ctx: Context, action: Action): Promise<Game> {
 }
 
 export async function handleFold(ctx: Context, action: Action): Promise<Game> {
-	await ctx.db
+	const [updatedPlayer] = await ctx.db
 		.update(players)
 		.set({
 			hasFolded: true,
 		})
-		.where(eq(players.id, action.playerId));
+		.where(eq(players.id, action.playerId))
+		.returning();
 
-	// TODO: Remove this, the update is unnecessary, it only exists to make the return type standard for later use.
-	const game = (
-		await ctx.db
-			.update(games)
-			.set({
-				updatedAt: new Date(),
-			})
-			.where(eq(games.id, action.gameId))
-			.returning()
-	)[0];
+	if (!updatedPlayer) {
+		throw new TRPCError({ code: "BAD_REQUEST", message: "Player not in game" });
+	}
+
+	const game = await ctx.db.query.games.findFirst({
+		where: eq(games.id, action.gameId),
+	});
 
 	if (!game) {
-		throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update game" });
+		throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 	}
 
 	return game;
