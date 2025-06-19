@@ -7,20 +7,18 @@ import { players } from "~/server/db/schema/players";
 
 export const gameRouter = createTRPCRouter({
 	getAll: privateProcedure.query(async ({ ctx }) => {
-		const games = await ctx.db.query.games.findMany();
-		return games;
+		const allGames = await ctx.db.query.games.findMany();
+		return allGames;
 	}),
 	get: privateProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
-		const game = await ctx.db.query.games.findFirst({
-			where: (gamesTable, { eq }) => eq(gamesTable.id, input.id),
-		});
+		const [game] = await ctx.db.select().from(games).where(eq(games.id, input.id));
 		return game;
 	}),
 	getSingle: privateProcedure
 		.input(z.object({ id: z.string() }))
 		.query(async ({ ctx, input }) => {
 			const game = await ctx.db.query.games.findFirst({
-				where: (gamesTable, { eq }) => eq(gamesTable.id, input.id),
+				where: eq(games.id, input.id),
 				with: {
 					players: {
 						with: {
@@ -64,7 +62,7 @@ export const gameRouter = createTRPCRouter({
 		.input(z.object({ gameId: z.string() }))
 		.mutation(async ({ ctx, input }) => {
 			const game = await ctx.db.query.games.findFirst({
-				where: (g, { eq }) => eq(g.id, input.gameId),
+				where: eq(games.id, input.gameId),
 				with: {
 					players: true,
 				},

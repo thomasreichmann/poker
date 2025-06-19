@@ -18,6 +18,10 @@ export function PublicGamesComponent() {
 	const { handleJoinGame, handleLeaveGame, isGameBeingModified, createGame, deleteGame } =
 		useGameMutations();
 
+	const handleViewGame = (gameId: string) => {
+		window.location.href = `/game/${gameId}`;
+	};
+
 	return (
 		<Stack spacing={2}>
 			<Button
@@ -70,11 +74,13 @@ export function PublicGamesComponent() {
 									)}
 								</TableCell>
 								<TableCell>
-									<a href={`/game/${game.id}`}>
-										<Button variant="outlined" color="primary">
-											View Game
-										</Button>
-									</a>
+									<Button 
+										variant="outlined" 
+										color="primary"
+										onClick={() => handleViewGame(game.id)}
+									>
+										View Game
+									</Button>
 								</TableCell>
 								<TableCell>
 									<Button

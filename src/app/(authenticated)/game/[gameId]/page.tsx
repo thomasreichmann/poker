@@ -1,7 +1,7 @@
 import { Suspense } from "react";
+import { Box, Paper, Skeleton } from "@mui/material";
 import { api, HydrateClient } from "~/trpc/server";
 import { SingleGameInterface } from "./SingleGameInterface";
-import { Box, Paper, Skeleton } from "@mui/material";
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +20,14 @@ function LoadingSkeleton() {
 	);
 }
 
-interface SingleGamePageProps {
-	params: {
+interface PageProps {
+	params: Promise<{
 		gameId: string;
-	};
+	}>;
 }
 
-export default async function SingleGamePage({ params }: SingleGamePageProps) {
-	const gameId = params.gameId;
+export default async function SingleGamePage({ params }: PageProps) {
+	const { gameId } = await params;
 
 	// Prefetch the game data
 	void api.game.getSingle.prefetch({ id: gameId });
