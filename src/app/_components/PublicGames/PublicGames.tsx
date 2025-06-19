@@ -37,6 +37,7 @@ export function PublicGamesComponent() {
 							<TableCell>Current Turn</TableCell>
 							<TableCell>Status</TableCell>
 							<TableCell>Actions</TableCell>
+							<TableCell>View</TableCell>
 							<TableCell>Delete</TableCell>
 						</TableRow>
 					</TableHead>
@@ -67,6 +68,13 @@ export function PublicGamesComponent() {
 											Join
 										</Button>
 									)}
+								</TableCell>
+								<TableCell>
+									<a href={`/game/${game.id}`}>
+										<Button variant="outlined" color="primary">
+											View Game
+										</Button>
+									</a>
 								</TableCell>
 								<TableCell>
 									<Button

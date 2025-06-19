@@ -12,10 +12,41 @@ export const gameRouter = createTRPCRouter({
 	}),
 	get: privateProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
 		const game = await ctx.db.query.games.findFirst({
-			where: (games, { eq }) => eq(games.id, input.id),
+			where: (gamesTable, { eq }) => eq(gamesTable.id, input.id),
 		});
 		return game;
 	}),
+	getSingle: privateProcedure
+		.input(z.object({ id: z.string() }))
+		.query(async ({ ctx, input }) => {
+			const game = await ctx.db.query.games.findFirst({
+				where: (gamesTable, { eq }) => eq(gamesTable.id, input.id),
+				with: {
+					players: {
+						with: {
+							cards: true,
+						},
+					},
+					cards: {
+						where: (cards, { isNull }) => isNull(cards.playerId),
+					},
+				},
+			});
+
+			if (!game) {
+				throw new Error("Game not found");
+			}
+
+			const callerPlayer = game.players.find((player) => player.userId === ctx.user.id);
+			const hasJoined = !!callerPlayer;
+
+			return {
+				...game,
+				hasJoined,
+				communityCards: game.cards.filter((card) => !!card.gameId),
+				callerPlayer,
+			};
+		}),
 	create: privateProcedure.mutation(async ({ ctx }) => {
 		return await ctx.db.insert(games).values({}).returning();
 	}),
