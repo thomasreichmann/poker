@@ -8,3 +8,10 @@ export default function Realtime() {
 		</Suspense>
 	);
 }
+
+export { RealtimeTest } from "./realtime";
+export { useGameRealtime } from "./useGameRealtime";
+export { usePlayerRealtime } from "./usePlayerRealtime";
+export { usePokerRealtime } from "./usePokerRealtime";
+export { RealtimeStatus } from "./RealtimeStatus";
+export { RealtimeTest as RealtimeTestNew } from "./test-realtime";
