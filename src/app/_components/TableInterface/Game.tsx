@@ -343,6 +343,7 @@ export default function Game({ game }: GameProps) {
 
 /**
  * TODO:
- * - Integrate realtime updates to update the game state without making extra requests
  * - Create a better UI to display the game state
+ * - Add visual indicators for realtime connection status
+ * - Optimize performance for large numbers of concurrent games
  */

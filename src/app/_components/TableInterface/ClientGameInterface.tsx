@@ -3,6 +3,7 @@
 import { Box, Paper, Tab, Tabs } from "@mui/material";
 import { useState } from "react";
 import { api } from "~/trpc/react";
+import { usePokerRealtime, RealtimeStatus } from "../Realtime";
 import Game from "./Game";
 
 interface TabPanelProps {
@@ -39,6 +40,9 @@ function TabPanel(props: TabPanelProps) {
 export function ClientGameInterface() {
 	const [currentGame, setCurrentGame] = useState(0);
 	const [games] = api.player.getAllGames.useSuspenseQuery({ joinedOnly: true });
+	
+	// Enable realtime updates for game state
+	const realtimeStatus = usePokerRealtime();
 
 	const handleGameChange = (event: React.SyntheticEvent, newValue: number) => {
 		setCurrentGame(newValue);
@@ -46,7 +50,7 @@ export function ClientGameInterface() {
 
 	return (
 		<Box className="flex grow flex-col">
-			<Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+			<Box sx={{ borderBottom: 1, borderColor: "divider" }} className="flex items-center justify-between px-2">
 				<Tabs
 					value={currentGame}
 					onChange={handleGameChange}
@@ -63,6 +67,7 @@ export function ClientGameInterface() {
 						/>
 					))}
 				</Tabs>
+				<RealtimeStatus />
 			</Box>
 
 			{games.map((game, index) => (
