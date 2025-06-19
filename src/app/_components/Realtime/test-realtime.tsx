@@ -3,16 +3,24 @@
 import { Button, Paper, Typography, Box } from "@mui/material";
 import { useState } from "react";
 import { api } from "~/trpc/react";
-import { usePokerRealtime } from "./usePokerRealtime";
+
+interface PokerRealtimeStatus {
+  isConnected: boolean;
+  lastUpdate: Date | null;
+  connectionErrors: number;
+}
+
+interface RealtimeTestProps {
+  status?: PokerRealtimeStatus;
+}
 
 /**
  * Test component to verify realtime functionality
  * This should only be used in development for testing
  */
-export function RealtimeTest() {
+export function RealtimeTest({ status }: RealtimeTestProps) {
   const [games] = api.player.getAllGames.useSuspenseQuery();
   const createGameMutation = api.game.create.useMutation();
-  const realtimeStatus = usePokerRealtime();
   const [logs, setLogs] = useState<string[]>([]);
 
   const addLog = (message: string) => {
@@ -35,17 +43,19 @@ export function RealtimeTest() {
         Realtime Functionality Test
       </Typography>
       
-      <Box className="mb-4">
-        <Typography variant="body2" color="text.secondary">
-          Connection Status: {realtimeStatus.isConnected ? "Connected" : "Disconnected"}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Errors: {realtimeStatus.connectionErrors}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Last Update: {realtimeStatus.lastUpdate?.toLocaleTimeString() || "None"}
-        </Typography>
-      </Box>
+      {status && (
+        <Box className="mb-4">
+          <Typography variant="body2" color="text.secondary">
+            Connection Status: {status.isConnected ? "Connected" : "Disconnected"}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Errors: {status.connectionErrors}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Last Update: {status.lastUpdate?.toLocaleTimeString() || "None"}
+          </Typography>
+        </Box>
+      )}
 
       <Box className="mb-4">
         <Button 

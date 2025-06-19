@@ -1,15 +1,19 @@
 "use client";
 
 import { Chip, Tooltip } from "@mui/material";
-import { usePokerRealtime } from "./usePokerRealtime";
+
+interface PokerRealtimeStatus {
+  isConnected: boolean;
+  lastUpdate: Date | null;
+  connectionErrors: number;
+}
 
 interface RealtimeStatusProps {
   showDetails?: boolean;
+  status: PokerRealtimeStatus;
 }
 
-export function RealtimeStatus({ showDetails = false }: RealtimeStatusProps) {
-  const status = usePokerRealtime();
-
+export function RealtimeStatus({ showDetails = false, status }: RealtimeStatusProps) {
   const getStatusColor = () => {
     if (!status.isConnected) return "error";
     if (status.connectionErrors > 0) return "warning";

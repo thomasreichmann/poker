@@ -82,7 +82,9 @@ export function usePokerRealtime() {
           table: "poker_games",
         },
         (payload: RealtimePayload) => {
-          const gameId = payload.new && 'id' in payload.new ? String(payload.new.id) : 'unknown';
+          // For DELETE operations, data is in payload.old, for INSERT/UPDATE it's in payload.new
+          const gameData = payload.new || payload.old;
+          const gameId = gameData && 'id' in gameData ? String(gameData.id) : 'unknown';
           console.log("Game state changed:", payload.eventType, gameId);
           scheduleInvalidation(`games:${gameId}`);
         }
@@ -96,7 +98,8 @@ export function usePokerRealtime() {
           table: "poker_players",
         },
         (payload: RealtimePayload) => {
-          const gameId = payload.new && 'game_id' in payload.new ? String(payload.new.game_id) : 'unknown';
+          const playerData = payload.new || payload.old;
+          const gameId = playerData && 'game_id' in playerData ? String(playerData.game_id) : 'unknown';
           console.log("Player state changed:", payload.eventType, gameId);
           scheduleInvalidation(`players:${gameId}`);
         }
@@ -110,7 +113,8 @@ export function usePokerRealtime() {
           table: "poker_actions",
         },
         (payload: RealtimePayload) => {
-          const gameId = payload.new && 'game_id' in payload.new ? String(payload.new.game_id) : 'unknown';
+          const actionData = payload.new || payload.old;
+          const gameId = actionData && 'game_id' in actionData ? String(actionData.game_id) : 'unknown';
           console.log("Action recorded:", payload.eventType, gameId);
           scheduleInvalidation(`actions:${gameId}`);
         }
@@ -124,7 +128,8 @@ export function usePokerRealtime() {
           table: "poker_cards",
         },
         (payload: RealtimePayload) => {
-          const gameId = payload.new && 'game_id' in payload.new ? String(payload.new.game_id) : 'unknown';
+          const cardData = payload.new || payload.old;
+          const gameId = cardData && 'game_id' in cardData ? String(cardData.game_id) : 'unknown';
           console.log("Cards changed:", payload.eventType, gameId);
           scheduleInvalidation(`cards:${gameId}`);
         }

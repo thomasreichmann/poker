@@ -67,7 +67,7 @@ export function ClientGameInterface() {
 						/>
 					))}
 				</Tabs>
-				<RealtimeStatus />
+				<RealtimeStatus status={realtimeStatus} />
 			</Box>
 
 			{games.map((game, index) => (

@@ -11,16 +11,12 @@ import {
 	TableRow,
 } from "@mui/material";
 import { api } from "~/trpc/react";
-import { usePokerRealtime } from "../Realtime/usePokerRealtime";
 import { useGameMutations } from "./useGameMutations";
 
 export function PublicGamesComponent() {
 	const [games] = api.player.getAllGames.useSuspenseQuery();
 	const { handleJoinGame, handleLeaveGame, isGameBeingModified, createGame, deleteGame } =
 		useGameMutations();
-
-	// Enable realtime updates for games list
-	const realtimeStatus = usePokerRealtime();
 
 	return (
 		<Stack spacing={2}>

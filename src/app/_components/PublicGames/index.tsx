@@ -1,5 +1,5 @@
 import { api, HydrateClient } from "~/trpc/server";
-import { PublicGamesComponent } from "./PublicGames";
+import { PublicGamesWithRealtime } from "./PublicGamesWithRealtime";
 
 export default async function PublicGames() {
 	await api.player.getAllGames.prefetch();
@@ -7,7 +7,7 @@ export default async function PublicGames() {
 	return (
 		<div className="flex flex-col gap-4">
 			<HydrateClient>
-				<PublicGamesComponent />
+				<PublicGamesWithRealtime />
 			</HydrateClient>
 		</div>
 	);
