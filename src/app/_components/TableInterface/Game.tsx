@@ -24,6 +24,7 @@ import {
 	Typography,
 } from "@mui/material";
 import { useEffect, useState } from "react";
+import useRealtime from "~/app/_components/Realtime/useRealtime";
 import { type Act } from "~/server/api/routers/player/action";
 import { type PublicGame } from "~/server/api/routers/player/player";
 import { api } from "~/trpc/react";
@@ -52,7 +53,10 @@ function getNextPlayer(game: PublicGame) {
 	return nextPlayer;
 }
 
-export default function Game({ game }: GameProps) {
+export default function Game({ game: serverGame }: GameProps) {
+	const { game: realtimeGame } = useRealtime("123");
+	const [game, setGame] = useState(serverGame);
+
 	const utils = api.useUtils();
 	const {
 		loginAsUser,
@@ -78,6 +82,12 @@ export default function Game({ game }: GameProps) {
 		const saved = localStorage.getItem("devSwitchUserAfterAction");
 		setDevSwitchUserAfterAction(saved ? (JSON.parse(saved) as boolean) : false);
 	}, []);
+
+	useEffect(() => {
+		console.log("Got new game, overriding existing game state with:", realtimeGame);
+		// Deconstruct the fresh game state from realtime in to the existing one, since we don't get relations (cards, players, etc) from realtime, only the games table info.
+		setGame({ ...game, ...realtimeGame });
+	}, [realtimeGame]);
 
 	const [betAmount, setBetAmount] = useState(100);
 	const isOurTurn = game.currentPlayerTurn === game.callerPlayer?.id;

@@ -91,6 +91,8 @@ export async function handleActionType(ctx: Context, action: Action): Promise<Ga
 			return handleBet(ctx, action);
 		case ActionTypeSchema.enum.fold:
 			return handleFold(ctx, action);
+		case ActionTypeSchema.enum.check:
+			return handleCheck(ctx, action);
 		default:
 			throw new TRPCError({
 				code: "INTERNAL_SERVER_ERROR",
@@ -193,6 +195,40 @@ export async function handleBet(ctx: Context, action: Action): Promise<Game> {
 	return updatedGame;
 }
 
+export async function handleCheck(ctx: Context, action: Action): Promise<Game> {
+	const game = await ctx.db.query.games.findFirst({
+		where: eq(games.id, action.gameId),
+	});
+
+	if (!game) {
+		throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Game not found" });
+	}
+
+	const player = await ctx.db.query.players.findFirst({
+		where: eq(players.id, action.playerId),
+	});
+
+	if (!player) {
+		throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Player not found" });
+	}
+
+	if (game.currentHighestBet !== 0) {
+		throw new TRPCError({
+			code: "BAD_REQUEST",
+			message: "Player can't check, there is a bet in the current round",
+		});
+	}
+
+	await ctx.db
+		.update(players)
+		.set({
+			currentBet: 0,
+		})
+		.where(eq(players.id, action.playerId));
+
+	return game;
+}
+
 export async function handleFold(ctx: Context, action: Action): Promise<Game> {
 	const [updatedPlayer] = await ctx.db
 		.update(players)
@@ -281,7 +317,7 @@ export async function advanceGameState(ctx: Context, game: Game): Promise<Game> 
 
 	// Check if all players have acted in the current round
 	const unactedPlayers = activePlayers.filter(
-		(player) => !player.currentBet || player.currentBet !== game.currentHighestBet,
+		(player) => player.currentBet !== game.currentHighestBet,
 	);
 
 	const allPlayersActed = unactedPlayers.length === 0;
