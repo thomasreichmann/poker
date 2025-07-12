@@ -1,8 +1,9 @@
 import { relations } from "drizzle-orm";
 import { integer, pgEnum, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { ActionType } from "~/server/db/schema/actionTypes";
 import { actions } from "./actions";
 import { type Card, cards } from "./cards";
-import { players } from "./players";
+import { type Player, players } from "./players";
 import { timeouts } from "./timeouts";
 
 export const roundTypeEnum = pgEnum("round_type", [
@@ -25,6 +26,8 @@ export const games = pgTable("poker_games", {
 	bigBlind: integer("big_blind").default(20).notNull(),
 	smallBlind: integer("small_blind").default(10).notNull(),
 	updatedAt: timestamp("updated_at").defaultNow().notNull(),
+	lastAction: ActionType("last_action").default("check"),
+	lastBetAmount: integer("last_bet_amount").default(0),
 });
 
 export type Game = typeof games.$inferSelect;
@@ -41,3 +44,4 @@ export const gamesRelations = relations(games, ({ many, one }) => ({
 }));
 
 export type GameWithCards = Game & { cards?: Card[] };
+export type GameWithPlayers = Game & { players?: Player[] };

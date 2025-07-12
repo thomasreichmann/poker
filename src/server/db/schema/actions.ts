@@ -1,17 +1,10 @@
 import { relations } from "drizzle-orm";
-import { integer, pgEnum, pgTable, serial, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, serial, timestamp, uuid } from "drizzle-orm/pg-core";
 import { z } from "zod";
+import { ActionType } from "~/server/db/schema/actionTypes";
 import { games } from "~/server/db/schema/games";
 import { players } from "~/server/db/schema/players";
 
-export const ActionType = pgEnum("action_type", [
-	"bet",
-	"check",
-	"call",
-	"raise",
-	"fold",
-	"timeout",
-]);
 export const ActionTypeSchema = z.enum(ActionType.enumValues);
 
 export const actions = pgTable("poker_actions", {

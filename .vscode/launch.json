@@ -16,7 +16,8 @@
 				"pattern": "- Local:.+(https?://.+)",
 				"uriFormat": "%s",
 				"action": "openExternally"
-			}
+			},
+			"runtimeExecutable": "/Users/thomas/.nodenv/shims/node"
 		},
 		{
 			"name": "Next.js: Development",

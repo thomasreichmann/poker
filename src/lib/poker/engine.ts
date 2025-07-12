@@ -183,6 +183,8 @@ export async function handleBet(ctx: Context, action: Action): Promise<Game> {
 			.set({
 				pot: sql`${games.pot} + ${action.amount}`,
 				currentHighestBet: sql`CASE WHEN ${games.currentHighestBet} < ${action.amount} THEN ${action.amount} ELSE ${games.currentHighestBet} END`,
+				lastAction: ActionTypeSchema.enum.bet,
+				lastBetAmount: action.amount,
 			})
 			.where(eq(games.id, action.gameId))
 			.returning()
@@ -226,7 +228,20 @@ export async function handleCheck(ctx: Context, action: Action): Promise<Game> {
 		})
 		.where(eq(players.id, action.playerId));
 
-	return game;
+	const [updatedGame] = await ctx.db
+		.update(games)
+		.set({
+			lastAction: ActionTypeSchema.enum.check,
+			lastBetAmount: 0,
+		})
+		.where(eq(games.id, action.gameId))
+		.returning();
+
+	if (!updatedGame) {
+		throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update game" });
+	}
+
+	return updatedGame;
 }
 
 export async function handleFold(ctx: Context, action: Action): Promise<Game> {
@@ -242,9 +257,14 @@ export async function handleFold(ctx: Context, action: Action): Promise<Game> {
 		throw new TRPCError({ code: "BAD_REQUEST", message: "Player not in game" });
 	}
 
-	const game = await ctx.db.query.games.findFirst({
-		where: eq(games.id, action.gameId),
-	});
+	const [game] = await ctx.db
+		.update(games)
+		.set({
+			lastAction: ActionTypeSchema.enum.fold,
+			lastBetAmount: 0,
+		})
+		.where(eq(games.id, action.gameId))
+		.returning();
 
 	if (!game) {
 		throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { actionRouter } from "~/server/api/routers/player/action";
+import { cardsRouter } from "~/server/api/routers/player/cards";
 import { createTRPCRouter, privateProcedure } from "../../trpc";
 
 export const playerRouter = createTRPCRouter({
@@ -52,6 +53,7 @@ export const playerRouter = createTRPCRouter({
 				.filter((game) => (input?.joinedOnly ? game.hasJoined : true));
 		}),
 	action: actionRouter,
+	cards: cardsRouter,
 });
 
 export type PublicGame = Awaited<ReturnType<typeof playerRouter.getAllGames>>[number];
