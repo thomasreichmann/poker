@@ -1,11 +1,21 @@
-import { type RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useEffect, useState } from "react";
 import { type PublicGame } from "~/server/api/routers/player/player";
 import { type Game } from "~/server/db/schema/games";
 import { createClient } from "~/supabase/client";
 import { api } from "~/trpc/react";
 
-type RealtimePayload = RealtimePostgresChangesPayload<Record<string, string>>;
+type BroadcastPayload = {
+	event: "UPDATE";
+	payload: {
+		id: string;
+		old_record: Record<string, unknown>;
+		operation: "UPDATE";
+		record: Record<string, unknown>;
+		schema: string;
+		table: string;
+	};
+	type: "broadcast";
+};
 
 const supabase = createClient();
 
@@ -55,9 +65,9 @@ const useRealtimeGame = (initialGame: PublicGame) => {
 		}
 	}, [getCommunityCardsQuery.data]);
 
-	const handleRealtimeUpdate = async (payload: RealtimePayload) => {
-		if (payload.new) {
-			const convertedGame = convertSnakeToCamelCase(payload.new) as Game;
+	const handleRealtimeUpdate = async (update: BroadcastPayload) => {
+		if (update.payload.record) {
+			const convertedGame = convertSnakeToCamelCase(update.payload.record) as Game;
 			// Along side the game, we also need to update last player to act's state using the lastAction and lastBetAmount fields.
 			const lastPlayerToAct = game.players?.find(
 				(player) => player.id === game.currentPlayerTurn,
@@ -86,20 +96,29 @@ const useRealtimeGame = (initialGame: PublicGame) => {
 
 	// The game coming from the realtime channel doesn't have any relational data, so we need to update the game state with the new data.
 	useEffect(() => {
+		console.log(`subscribing to topic:${game.id}`);
 		const channel = supabase
-			.channel("schema-db-changes")
-			.on(
-				"postgres_changes",
-				{
-					event: "*",
-					schema: "public",
-					table: "poker_games",
+			.channel(`topic:${game.id}`, {
+				config: {
+					private: true,
 				},
-				(payload) => {
-					void handleRealtimeUpdate(payload);
-				},
-			)
-			.subscribe();
+			})
+			.on("broadcast", { event: "UPDATE" }, (payload) => {
+				console.log(`Received update for game ${game.id}`);
+				void handleRealtimeUpdate(payload as BroadcastPayload);
+			});
+
+		supabase.realtime
+			.setAuth()
+			.then(() => {
+				channel.subscribe((status, err) => {
+					if (err) {
+						console.log("status", status);
+						console.error(err);
+					}
+				});
+			})
+			.catch(console.error);
 
 		return () => {
 			void channel.unsubscribe();
