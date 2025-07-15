@@ -13,7 +13,6 @@ import {
 	FormControlLabel,
 	Grid,
 	Paper,
-	Slider,
 	styled,
 	Table,
 	TableBody,
@@ -21,6 +20,7 @@ import {
 	TableContainer,
 	TableHead,
 	TableRow,
+	TextField,
 	Typography,
 } from "@mui/material";
 import { useEffect, useState } from "react";
@@ -67,7 +67,6 @@ export default function Game({ game: serverGame }: GameProps) {
 	const resetGameMutation = api.admin.resetGame.useMutation();
 	const mutation = api.player.action.act.useMutation({
 		onSuccess: async () => {
-			await utils.player.getAllGames.invalidate();
 			await handleActionComplete();
 		},
 		onError: (error) => {
@@ -105,7 +104,6 @@ export default function Game({ game: serverGame }: GameProps) {
 				await loginAsUser(nextPlayer.userId);
 			}
 		}
-		await utils.player.getAllGames.invalidate();
 	};
 
 	const handleResetGame = async () => {
@@ -285,11 +283,18 @@ export default function Game({ game: serverGame }: GameProps) {
 					<Grid size={4} className="flex w-full gap-4 text-nowrap">
 						<Typography>Your stack: ${game.callerPlayer?.stack}</Typography>
 						<Typography>Current bet: ${game.currentHighestBet}</Typography>
-						<Slider
-							min={0}
-							max={game.callerPlayer?.stack}
+						<TextField
+							type="number"
+							label="Bet Amount"
+							variant="outlined"
+							size="small"
 							value={betAmount}
-							onChange={(e, value) => setBetAmount(value)}
+							onChange={(e) => {
+								const value = Number(e.target.value);
+								setBetAmount(
+									Math.max(0, Math.min(value, game.callerPlayer?.stack ?? 0)),
+								);
+							}}
 						/>
 					</Grid>
 				</Grid>

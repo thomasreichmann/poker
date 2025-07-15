@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { type PublicGame } from "~/server/api/routers/player/player";
-import { type Game } from "~/server/db/schema/games";
 import { createClient } from "~/supabase/client";
 import { api } from "~/trpc/react";
 
@@ -45,58 +44,71 @@ function convertSnakeToCamelCase<T extends Record<string, unknown>>(
 }
 
 const useRealtimeGame = (initialGame: PublicGame) => {
-	const [game, setGame] = useState<PublicGame>(initialGame);
+	const [game, setGame] = useState<PublicGame & { newGame?: boolean }>(initialGame);
 
-	// Query to get community cards
-	const getCommunityCardsQuery = api.player.cards.getCommunityCards.useQuery(
+	// Query to get player's cards - only used when new game starts
+	const getPlayerCardsQuery = api.player.cards.getPlayerCards.useQuery(
 		{ gameId: game.id },
 		{
 			enabled: false, // Only fetch when needed
 		},
 	);
 
-	// Update community cards when query data changes
-	useEffect(() => {
-		if (getCommunityCardsQuery.data) {
-			setGame((prevGame) => ({
-				...prevGame,
-				communityCards: getCommunityCardsQuery.data,
-			}));
-		}
-	}, [getCommunityCardsQuery.data]);
-
 	const handleRealtimeUpdate = async (update: BroadcastPayload) => {
+		console.log(update);
 		if (update.payload.record) {
-			const convertedGame = convertSnakeToCamelCase(update.payload.record) as Game;
-			// Along side the game, we also need to update last player to act's state using the lastAction and lastBetAmount fields.
-			const lastPlayerToAct = game.players?.find(
-				(player) => player.id === game.currentPlayerTurn,
-			);
-			if (lastPlayerToAct) {
-				lastPlayerToAct.hasFolded = convertedGame.lastAction === "fold";
-				lastPlayerToAct.currentBet = convertedGame.lastBetAmount ?? 1111;
-				lastPlayerToAct.stack = lastPlayerToAct.stack - (convertedGame.lastBetAmount ?? 0);
-			}
+			const convertedGame = convertSnakeToCamelCase(update.payload.record) as PublicGame;
 
-			// If the round progresses, we need to fetch the new cards.
-			if (convertedGame.currentRound !== game.currentRound) {
-				// Fetch updated community cards
-				void getCommunityCardsQuery.refetch();
-			}
+			const isNewGameStarting =
+				game.newGame === undefined &&
+				game.status !== "waiting" &&
+				convertedGame.status === "waiting";
 
-			setGame((prevGame) => ({
-				...prevGame,
+			// Now the broadcast includes complete game state with all relations
+			// We need to reconstruct the PublicGame format that matches the getAllGames query
+			const updatedGame: PublicGame & { newGame?: boolean } = {
 				...convertedGame,
-				players: prevGame.players?.map((p) =>
-					p.id === lastPlayerToAct?.id ? lastPlayerToAct : p,
+				hasJoined: !!convertedGame.players?.find(
+					(player: { userId: string }) => player.userId === game.callerPlayer?.userId,
 				),
-			}));
+				communityCards: convertedGame.cards,
+				callerPlayer:
+					convertedGame.players?.find(
+						(player: { userId: string }) => player.userId === game.callerPlayer?.userId,
+					) ?? game.callerPlayer,
+				newGame: isNewGameStarting,
+			};
+
+			if (isNewGameStarting) {
+				// Fetch player's cards since they won't be in the broadcast for security
+				console.log("New game starting, fetching player cards...");
+				void getPlayerCardsQuery.refetch();
+			}
+
+			setGame(updatedGame);
 		}
 	};
 
-	// The game coming from the realtime channel doesn't have any relational data, so we need to update the game state with the new data.
+	// Update game state when player cards are fetched
 	useEffect(() => {
-		console.log(`subscribing to topic:${game.id}`);
+		if (getPlayerCardsQuery.data && game.callerPlayer) {
+			setGame((prevGame) => ({
+				...prevGame,
+				callerPlayer: {
+					...prevGame.callerPlayer!,
+					cards: getPlayerCardsQuery.data,
+				},
+				players: prevGame.players.map((player) =>
+					player.id === prevGame.callerPlayer?.id
+						? { ...player, cards: getPlayerCardsQuery.data }
+						: player,
+				),
+			}));
+		}
+	}, [getPlayerCardsQuery.data]);
+
+	// The game coming from the realtime channel now includes complete relational data
+	useEffect(() => {
 		const channel = supabase
 			.channel(`topic:${game.id}`, {
 				config: {
@@ -104,21 +116,9 @@ const useRealtimeGame = (initialGame: PublicGame) => {
 				},
 			})
 			.on("broadcast", { event: "UPDATE" }, (payload) => {
-				console.log(`Received update for game ${game.id}`);
 				void handleRealtimeUpdate(payload as BroadcastPayload);
-			});
-
-		supabase.realtime
-			.setAuth()
-			.then(() => {
-				channel.subscribe((status, err) => {
-					if (err) {
-						console.log("status", status);
-						console.error(err);
-					}
-				});
 			})
-			.catch(console.error);
+			.subscribe();
 
 		return () => {
 			void channel.unsubscribe();
