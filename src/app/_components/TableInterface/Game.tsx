@@ -7,7 +7,6 @@ import {
 	Card,
 	CardActions,
 	CardContent,
-	CardHeader,
 	Checkbox,
 	Chip,
 	FormControlLabel,
@@ -56,7 +55,6 @@ function getNextPlayer(game: PublicGame) {
 export default function Game({ game: serverGame }: GameProps) {
 	const { game } = useRealtimeGame(serverGame);
 
-	const utils = api.useUtils();
 	const {
 		loginAsUser,
 		loading: loginAsUserLoading,
@@ -117,7 +115,6 @@ export default function Game({ game: serverGame }: GameProps) {
 
 	return (
 		<Card elevation={4}>
-			<CardHeader title={`Game ${game.id}`} />
 			<CardContent>
 				<Box className="mb-8 flex flex-col gap-4">
 					<Box className="flex flex-col items-center gap-2">
@@ -131,11 +128,7 @@ export default function Game({ game: serverGame }: GameProps) {
 							variant="filled"
 						/>
 					</Box>
-					{game.communityCards.length === 0 ? (
-						<Typography variant="subtitle1" color="text.secondary">
-							No community cards
-						</Typography>
-					) : (
+					{game.communityCards.length > 0 && (
 						<Box className="flex justify-center gap-4">
 							{game.communityCards.map((card, index) => (
 								<PlayingCard key={index} card={card} />

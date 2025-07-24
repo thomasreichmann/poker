@@ -59,6 +59,34 @@ export function isFlush(cards: Card[]): boolean {
 	return suits.some((suit) => suits.filter((s) => s === suit).length >= 5);
 }
 
+// Check for straight flush - 5 consecutive cards all of the same suit
+export function isStraightFlush(cards: Card[]): boolean {
+	const suits = Suit.enumValues;
+
+	for (const suit of suits) {
+		const suitCards = cards.filter((card) => getSuit(card) === suit);
+		if (suitCards.length >= 5) {
+			// Check if this suit has a straight
+			const sortedValues = [...new Set(suitCards.map(getRankValue))].sort((a, b) => b - a);
+
+			// Check for Ace-low straight (A-2-3-4-5)
+			if (sortedValues.includes(14)) {
+				const lowStraight = [2, 3, 4, 5].every((val) => sortedValues.includes(val));
+				if (lowStraight) return true;
+			}
+
+			// Check for regular straights
+			for (let i = 0; i <= sortedValues.length - 5; i++) {
+				const diff = sortedValues[i]! - sortedValues[i + 4]!;
+				if (diff === 4) {
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
 // Get hand rank and value
 export function evaluateHand(cards: Card[]): HandRank {
 	if (cards.length < 5) {
@@ -76,7 +104,15 @@ export function evaluateHand(cards: Card[]): HandRank {
 	});
 
 	// Check for straight flush
-	if (isStraight(cards) && isFlush(cards)) {
+	if (isStraightFlush(cards)) {
+		// For Ace-low straight flush, use 5 as the value
+		if (values.includes(14) && [2, 3, 4, 5].every((val) => values.includes(val))) {
+			return {
+				rank: 8,
+				value: 5,
+				name: "Straight Flush",
+			};
+		}
 		return {
 			rank: 8,
 			value: Math.max(...values),

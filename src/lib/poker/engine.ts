@@ -169,22 +169,29 @@ export async function handleBet(ctx: Context, action: Action): Promise<Game> {
 	await validateBet(ctx, action, game, player);
 
 	// Process the bet
-	await ctx.db
+	const [updatedPlayer] = await ctx.db
 		.update(players)
 		.set({
 			stack: sql`${players.stack} - ${action.amount}`,
 			currentBet: sql`COALESCE(${players.currentBet}, 0) + ${action.amount}`,
 		})
-		.where(eq(players.id, action.playerId));
+		.where(eq(players.id, action.playerId))
+		.returning();
+
+	if (!updatedPlayer) {
+		throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update player" });
+	}
+
+	const newHighestBet = Math.max(game.currentHighestBet, updatedPlayer.currentBet ?? 0);
 
 	const updatedGame = (
 		await ctx.db
 			.update(games)
 			.set({
 				pot: sql`${games.pot} + ${action.amount}`,
-				currentHighestBet: sql`CASE WHEN ${games.currentHighestBet} < ${action.amount} THEN ${action.amount} ELSE ${games.currentHighestBet} END`,
+				currentHighestBet: newHighestBet,
 				lastAction: ActionTypeSchema.enum.bet,
-				lastBetAmount: action.amount,
+				lastBetAmount: updatedPlayer.currentBet,
 			})
 			.where(eq(games.id, action.gameId))
 			.returning()
@@ -292,32 +299,29 @@ async function handleSinglePlayerWin(
 	game: Game,
 	winner: { id: string; stack: number },
 ): Promise<Game> {
-	// Update both player and game state in parallel
-	const [completedGame] = await Promise.all([
-		ctx.db
-			.update(games)
-			.set({
-				status: "completed",
-				currentRound: "showdown",
-				updatedAt: new Date(),
-			})
-			.where(eq(games.id, game.id))
-			.returning(),
-		ctx.db
-			.update(players)
-			.set({
-				stack: sql`${players.stack} + ${game.pot}`,
-				hasWon: true,
-			})
-			.where(eq(players.id, winner.id))
-			.returning(),
-	]);
+	await ctx.db
+		.update(players)
+		.set({
+			stack: sql`${players.stack} + ${game.pot}`,
+			hasWon: true,
+		})
+		.where(eq(players.id, winner.id));
 
-	if (!completedGame?.[0]) {
+	const [completedGame] = await ctx.db
+		.update(games)
+		.set({
+			status: "completed",
+			currentRound: "showdown",
+			updatedAt: new Date(),
+		})
+		.where(eq(games.id, game.id))
+		.returning();
+
+	if (!completedGame) {
 		throw new Error("Failed to complete game");
 	}
 
-	return completedGame[0];
+	return completedGame;
 }
 
 export async function advanceGameState(ctx: Context, game: Game): Promise<Game> {
@@ -726,6 +730,7 @@ export async function resetGame(ctx: Context, gameId: string): Promise<Game> {
 			handRank: null,
 			handValue: null,
 			handName: null,
+			hasWon: false,
 		})
 		.where(eq(players.gameId, gameId))
 		.returning();

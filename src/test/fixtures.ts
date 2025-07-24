@@ -19,6 +19,8 @@ export const createTestGame = (overrides: Partial<GameWithCards> = {}): GameWith
 	]),
 	bigBlind: 20,
 	smallBlind: 10,
+	lastAction: "check",
+	lastBetAmount: 0,
 	...overrides,
 });
 

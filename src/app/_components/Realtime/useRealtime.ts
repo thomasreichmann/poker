@@ -107,7 +107,6 @@ const useRealtimeGame = (initialGame: PublicGame) => {
 		}
 	}, [getPlayerCardsQuery.data]);
 
-	// The game coming from the realtime channel now includes complete relational data
 	useEffect(() => {
 		const channel = supabase
 			.channel(`topic:${game.id}`, {
