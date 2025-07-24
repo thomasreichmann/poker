@@ -120,3 +120,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Hides the calendar icon in most modern browsers */
+.hide-date-icon::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+/* For Firefox */
+.hide-date-icon::-moz-calendar-picker-indicator {
+  display: none;
+}

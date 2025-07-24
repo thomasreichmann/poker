@@ -36,11 +36,16 @@ export default function PokerLandingPage() {
               variant="ghost"
               size="sm"
               className="text-slate-300 hover:bg-slate-800 hover:text-white"
+              asChild
             >
-              Entrar
+              <Link href="/login">Entrar</Link>
             </Button>
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
-              Registrar
+            <Button
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700"
+              asChild
+            >
+              <Link href="/register">Registrar</Link>
             </Button>
           </div>
         </div>
@@ -66,17 +71,23 @@ export default function PokerLandingPage() {
               <Button
                 size="lg"
                 className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-3"
+                asChild
               >
-                <UserPlus className="mr-2 h-5 w-5" />
-                Criar Conta Grátis
+                <Link href="/register">
+                  <UserPlus className="mr-2 h-5 w-5" />
+                  Criar Conta Grátis
+                </Link>
               </Button>
               <Button
                 size="lg"
                 variant="outline"
                 className="border-slate-600 text-slate-300 hover:bg-slate-800 text-lg px-8 py-3 bg-transparent"
+                asChild
               >
-                <Play className="mr-2 h-5 w-5" />
-                Jogar Agora
+                <Link href="/login">
+                  <Play className="mr-2 h-5 w-5" />
+                  Jogar Agora
+                </Link>
               </Button>
             </div>
           </div>
@@ -140,8 +151,11 @@ export default function PokerLandingPage() {
                     </span>
                   </div>
                 </div>
-                <Button className="w-full bg-emerald-600 hover:bg-emerald-700">
-                  Entrar nas Mesas
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  asChild
+                >
+                  <Link href="/login">Entrar nas Mesas</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -185,8 +199,11 @@ export default function PokerLandingPage() {
                     </span>
                   </div>
                 </div>
-                <Button className="w-full bg-yellow-600 hover:bg-yellow-700">
-                  Ver Cronograma
+                <Button
+                  className="w-full bg-yellow-600 hover:bg-yellow-700"
+                  asChild
+                >
+                  <Link href="/login">Ver Cronograma</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -307,9 +324,12 @@ export default function PokerLandingPage() {
               <Button
                 size="lg"
                 className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-3"
+                asChild
               >
-                <UserPlus className="mr-2 h-5 w-5" />
-                Criar Conta Grátis
+                <Link href="/register">
+                  <UserPlus className="mr-2 h-5 w-5" />
+                  Criar Conta Grátis
+                </Link>
               </Button>
               <Button
                 size="lg"
