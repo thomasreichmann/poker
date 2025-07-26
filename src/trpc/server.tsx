@@ -29,14 +29,18 @@ export function HydrateClient(props: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Prefetch a query. The client component needs to be wrapped in a HydrateClient for this to work.
+ * @param queryOptions - These need to be the same as the ones used in the client for prefetching to work.
+ * @returns The prefetch promise, which can be awaited or voided, depending on if you want to use streaming or not.
+ */
 export function prefetch<T extends ReturnType<TRPCQueryOptions<any>>>(
   queryOptions: T
 ) {
   const queryClient = getQueryClient();
-  console.log("prefetch", queryOptions);
   if (queryOptions.queryKey[1]?.type === "infinite") {
-    return queryClient.prefetchInfiniteQuery(queryOptions as any);
+    void queryClient.prefetchInfiniteQuery(queryOptions as any);
   } else {
-    return queryClient.prefetchQuery(queryOptions);
+    void queryClient.prefetchQuery(queryOptions);
   }
 }
