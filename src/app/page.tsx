@@ -7,6 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Test } from "@/components/ui/test";
+import { HydrateClient, prefetch, trpc } from "@/trpc/server";
 import {
   CheckCircle,
   Lock,
@@ -19,9 +21,18 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-export default function PokerLandingPage() {
+export default async function PokerLandingPage() {
+  await prefetch(
+    trpc.hello.queryOptions({
+      text: "world thomas (now with helpers!)",
+    })
+  );
+
   return (
     <div className="min-h-screen bg-slate-900 text-white">
+      <HydrateClient>
+        <Test />
+      </HydrateClient>
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900/95 backdrop-blur supports-[backdrop-filter]:bg-slate-900/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
