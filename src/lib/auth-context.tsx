@@ -11,7 +11,7 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    metadata?: any
+    metadata?: object
   ) => Promise<{ user: User | null; error: AuthError | null }>;
   signIn: (
     email: string,
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user_metadata: supabaseUser.user_metadata,
   });
 
-  const signUp = async (email: string, password: string, metadata?: any) => {
+  const signUp = async (email: string, password: string, metadata?: object) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       return {
         user: null,
-        error: { message: "An unexpected error occurred" },
+        error: { message: "An unexpected error occurred", cause: error },
       };
     }
   };
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       return {
         user: null,
-        error: { message: "An unexpected error occurred" },
+        error: { message: "An unexpected error occurred", cause: error },
       };
     }
   };
@@ -112,7 +112,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return { error: null };
     } catch (error) {
-      return { error: { message: "An unexpected error occurred" } };
+      return {
+        error: { message: "An unexpected error occurred", cause: error },
+      };
     }
   };
 
