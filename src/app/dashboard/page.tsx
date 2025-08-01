@@ -1,6 +1,6 @@
 "use client";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/lib/auth-context";
 import {
   BarChart3,
   Bell,
@@ -39,23 +40,58 @@ import {
   Wallet,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
   const [selectedStake, setSelectedStake] = useState("all");
+  const { user: authUser, signOut, loading } = useAuth();
+  const router = useRouter();
 
-  // Mock user data
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (!error) {
+      router.push("/");
+    }
+  };
+
+  useEffect(() => {
+    if (!loading && !authUser) {
+      router.push("/login");
+    }
+  }, [authUser, loading, router]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return null;
+  }
+
+  // User data (mix of auth data and defaults for new users)
+  const firstName = authUser.user_metadata?.firstName || "Usuário";
+  const lastName = authUser.user_metadata?.lastName || "";
+  const fullName = `${firstName} ${lastName}`.trim();
+  const initials = `${firstName[0]}${
+    lastName[0] || firstName[1] || ""
+  }`.toUpperCase();
+
   const user = {
-    name: "João Silva",
-    username: "joaopoker",
-    avatar: "/placeholder.svg?height=40&width=40&text=JS",
-    balance: 2450.75,
-    level: 12,
-    xp: 2340,
-    xpToNext: 3000,
-    totalWinnings: 15420.5,
-    gamesPlayed: 1247,
-    winRate: 68.5,
+    name: fullName,
+    username: firstName.toLowerCase(),
+    avatar: "",
+    balance: 0.0, // New users start with 0 balance
+    level: 1,
+    xp: 0,
+    xpToNext: 1000,
+    totalWinnings: 0.0,
+    gamesPlayed: 0,
+    winRate: 0,
   };
 
   // Mock cash game tables
@@ -225,15 +261,8 @@ export default function DashboardPage() {
                   className="relative h-10 w-10 rounded-full"
                 >
                   <Avatar className="h-10 w-10">
-                    <AvatarImage
-                      src={user.avatar || "/placeholder.svg"}
-                      alt={user.name}
-                    />
                     <AvatarFallback className="bg-emerald-600">
-                      {user.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
+                      {initials}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -249,7 +278,7 @@ export default function DashboardPage() {
                       {user.name}
                     </p>
                     <p className="text-xs leading-none text-slate-400">
-                      @{user.username}
+                      {authUser.email}
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -263,9 +292,12 @@ export default function DashboardPage() {
                   <span>Configurações</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-slate-700" />
-                <DropdownMenuItem className="text-slate-300 hover:bg-slate-700 hover:text-white">
+                <DropdownMenuItem
+                  className="text-slate-300 hover:bg-slate-700 hover:text-white cursor-pointer"
+                  onClick={handleSignOut}
+                >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <Link href="/login">Sair</Link>
+                  <span>Sair</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -280,10 +312,12 @@ export default function DashboardPage() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
             <div>
               <h1 className="text-3xl font-bold mb-2">
-                Bem-vindo, {user.name.split(" ")[0]}!
+                Bem-vindo, {firstName}!
               </h1>
               <p className="text-slate-300">
-                Pronto para dominar as mesas hoje?
+                {user.gamesPlayed === 0
+                  ? "Complete seu perfil e comece a jogar poker!"
+                  : "Pronto para dominar as mesas hoje?"}
               </p>
             </div>
             <div className="flex items-center space-x-4 mt-4 md:mt-0">

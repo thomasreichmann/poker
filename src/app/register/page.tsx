@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/lib/auth-context";
 import {
   ArrowLeft,
   Calendar,
@@ -32,13 +33,19 @@ import {
   User,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function RegisterPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const { signUp } = useAuth();
+  const router = useRouter();
 
   // Form data
   const [formData, setFormData] = useState({
@@ -83,15 +90,65 @@ export default function RegisterPage() {
     }
   };
 
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        router.push("/dashboard");
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [success, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // If not on the final step, go to next step instead of submitting
+    if (currentStep < 4) {
+      if (isStepValid(currentStep)) {
+        handleNext();
+      }
+      return;
+    }
+
+    // Only run registration logic on the final step
     setIsLoading(true);
+    setError(null);
 
-    // Simulate registration process
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      // Create user metadata from form data
+      const metadata = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        dateOfBirth: formData.dateOfBirth,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        zipCode: formData.zipCode,
+        marketingEmails: formData.marketingEmails,
+      };
 
-    setIsLoading(false);
-    // Handle registration logic here
+      const { user, error: authError } = await signUp(
+        formData.email,
+        formData.password,
+        metadata
+      );
+
+      if (authError) {
+        setError(authError.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (user) {
+        setSuccess(true);
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error("Registration error:", error);
+      setError("Ocorreu um erro inesperado. Tente novamente.");
+      setIsLoading(false);
+    }
   };
 
   const brazilianStates = [
@@ -683,6 +740,25 @@ export default function RegisterPage() {
                   </div>
                 )}
 
+                {/* Error and Success Messages */}
+                {error && (
+                  <div className="bg-red-900/20 border border-red-700/50 p-4 rounded-lg">
+                    <p className="text-red-400 text-sm">{error}</p>
+                  </div>
+                )}
+
+                {success && (
+                  <div className="bg-green-900/20 border border-green-700/50 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-4 w-4 text-green-400" />
+                      <p className="text-green-400 text-sm">
+                        Conta criada com sucesso! Redirecionando para o
+                        dashboard...
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Navigation Buttons */}
                 <div className="flex justify-between pt-6">
                   {currentStep > 1 && (
@@ -698,8 +774,7 @@ export default function RegisterPage() {
 
                   {currentStep < 4 ? (
                     <Button
-                      type="button"
-                      onClick={handleNext}
+                      type="submit"
                       disabled={!isStepValid(currentStep)}
                       className="bg-emerald-600 hover:bg-emerald-700 ml-auto"
                     >

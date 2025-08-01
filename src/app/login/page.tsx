@@ -13,9 +13,19 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import {
+  ArrowLeft,
+  CheckCircle,
+  Eye,
+  EyeOff,
+  Lock,
+  Mail,
+  Shield,
+} from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -23,16 +33,44 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const { signIn } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        router.push("/dashboard");
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [success, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
 
-    // Simulate login process
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const { user, error: authError } = await signIn(email, password);
 
-    setIsLoading(false);
-    // Handle login logic here
+      if (authError) {
+        setError(authError.message);
+        setIsLoading(false);
+        return;
+      }
+
+      if (user) {
+        setSuccess(true);
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("Ocorreu um erro inesperado. Tente novamente.");
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -155,6 +193,24 @@ export default function LoginPage() {
                     Esqueceu a senha?
                   </Link>
                 </div>
+
+                {/* Error and Success Messages */}
+                {error && (
+                  <div className="bg-red-900/20 border border-red-700/50 p-4 rounded-lg">
+                    <p className="text-red-400 text-sm">{error}</p>
+                  </div>
+                )}
+
+                {success && (
+                  <div className="bg-green-900/20 border border-green-700/50 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-4 w-4 text-green-400" />
+                      <p className="text-green-400 text-sm">
+                        Login realizado com sucesso! Redirecionando...
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Login Button */}
                 <Button
