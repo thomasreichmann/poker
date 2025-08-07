@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handleAction } from "~/lib/poker/engine";
+import { handleActionPure } from "~/lib/poker/engineAdapter";
 import { createTRPCRouter, privateProcedure } from "~/server/api/trpc";
 import { ActionTypeSchema } from "~/server/db/schema/actions";
 import { players } from "~/server/db/schema/players";
@@ -36,6 +36,6 @@ export const actionRouter = createTRPCRouter({
 			throw new TRPCError({ code: "BAD_REQUEST", message: "Player not in game" });
 		}
 
-		return handleAction(ctx, input, player.id);
+		return handleActionPure(ctx, input, player.id);
 	}),
 });

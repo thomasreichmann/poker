@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { advanceGameState, resetGame } from "~/lib/poker/engine";
+import { advanceGameStatePure, resetGamePure } from "~/lib/poker/engineAdapter";
 import { type AuthenticatedTRPCContext, createTRPCRouter, devProcedure } from "~/server/api/trpc";
 import { games } from "~/server/db/schema/games";
 import { players } from "~/server/db/schema/players";
@@ -124,7 +124,7 @@ export const adminRouter = createTRPCRouter({
 				throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Game not found" });
 			}
 
-			await resetGame(ctx as AuthenticatedTRPCContext, input.gameId);
+			await resetGamePure(ctx as AuthenticatedTRPCContext, input.gameId);
 		}),
 	advanceGame: devProcedure
 		.input(
@@ -139,6 +139,6 @@ export const adminRouter = createTRPCRouter({
 				throw new Error("Game not found");
 			}
 
-			await advanceGameState(ctx as AuthenticatedTRPCContext, game);
+			await advanceGameStatePure(ctx as AuthenticatedTRPCContext, game);
 		}),
 });

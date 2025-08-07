@@ -108,6 +108,7 @@ const useRealtimeGame = (initialGame: PublicGame) => {
 	}, [getPlayerCardsQuery.data]);
 
 	useEffect(() => {
+		console.log(`topic:${game.id}`);
 		const channel = supabase
 			.channel(`topic:${game.id}`, {
 				config: {

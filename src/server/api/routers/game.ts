@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { handleJoinGame, nextPlayer } from "~/lib/poker/engine";
+import { handleJoinGamePure, nextPlayerPure } from "~/lib/poker/engineAdapter";
 import { createTRPCRouter, privateProcedure } from "~/server/api/trpc";
 import { games } from "~/server/db/schema/games";
 import { players } from "~/server/db/schema/players";
@@ -27,7 +27,7 @@ export const gameRouter = createTRPCRouter({
 	join: privateProcedure
 		.input(z.object({ gameId: z.string(), stack: z.number().default(1000) }))
 		.mutation(async ({ ctx, input }) => {
-			return await handleJoinGame(ctx, input.gameId, input.stack);
+			return await handleJoinGamePure(ctx, input.gameId, input.stack);
 		}),
 	leave: privateProcedure
 		.input(z.object({ gameId: z.string() }))
@@ -40,7 +40,7 @@ export const gameRouter = createTRPCRouter({
 			});
 
 			if (game?.currentPlayerTurn === ctx.user.id) {
-				await nextPlayer(ctx, game);
+				await nextPlayerPure(ctx, game);
 			}
 
 			await ctx.db
