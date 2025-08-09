@@ -21,13 +21,14 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth-context";
+import { useTRPC } from "@/trpc/client";
+import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
   Bell,
   Calendar,
   ChevronRight,
   Clock,
-  Eye,
   Gift,
   LogOut,
   Plus,
@@ -47,6 +48,10 @@ export default function DashboardPage() {
   const [selectedStake, setSelectedStake] = useState("all");
   const { user: authUser, signOut, loading } = useAuth();
   const router = useRouter();
+  const trpc = useTRPC();
+  const { data: games, isLoading: gamesLoading } = useQuery(
+    trpc.game.list.queryOptions()
+  );
 
   const handleSignOut = async () => {
     const { error } = await signOut();
@@ -93,50 +98,6 @@ export default function DashboardPage() {
     gamesPlayed: 0,
     winRate: 0,
   };
-
-  // Mock cash game tables
-  const cashTables = [
-    {
-      id: 1,
-      name: "Mesa Diamante",
-      stakes: "R$ 1/2",
-      players: 6,
-      maxPlayers: 9,
-      avgPot: "R$ 45",
-      handsPerHour: 85,
-      waitingList: 0,
-    },
-    {
-      id: 2,
-      name: "Mesa Esmeralda",
-      stakes: "R$ 2/5",
-      players: 8,
-      maxPlayers: 9,
-      avgPot: "R$ 120",
-      handsPerHour: 78,
-      waitingList: 2,
-    },
-    {
-      id: 3,
-      name: "Mesa Rubi",
-      stakes: "R$ 5/10",
-      players: 5,
-      maxPlayers: 9,
-      avgPot: "R$ 280",
-      handsPerHour: 72,
-      waitingList: 0,
-    },
-    {
-      id: 4,
-      name: "Mesa Safira",
-      stakes: "R$ 0.25/0.50",
-      players: 9,
-      maxPlayers: 9,
-      avgPot: "R$ 12",
-      handsPerHour: 92,
-      waitingList: 5,
-    },
-  ];
 
   // Mock tournaments
   const tournaments = [
@@ -440,7 +401,10 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid gap-4">
-              {cashTables.map((table) => (
+              {gamesLoading && (
+                <div className="text-slate-400">Carregando mesas...</div>
+              )}
+              {games?.map((table: any) => (
                 <Card
                   key={table.id}
                   className="bg-slate-800 border-slate-700 hover:border-emerald-600/50 transition-colors"
@@ -450,17 +414,18 @@ export default function DashboardPage() {
                       <div className="flex items-center space-x-4">
                         <div>
                           <h3 className="text-lg font-semibold text-white">
-                            {table.name}
+                            Mesa {String(table.id).slice(0, 8)}
                           </h3>
                           <p className="text-slate-400">
-                            {table.stakes} • {table.avgPot} pot médio
+                            R$ {table.smallBlind}/{table.bigBlind} • Pot: R${" "}
+                            {table.pot}
                           </p>
                         </div>
                         <Badge
                           variant="secondary"
                           className="bg-slate-700 text-slate-300"
                         >
-                          {table.handsPerHour} mãos/h
+                          {table.currentRound}
                         </Badge>
                       </div>
 
@@ -468,32 +433,19 @@ export default function DashboardPage() {
                         <div className="text-center">
                           <div className="flex items-center space-x-1 text-sm text-slate-400">
                             <Users className="h-4 w-4" />
-                            <span>
-                              {table.players}/{table.maxPlayers}
-                            </span>
+                            <span>{table.playersCount ?? 0}/9</span>
                           </div>
-                          {table.waitingList > 0 && (
-                            <p className="text-xs text-yellow-400">
-                              {table.waitingList} na fila
-                            </p>
-                          )}
                         </div>
 
                         <div className="flex items-center space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent"
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            Observar
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                          >
-                            Sentar
-                          </Button>
+                          <Link href={`/game/${table.id}`}>
+                            <Button
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-700"
+                            >
+                              Entrar
+                            </Button>
+                          </Link>
                         </div>
                       </div>
                     </div>

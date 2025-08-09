@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { baseProcedure, createTRPCRouter } from "../init";
 import { authRouter } from "./auth";
+import { gameRouter } from "./game";
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
+  game: gameRouter,
   hello: baseProcedure
     .input(
       z.object({
