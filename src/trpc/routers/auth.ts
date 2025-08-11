@@ -2,6 +2,15 @@ import { z } from "zod";
 import { baseProcedure, createTRPCRouter, protectedProcedure } from "../init";
 
 export const authRouter = createTRPCRouter({
+  // Current session user (minimal fields)
+  me: baseProcedure.query(({ ctx }) => {
+    if (!ctx.user) return null;
+    return {
+      id: ctx.user.id,
+      email: ctx.user.email,
+      user_metadata: ctx.user.user_metadata,
+    };
+  }),
   // Get current user profile
   getProfile: protectedProcedure.query(({ ctx }) => {
     return {

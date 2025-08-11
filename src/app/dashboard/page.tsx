@@ -20,8 +20,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/lib/auth-context";
 import { useTRPC } from "@/trpc/client";
+import { meQueryOptions } from "@/trpc/query-client";
 import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3,
@@ -46,7 +46,7 @@ import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
   const [selectedStake, setSelectedStake] = useState("all");
-  const { user: authUser, signOut, loading } = useAuth();
+  const { data: authUser, isLoading: meLoading } = useQuery(meQueryOptions);
   const router = useRouter();
   const trpc = useTRPC();
   const { data: games, isLoading: gamesLoading } = useQuery(
@@ -54,19 +54,15 @@ export default function DashboardPage() {
   );
 
   const handleSignOut = async () => {
-    const { error } = await signOut();
-    if (!error) {
-      router.push("/");
-    }
+    const res = await fetch("/api/auth/signout", { method: "POST" });
+    if (res.ok) router.push("/");
   };
 
   useEffect(() => {
-    if (!loading && !authUser) {
-      router.push("/login");
-    }
-  }, [authUser, loading, router]);
+    if (!meLoading && !authUser) router.push("/login");
+  }, [authUser, meLoading, router]);
 
-  if (loading) {
+  if (meLoading) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-emerald-600"></div>

@@ -1,8 +1,12 @@
 "use client";
 
+// Deprecated: this context is no longer needed with SSR + middleware guarding.
+// Keeping minimal no-op provider to avoid breaking imports. Components should
+// fetch user via trpc.auth.me or directly through supabase client when needed.
+import { getSupabaseBrowserClient } from "@/supabase/client";
+import type { AuthError, User } from "@/supabase/types";
 import { Session, User as SupabaseUser } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useState } from "react";
-import { supabase, type AuthError, type User } from "./supabase";
 
 interface AuthContextType {
   user: User | null;
@@ -28,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -55,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, metadata?: object) => {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await getSupabaseBrowserClient().auth.signUp({
         email,
         password,
         options: {
@@ -81,10 +86,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error } =
+        await getSupabaseBrowserClient().auth.signInWithPassword({
+          email,
+          password,
+        });
 
       if (error) {
         return { user: null, error: { message: error.message } };
@@ -104,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await getSupabaseBrowserClient().auth.signOut();
 
       if (error) {
         return { error: { message: error.message } };

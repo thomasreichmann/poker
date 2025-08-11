@@ -13,7 +13,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/lib/auth-context";
+import { getSupabaseBrowserClient } from "@/supabase/client";
 import {
   ArrowLeft,
   CheckCircle,
@@ -36,7 +36,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  const { signIn } = useAuth();
+  const supabase = getSupabaseBrowserClient();
   const router = useRouter();
 
   useEffect(() => {
@@ -54,7 +54,12 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const { user, error: authError } = await signIn(email, password);
+      const { data, error: authError } = await supabase.auth.signInWithPassword(
+        {
+          email,
+          password,
+        }
+      );
 
       if (authError) {
         setError(authError.message);
@@ -62,7 +67,18 @@ export default function LoginPage() {
         return;
       }
 
-      if (user) {
+      if (data.user) {
+        // Sync session cookies to the server so middleware sees the auth state
+        const sessionRes = await supabase.auth.getSession();
+        const at = sessionRes.data.session?.access_token;
+        const rt = sessionRes.data.session?.refresh_token;
+        if (at && rt) {
+          await fetch("/api/auth/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accessToken: at, refreshToken: rt }),
+          }).catch(() => {});
+        }
         setSuccess(true);
         setIsLoading(false);
       }

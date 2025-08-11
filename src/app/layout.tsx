@@ -1,3 +1,4 @@
+import { ToastProvider } from "@/components/ui/toast";
 import { AuthProvider } from "@/lib/auth-context";
 import { TRPCReactProvider } from "@/trpc/client";
 import type { Metadata } from "next";
@@ -30,7 +31,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-900`}
       >
         <AuthProvider>
-          <TRPCReactProvider>{children}</TRPCReactProvider>
+          <ToastProvider>
+            <TRPCReactProvider>{children}</TRPCReactProvider>
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>
