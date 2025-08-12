@@ -2,6 +2,7 @@
 
 import type React from "react";
 
+import { ImpersonateDialog } from "@/components/dev/ImpersonateDialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getSupabaseBrowserClient } from "@/supabase/client";
@@ -35,6 +37,12 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [devOpen, setDevOpen] = useState(false);
+  const [devUsers, setDevUsers] = useState<
+    Array<{ id: string; email: string }>
+  >([]);
+  const [devLoading, setDevLoading] = useState(false);
+  const [devSearch, setDevSearch] = useState("");
 
   const supabase = getSupabaseBrowserClient();
   const router = useRouter();
@@ -47,6 +55,31 @@ export default function LoginPage() {
       return () => clearTimeout(timer);
     }
   }, [success, router]);
+
+  const loadDevUsers = async () => {
+    setDevLoading(true);
+    try {
+      const res = await fetch("/api/dev/users");
+      const json = await res.json();
+      setDevUsers(json.users ?? []);
+    } catch {
+      // ignore
+    } finally {
+      setDevLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (devOpen) {
+      void loadDevUsers();
+    }
+  }, [devOpen]);
+
+  const filteredDevUsers = devUsers.filter((u) => {
+    const q = devSearch.toLowerCase().trim();
+    if (!q) return true;
+    return u.email.toLowerCase().includes(q) || u.id.toLowerCase().includes(q);
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,6 +330,24 @@ export default function LoginPage() {
               </Link>
             </div>
           </div>
+
+          {/* Dev-only impersonation modal trigger */}
+          {process.env.NODE_ENV !== "production" && (
+            <div className="mt-6">
+              <Dialog open={devOpen} onOpenChange={setDevOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="secondary" className="w-full">
+                    Impersonate a user (dev)
+                  </Button>
+                </DialogTrigger>
+                <ImpersonateDialog
+                  open={devOpen}
+                  onOpenChangeAction={setDevOpen}
+                  onImpersonatedAction={() => router.push("/dashboard")}
+                />
+              </Dialog>
+            </div>
+          )}
         </div>
       </div>
 

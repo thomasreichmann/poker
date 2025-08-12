@@ -1,5 +1,6 @@
 "use client";
 
+import { ImpersonateDialog } from "@/components/dev/ImpersonateDialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,12 @@ import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
   const [selectedStake, setSelectedStake] = useState("all");
+  const [devOpen, setDevOpen] = useState(false);
+  const [devUsers, setDevUsers] = useState<
+    Array<{ id: string; email: string }>
+  >([]);
+  const [devLoading, setDevLoading] = useState(false);
+  const [devSearch, setDevSearch] = useState("");
   const { data: authUser, isLoading: meLoading } = useQuery(meQueryOptions);
   const router = useRouter();
   const trpc = useTRPC();
@@ -58,9 +65,34 @@ export default function DashboardPage() {
     if (res.ok) router.push("/");
   };
 
+  const loadDevUsers = async () => {
+    setDevLoading(true);
+    try {
+      const res = await fetch("/api/dev/users");
+      const json = await res.json();
+      setDevUsers(json.users ?? []);
+    } catch {
+      // ignore
+    } finally {
+      setDevLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!meLoading && !authUser) router.push("/login");
   }, [authUser, meLoading, router]);
+
+  useEffect(() => {
+    if (devOpen) {
+      void loadDevUsers();
+    }
+  }, [devOpen]);
+
+  const filteredDevUsers = devUsers.filter((u) => {
+    const q = devSearch.toLowerCase().trim();
+    if (!q) return true;
+    return u.email.toLowerCase().includes(q) || u.id.toLowerCase().includes(q);
+  });
 
   if (meLoading) {
     return (
@@ -249,6 +281,15 @@ export default function DashboardPage() {
                   <span>Configurações</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-slate-700" />
+                {process.env.NODE_ENV !== "production" && (
+                  <DropdownMenuItem
+                    className="text-emerald-400 hover:bg-slate-700 hover:text-emerald-300 cursor-pointer"
+                    onClick={() => setDevOpen(true)}
+                  >
+                    <Users className="mr-2 h-4 w-4" />
+                    <span>Impersonate (dev)</span>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem
                   className="text-slate-300 hover:bg-slate-700 hover:text-white cursor-pointer"
                   onClick={handleSignOut}
@@ -635,6 +676,13 @@ export default function DashboardPage() {
           </TabsContent>
         </Tabs>
       </div>
+      {process.env.NODE_ENV !== "production" && (
+        <ImpersonateDialog
+          open={devOpen}
+          onOpenChangeAction={setDevOpen}
+          onImpersonatedAction={() => router.refresh()}
+        />
+      )}
     </div>
   );
 }

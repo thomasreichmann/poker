@@ -1,5 +1,9 @@
+import { db } from "@/db";
+import { users } from "@/db/schema/users";
 import { getSupabaseServerClient } from "@/supabase/server";
 import { initTRPC } from "@trpc/server";
+import { eq } from "drizzle-orm";
+import { cookies } from "next/headers";
 import superjson from "superjson";
 
 export const createTRPCContext = async () => {
@@ -8,7 +12,36 @@ export const createTRPCContext = async () => {
    */
   const supabase = await getSupabaseServerClient();
   const { data: userData } = await supabase.auth.getUser();
-  const user = userData.user;
+  let user = userData.user;
+
+  // Dev-only impersonation (takes precedence over real session)
+  if (process.env.NODE_ENV !== "production") {
+    const cookieStore = await cookies();
+    const impersonateUserId = cookieStore.get("dev_impersonate_user_id")?.value;
+    if (impersonateUserId) {
+      const rows = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, impersonateUserId))
+        .limit(1);
+      const row = rows[0];
+      if (row) {
+        user = {
+          id: row.id,
+          email: row.email,
+          user_metadata: {},
+          aud: "authenticated",
+          app_metadata: {},
+          created_at: new Date().toISOString(),
+          factors: null,
+          identities: null,
+          phone: "",
+          role: "authenticated",
+          updated_at: new Date().toISOString(),
+        } as unknown as typeof user;
+      }
+    }
+  }
 
   return {
     user,

@@ -32,7 +32,18 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user && !isAuthPath(request.nextUrl.pathname)) {
+  // Dev-only impersonation: if a dev cookie is present, allow access
+  // to protected routes as that user. We do not mutate supabase auth;
+  // the trpc context will also honor this cookie.
+  let isImpersonating = false;
+  const devImpersonateUserId = request.cookies.get(
+    "dev_impersonate_user_id"
+  )?.value;
+  if (process.env.NODE_ENV !== "production" && devImpersonateUserId) {
+    isImpersonating = true;
+  }
+
+  if (!user && !isImpersonating && !isAuthPath(request.nextUrl.pathname)) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone();
     url.pathname = "/login";
