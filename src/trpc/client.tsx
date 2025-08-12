@@ -56,6 +56,17 @@ export function TRPCReactProvider(
         httpBatchLink({
           transformer: superjson,
           url: getUrl(),
+          headers() {
+            if (typeof window === "undefined") return {};
+            try {
+              const userId = window.sessionStorage.getItem(
+                "dev_impersonate_user_id"
+              );
+              return userId ? { "x-dev-impersonate-user-id": userId } : {};
+            } catch {
+              return {};
+            }
+          },
         }),
       ],
     })

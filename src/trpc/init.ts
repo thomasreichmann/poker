@@ -3,7 +3,7 @@ import { users } from "@/db/schema/users";
 import { getSupabaseServerClient } from "@/supabase/server";
 import { initTRPC } from "@trpc/server";
 import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import superjson from "superjson";
 
 export const createTRPCContext = async () => {
@@ -14,10 +14,13 @@ export const createTRPCContext = async () => {
   const { data: userData } = await supabase.auth.getUser();
   let user = userData.user;
 
-  // Dev-only impersonation (takes precedence over real session)
+  // Dev-only impersonation (header takes precedence per-tab; cookie fallback)
   if (process.env.NODE_ENV !== "production") {
+    const hdr = await headers();
+    const headerUserId = hdr.get("x-dev-impersonate-user-id");
     const cookieStore = await cookies();
-    const impersonateUserId = cookieStore.get("dev_impersonate_user_id")?.value;
+    const cookieUserId = cookieStore.get("dev_impersonate_user_id")?.value;
+    const impersonateUserId = headerUserId || cookieUserId;
     if (impersonateUserId) {
       const rows = await db
         .select()

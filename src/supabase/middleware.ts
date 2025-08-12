@@ -39,8 +39,11 @@ export async function updateSession(request: NextRequest) {
   const devImpersonateUserId = request.cookies.get(
     "dev_impersonate_user_id"
   )?.value;
-  if (process.env.NODE_ENV !== "production" && devImpersonateUserId) {
-    isImpersonating = true;
+  if (process.env.NODE_ENV !== "production") {
+    const headerUserId = request.headers.get("x-dev-impersonate-user-id");
+    if (headerUserId || devImpersonateUserId) {
+      isImpersonating = true;
+    }
   }
 
   if (!user && !isImpersonating && !isAuthPath(request.nextUrl.pathname)) {
