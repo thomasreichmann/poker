@@ -8,7 +8,6 @@ import {
   advanceGameStatePure,
   handleActionPure,
   handleJoinGamePure,
-  leaveGamePure,
   resetGamePure,
 } from "@/lib/poker/engineAdapter";
 import { and, count, desc, eq } from "drizzle-orm";
@@ -43,10 +42,10 @@ export const gameRouter = createTRPCRouter({
     return rows;
   }),
 
-  // Get a single game with players and cards
+  // Get a single game with players and filtered cards
   getById: baseProcedure
     .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const [game] = await db
         .select()
         .from(games)
@@ -68,12 +67,28 @@ export const gameRouter = createTRPCRouter({
       const gamePlayers = gamePlayersJoined.map((row) => ({
         ...row.player,
         email: row.email ?? null,
+        displayName:
+          row.player.displayName ??
+          (row.email ? row.email.split("@")[0] + "@" : null),
       }));
 
-      const gameCards = await db
+      const allCards = await db
         .select()
         .from(cards)
         .where(eq(cards.gameId, game.id));
+
+      // Filter visibility: send community always, viewer's own hole cards, and any revealed hands
+      const viewerUserId = ctx.user?.id ?? null;
+      const viewerPlayerId = viewerUserId
+        ? gamePlayers.find((p) => p.userId === viewerUserId)?.id ?? null
+        : null;
+
+      const gameCards = allCards.filter((c) => {
+        if (c.playerId === null) return true; // community
+        if (viewerPlayerId && c.playerId === viewerPlayerId) return true; // own
+        const owner = gamePlayers.find((p) => p.id === c.playerId);
+        return Boolean(owner?.showCards); // revealed
+      });
 
       const recentActions = await db
         .select()
@@ -90,6 +105,27 @@ export const gameRouter = createTRPCRouter({
       };
     }),
 
+  // Get only the caller's own hole cards (protected)
+  getMyHoleCards: protectedProcedure
+    .input(z.object({ gameId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      // Find the player's seat for this user in the game
+      const rows = await db
+        .select()
+        .from(players)
+        .where(and(eq(players.gameId, input.gameId), eq(players.userId, ctx.user.id)))
+        .limit(1);
+      const player = rows[0];
+      if (!player) {
+        throw new Error("Forbidden: not seated in this game");
+      }
+      const myCards = await db
+        .select()
+        .from(cards)
+        .where(and(eq(cards.gameId, input.gameId), eq(cards.playerId, player.id)));
+      return myCards;
+    }),
+
   // Join game (creates a player and may start the game)
   join: protectedProcedure
     .input(
@@ -99,11 +135,44 @@ export const gameRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // If the user already has a seat, just flip the leave flag off and mark connected
+      const existing = await db
+        .select()
+        .from(players)
+        .where(
+          and(eq(players.gameId, input.gameId), eq(players.userId, ctx.user.id))
+        )
+        .limit(1);
+      const found = existing[0];
+      if (found) {
+        await db
+          .update(players)
+          .set({
+            leaveAfterHand: false,
+            isConnected: true,
+            lastSeen: new Date(),
+          })
+          .where(eq(players.id, found.id));
+        return { ...found, leaveAfterHand: false, isConnected: true };
+      }
+      // Otherwise, add a new seat (and possibly auto-start)
       const player = await handleJoinGamePure(
         ctx.user.id,
         input.gameId,
         input.stack
       );
+      // Attempt to set displayName from user profile (email fallback)
+      const name = ctx.user.user_metadata?.displayName
+        ? String(ctx.user.user_metadata.displayName)
+        : ctx.user.email
+        ? String(ctx.user.email).split("@")[0] + "@"
+        : null;
+      if (name) {
+        await db
+          .update(players)
+          .set({ displayName: name })
+          .where(eq(players.id, player.id));
+      }
       return player;
     }),
 
@@ -147,6 +216,20 @@ export const gameRouter = createTRPCRouter({
   leave: protectedProcedure
     .input(z.object({ gameId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      return await leaveGamePure(ctx.user.id, input.gameId);
+      // Soft-leave: mark player to be removed after current hand
+      const rows = await db
+        .select()
+        .from(players)
+        .where(
+          and(eq(players.gameId, input.gameId), eq(players.userId, ctx.user.id))
+        )
+        .limit(1);
+      const player = rows[0];
+      if (!player) throw new Error("Player not found in this game");
+      await db
+        .update(players)
+        .set({ leaveAfterHand: true, isConnected: false, lastSeen: new Date() })
+        .where(eq(players.id, player.id));
+      return { success: true };
     }),
 });

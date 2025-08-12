@@ -69,8 +69,10 @@ export function PlayerSeat({
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-white truncate">
-                  {player.email
-                    ? player.email.split("@")[0]
+                  {player.displayName
+                    ? player.displayName
+                    : player.email
+                    ? player.email.split("@")[0] + "@"
                     : `Player ${player.seat}`}
                 </div>
                 <div className="text-xs text-emerald-400">

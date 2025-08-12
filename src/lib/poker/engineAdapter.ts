@@ -3,7 +3,7 @@ import { actions } from "@/db/schema/actions";
 import { cards as cardsTable } from "@/db/schema/cards";
 import { games, type Game } from "@/db/schema/games";
 import { players as playersTable, type Player } from "@/db/schema/players";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { generateDeck, getAvailableCards } from "./cards";
 import {
   addPlayerToGame,
@@ -103,77 +103,84 @@ export async function persistPureGameState(
   pureGameState: GameState,
   _previousState?: GameState
 ): Promise<Game> {
-  const [updated] = await db
-    .update(games)
-    .set({
-      status: pureGameState.status,
-      currentRound: pureGameState.currentRound,
-      currentHighestBet: pureGameState.currentHighestBet,
-      currentPlayerTurn: pureGameState.currentPlayerTurn ?? null,
-      pot: pureGameState.pot,
-      bigBlind: pureGameState.bigBlind,
-      smallBlind: pureGameState.smallBlind,
-      lastAction: pureGameState.lastAction ?? null,
-      lastBetAmount: pureGameState.lastBetAmount,
-      updatedAt: new Date(),
-    })
-    .where(eq(games.id, pureGameState.id))
-    .returning();
+  return await db.transaction(async (tx) => {
+    // Serialize all writes per game to avoid interleaving (e.g., multi-client advance/reset)
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${pureGameState.id}))`
+    );
 
-  // Update players
-  for (const p of pureGameState.players) {
-    await db
-      .update(playersTable)
+    const [updated] = await tx
+      .update(games)
       .set({
-        seat: p.seat,
-        stack: p.stack,
-        currentBet: p.currentBet,
-        hasFolded: p.hasFolded,
-        isButton: p.isButton,
-        hasWon: p.hasWon,
-        showCards: p.showCards,
-        handRank: p.handRank ?? null,
-        handValue: p.handValue ?? null,
-        handName: p.handName ?? null,
+        status: pureGameState.status,
+        currentRound: pureGameState.currentRound,
+        currentHighestBet: pureGameState.currentHighestBet,
+        currentPlayerTurn: pureGameState.currentPlayerTurn ?? null,
+        pot: pureGameState.pot,
+        bigBlind: pureGameState.bigBlind,
+        smallBlind: pureGameState.smallBlind,
+        lastAction: pureGameState.lastAction ?? null,
+        lastBetAmount: pureGameState.lastBetAmount,
+        updatedAt: new Date(),
       })
-      .where(eq(playersTable.id, p.id));
-  }
+      .where(eq(games.id, pureGameState.id))
+      .returning();
 
-  // Replace dealt cards for this game
-  await db.delete(cardsTable).where(eq(cardsTable.gameId, pureGameState.id));
+    // Update players
+    for (const p of pureGameState.players) {
+      await tx
+        .update(playersTable)
+        .set({
+          seat: p.seat,
+          stack: p.stack,
+          currentBet: p.currentBet,
+          hasFolded: p.hasFolded,
+          isButton: p.isButton,
+          hasWon: p.hasWon,
+          showCards: p.showCards,
+          handRank: p.handRank ?? null,
+          handValue: p.handValue ?? null,
+          handName: p.handName ?? null,
+        })
+        .where(eq(playersTable.id, p.id));
+    }
 
-  const newCards: Array<
-    Parameters<typeof db.insert>[0] extends never
-      ? never
-      : { gameId: string; playerId: string | null; rank: any; suit: any }
-  > = [];
+    // Replace dealt cards for this game atomically
+    await tx.delete(cardsTable).where(eq(cardsTable.gameId, pureGameState.id));
 
-  // Community cards
-  for (const c of pureGameState.communityCards) {
-    newCards.push({
-      gameId: pureGameState.id,
-      playerId: null,
-      rank: c.rank as any,
-      suit: c.suit as any,
-    });
-  }
-  // Hole cards
-  for (const pl of pureGameState.players) {
-    for (const c of pl.holeCards) {
+    const newCards: Array<
+      Parameters<typeof db.insert>[0] extends never
+        ? never
+        : { gameId: string; playerId: string | null; rank: any; suit: any }
+    > = [];
+
+    // Community cards
+    for (const c of pureGameState.communityCards) {
       newCards.push({
         gameId: pureGameState.id,
-        playerId: pl.id,
+        playerId: null,
         rank: c.rank as any,
         suit: c.suit as any,
       });
     }
-  }
+    // Hole cards
+    for (const pl of pureGameState.players) {
+      for (const c of pl.holeCards) {
+        newCards.push({
+          gameId: pureGameState.id,
+          playerId: pl.id,
+          rank: c.rank as any,
+          suit: c.suit as any,
+        });
+      }
+    }
 
-  if (newCards.length > 0) {
-    await db.insert(cardsTable).values(newCards);
-  }
+    if (newCards.length > 0) {
+      await tx.insert(cardsTable).values(newCards);
+    }
 
-  return updated;
+    return updated;
+  });
 }
 
 export async function handleJoinGamePure(
@@ -268,9 +275,22 @@ export async function resetGamePure(gameId: string): Promise<Game> {
   );
 
   if (resetGameState.players.length >= 2) {
+    // Remove players who opted to leave after the hand BEFORE building next hand state
+    await db
+      .delete(playersTable)
+      .where(
+        and(
+          eq(playersTable.gameId, gameId),
+          eq(playersTable.leaveAfterHand as any, true)
+        )
+      );
+
+    // Rebuild state after removals
     const gameWithPlayers = await dbGameToPureGame(gameId);
-    const startedGame = startNewGame(gameWithPlayers);
-    return await persistPureGameState(startedGame, gameWithPlayers);
+    if (gameWithPlayers.players.length >= 2) {
+      const startedGame = startNewGame(gameWithPlayers);
+      return await persistPureGameState(startedGame, gameWithPlayers);
+    }
   }
 
   return updatedGame;
@@ -314,7 +334,7 @@ export async function leaveGamePure(
   userId: string,
   gameId: string
 ): Promise<Game> {
-  // Find the player's row by user and game
+  // Soft-leave: mark player to be removed after the current hand. Do not modify engine state.
   const existing = await db
     .select()
     .from(playersTable)
@@ -324,82 +344,18 @@ export async function leaveGamePure(
     .limit(1);
 
   const player = existing[0];
-
-  // If player is not seated, just return current game state
-  if (!player) {
-    const [game] = await db
-      .select()
-      .from(games)
-      .where(eq(games.id, gameId))
-      .limit(1);
-    if (!game) throw new Error("Game not found");
-    return game;
+  if (player) {
+    await db
+      .update(playersTable)
+      .set({ leaveAfterHand: true, isConnected: false, lastSeen: new Date() })
+      .where(eq(playersTable.id, player.id));
   }
 
-  const previousState = await dbGameToPureGame(gameId);
-  const leavingPlayerId = player.id;
-  const remainingPlayers = previousState.players.filter(
-    (p) => p.id !== leavingPlayerId
-  );
-
-  // Ensure there is a valid button holder if the leaving player had the button
-  let adjustedPlayers = remainingPlayers;
-  const leavingHadButton = previousState.players.find(
-    (p) => p.id === leavingPlayerId
-  )?.isButton;
-  if (leavingHadButton && adjustedPlayers.length > 0) {
-    const sortedBySeat = [...adjustedPlayers].sort((a, b) => a.seat - b.seat);
-    const nextButton =
-      sortedBySeat.find((p) => p.seat > player.seat) ?? sortedBySeat[0]!;
-    adjustedPlayers = adjustedPlayers.map((p) => ({
-      ...p,
-      isButton: p.id === nextButton.id,
-    }));
-  }
-
-  let newState: GameState = {
-    ...previousState,
-    players: adjustedPlayers,
-  };
-
-  // If no players remain, reset to initial waiting state
-  if (remainingPlayers.length === 0) {
-    newState = createInitialGameState(
-      previousState.id,
-      previousState.bigBlind,
-      previousState.smallBlind
-    );
-    // Ensure there are no dealt cards for this game
-    await db.delete(cardsTable).where(eq(cardsTable.gameId, gameId));
-    // Remove the player's DB row
-    await db.delete(playersTable).where(eq(playersTable.id, leavingPlayerId));
-    return await persistPureGameState(newState, previousState);
-  }
-
-  // If only one player remains, they win the pot
-  if (remainingPlayers.length === 1) {
-    // Remove the player's DB row first to avoid stale references
-    await db.delete(playersTable).where(eq(playersTable.id, leavingPlayerId));
-    const awarded = handleSinglePlayerWin(newState);
-    return await persistPureGameState(awarded, previousState);
-  }
-
-  // Multiple players remain
-  // If the leaving player was to act, pass action to the next seat by order
-  if (previousState.currentPlayerTurn === leavingPlayerId) {
-    const leavingSeat = player.seat;
-    // Find the next player by seat order after the leaving seat
-    const sorted = [...adjustedPlayers].sort((a, b) => a.seat - b.seat);
-    const next = sorted.find((p) => p.seat > leavingSeat) ?? sorted[0]!;
-    newState = {
-      ...newState,
-      currentPlayerTurn: next.id,
-    };
-  }
-
-  // Remove the player's DB row
-  await db.delete(playersTable).where(eq(playersTable.id, leavingPlayerId));
-
-  // Persist the updated state (this also rewrites cards for remaining players)
-  return await persistPureGameState(newState, previousState);
+  const [game] = await db
+    .select()
+    .from(games)
+    .where(eq(games.id, gameId))
+    .limit(1);
+  if (!game) throw new Error("Game not found");
+  return game;
 }

@@ -30,6 +30,9 @@ export const players = pgTable("poker_players", {
   isButton: boolean("is_button").default(false),
   hasWon: boolean("has_won").default(false),
   showCards: boolean("show_cards").default(false),
+  displayName: text("display_name"),
+  // Mark player to leave the table after the current hand finishes
+  leaveAfterHand: boolean("leave_after_hand").default(false),
   handRank: integer("hand_rank"),
   handValue: integer("hand_value"),
   handName: text("hand_name"),

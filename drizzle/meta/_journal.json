@@ -8,6 +8,55 @@
       "when": 1754696193450,
       "tag": "0000_funny_titania",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1754973015117,
+      "tag": "0001_realtime-broadcast",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1754973664175,
+      "tag": "0002_realtime-broadcast-safe",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1754975873792,
+      "tag": "0003_player-status-leave-flag",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1754977590787,
+      "tag": "0004_cards-view-alias",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1754981113918,
+      "tag": "0005_cards-privacy-reveal",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1754981448760,
+      "tag": "0006_cards-reveal-intent-and-redaction",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1755022008211,
+      "tag": "0007_cards-broadcast-community-only",
+      "breakpoints": true
     }
   ]
 }
