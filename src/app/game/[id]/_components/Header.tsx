@@ -2,7 +2,16 @@
 
 import { Button } from "@/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ArrowLeft,
+  RotateCcw,
   Settings,
   Trophy,
   Users,
@@ -25,6 +34,8 @@ type HeaderProps = {
   onJoinAction: () => void;
   canLeave?: boolean;
   onLeaveAction?: () => Promise<void> | void;
+  canReset?: boolean;
+  onResetAction?: () => Promise<void> | void;
 };
 
 export function Header({
@@ -40,6 +51,8 @@ export function Header({
   onJoinAction,
   canLeave = false,
   onLeaveAction,
+  canReset = false,
+  onResetAction,
 }: HeaderProps) {
   const router = useRouter();
   return (
@@ -103,8 +116,35 @@ export function Header({
             variant="ghost"
             size="sm"
             className="text-slate-400 hover:text-white"
+            asChild
           >
-            <Settings className="h-4 w-4" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-slate-400 hover:text-white"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="bg-slate-800 border-slate-700 text-slate-200">
+                <DropdownMenuLabel>Configurações</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {process.env.NODE_ENV !== "production" && canReset && (
+                  <>
+                    <DropdownMenuLabel>Developer</DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={() => onResetAction?.()}
+                      className="text-amber-300 focus:text-amber-200"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Reset game
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </Button>
           {canJoin && (
             <Button

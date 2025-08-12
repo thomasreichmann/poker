@@ -1,9 +1,10 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast";
+import { evaluateHand } from "@/lib/poker/cards";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 export function useGameData(id: string) {
   const trpc = useTRPC();
@@ -32,8 +33,8 @@ export function useGameData(id: string) {
       dbCards
         .filter((c) => c.playerId === null)
         .map((c, idx) => ({
-          suit: c.suit as any,
-          rank: c.rank as any,
+          suit: c.suit,
+          rank: c.rank,
           id: `${c.rank}-${c.suit}-${idx}`,
         })),
     [dbCards]
@@ -89,8 +90,8 @@ export function useGameData(id: string) {
       counters.set(c.playerId, idx);
       const arr = map.get(c.playerId) ?? [];
       arr.push({
-        suit: c.suit as any,
-        rank: c.rank as any,
+        suit: c.suit,
+        rank: c.rank,
         id: `${c.rank}-${c.suit}-${c.playerId}-${idx - 1}`,
       });
       map.set(c.playerId, arr);
@@ -247,6 +248,76 @@ export function useGameData(id: string) {
       );
     },
   };
+
+  // Show showdown feedback and auto-advance to next hand
+  const showdownHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!dbGame) return;
+    const isShowdown = (dbGame.currentRound ?? "pre-flop") === "showdown";
+    if (!isShowdown) {
+      showdownHandledRef.current = null;
+      return;
+    }
+
+    const key = `${dbGame.id}-${String((dbGame as any).updatedAt ?? "")}`;
+    if (showdownHandledRef.current === key) return;
+    showdownHandledRef.current = key;
+
+    // Determine winners (prefer server flag, fallback to client eval)
+    const community = dbCards.filter((c) => c.playerId === null);
+    const activePlayers = dbPlayers.filter((p) => !p.hasFolded);
+    let winners = dbPlayers.filter((p) => p.hasWon);
+    let handName: string | undefined;
+
+    try {
+      if (winners.length === 0 && activePlayers.length > 0) {
+        const evals = activePlayers.map((p) => {
+          const hole = dbCards.filter((c) => c.playerId === p.id);
+          return {
+            player: p,
+            eval: evaluateHand([...hole, ...community] as any),
+          };
+        });
+        const bestRank = Math.max(...evals.map((e) => e.eval.rank));
+        const bests = evals.filter((e) => e.eval.rank === bestRank);
+        const bestValue = Math.max(...bests.map((e) => e.eval.value));
+        const finalWinners = bests.filter((e) => e.eval.value === bestValue);
+        winners = finalWinners.map((e) => e.player);
+        handName = finalWinners[0]?.eval.name;
+      } else if (winners[0]) {
+        const hole = dbCards.filter((c) => c.playerId === winners[0]!.id);
+        const ev = evaluateHand([...hole, ...community] as any);
+        handName = ev.name;
+      }
+    } catch {
+      // ignore eval errors
+    }
+
+    const winnerNames = winners
+      .map((p) => (p.email ? p.email.split("@")[0] : `Player ${p.seat}`))
+      .join(", ");
+    const description = handName
+      ? `Winner: ${winnerNames} — ${handName}`
+      : `Winner: ${winnerNames}`;
+    toast({
+      variant: "success",
+      title: "Showdown",
+      description,
+      duration: 5000,
+    });
+
+    const timer = setTimeout(() => {
+      void actions.advance();
+    }, 5200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    dbGame?.currentRound,
+    (dbGame as any)?.updatedAt,
+    dbGame?.id,
+    dbPlayers,
+    dbCards,
+  ]);
 
   return {
     me,

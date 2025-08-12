@@ -231,20 +231,28 @@ export async function nextPlayerPure(gameId: string): Promise<Game> {
 export async function resetGamePure(gameId: string): Promise<Game> {
   const currentGameState = await dbGameToPureGame(gameId);
 
+  // Rotate dealer button to next seated player
+  const sortedPlayers = [...currentGameState.players].sort(
+    (a, b) => a.seat - b.seat
+  );
+  const currentButtonIdx = sortedPlayers.findIndex((p) => p.isButton);
+  const nextButtonIdx =
+    currentButtonIdx === -1 ? 0 : (currentButtonIdx + 1) % sortedPlayers.length;
+
   const resetGameState: GameState = {
     ...createInitialGameState(
       gameId,
       currentGameState.bigBlind,
       currentGameState.smallBlind
     ),
-    players: currentGameState.players.map((player) => ({
+    // Preserve stacks, clear round-specific state, and set next button
+    players: sortedPlayers.map((player, index) => ({
       ...player,
-      stack: 1000,
       currentBet: 0,
       hasFolded: false,
       hasWon: false,
       showCards: false,
-      isButton: false,
+      isButton: index === nextButtonIdx,
       handRank: undefined,
       handValue: undefined,
       handName: undefined,
@@ -272,6 +280,11 @@ export async function advanceGameStatePure(gameId: string): Promise<Game> {
   const previousState = await dbGameToPureGame(gameId);
   const activePlayers = previousState.players.filter((p) => !p.hasFolded);
 
+  // If we're already in showdown, reset to a new hand
+  if (previousState.currentRound === "showdown") {
+    return await resetGamePure(gameId);
+  }
+
   if (activePlayers.length === 1) {
     const newGameState = handleSinglePlayerWin(previousState);
     return await persistPureGameState(newGameState, previousState);
@@ -291,8 +304,6 @@ export async function advanceGameStatePure(gameId: string): Promise<Game> {
   if (previousState.currentRound === "river") {
     const newGameState = handleShowdown(previousState);
     return await persistPureGameState(newGameState, previousState);
-  } else if (previousState.currentRound === "showdown") {
-    return await resetGamePure(gameId);
   } else {
     const newGameState = advanceToNextRound(previousState);
     return await persistPureGameState(newGameState, previousState);

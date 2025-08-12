@@ -38,9 +38,8 @@ export default function PokerGamePage() {
 
   useEffect(() => {
     // Reset baseline when turn or round changes
-    const tableBet = dbGame?.currentHighestBet ?? 0;
     if (!yourDbPlayer) return;
-    const baseline = tableBet > 0 ? callAmount : minRaiseTotal;
+    const baseline = canCall ? callAmount : minRaiseTotal;
     setRaiseAmount(baseline);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -48,6 +47,7 @@ export default function PokerGamePage() {
     dbGame?.currentRound,
     dbGame?.currentHighestBet,
     yourDbPlayer?.id,
+    canCall,
   ]);
 
   const handleRaiseAmountChange = (delta: number) => {
@@ -88,9 +88,38 @@ export default function PokerGamePage() {
 
   const handleReset = async () => actions.reset();
 
-  const sliderMin =
-    (dbGame?.currentHighestBet ?? 0) > 0 ? callAmount : minRaiseTotal;
+  const sliderMin = canCall ? callAmount : minRaiseTotal;
   const sliderValue = Math.max(sliderMin, Math.min(maxRaiseTotal, raiseAmount));
+
+  // Compute SB/BB flags based on button position and number of active players
+  const buttonIndex = playersBySeat.findIndex((p) => p.isButton);
+  const activePlayers = playersBySeat.filter((p) => !p.hasFolded);
+  const headsUp = activePlayers.length === 2;
+
+  const getIsSB = (seatIndex: number) => {
+    if (buttonIndex === -1) return false;
+    if (headsUp) {
+      // Heads-up: button is SB
+      return playersBySeat[seatIndex]?.isButton ?? false;
+    }
+    return (
+      playersBySeat[(buttonIndex + 1) % playersBySeat.length]?.id ===
+      playersBySeat[seatIndex]?.id
+    );
+  };
+
+  const getIsBB = (seatIndex: number) => {
+    if (buttonIndex === -1) return false;
+    if (headsUp) {
+      // Heads-up: BB is the other active player
+      const bbIndex = (buttonIndex + 1) % playersBySeat.length;
+      return playersBySeat[bbIndex]?.id === playersBySeat[seatIndex]?.id;
+    }
+    return (
+      playersBySeat[(buttonIndex + 2) % playersBySeat.length]?.id ===
+      playersBySeat[seatIndex]?.id
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-900 text-white relative overflow-hidden">
@@ -107,6 +136,8 @@ export default function PokerGamePage() {
         onJoinAction={handleJoin}
         canLeave={!!yourDbPlayer}
         onLeaveAction={handleLeave}
+        canReset={!!dbGame}
+        onResetAction={handleReset}
       />
 
       {/* Poker Table */}
@@ -163,6 +194,9 @@ export default function PokerGamePage() {
               const isYou = player.id === yourDbPlayer?.id;
               const playerCards = playerIdToCards.get(player.id) ?? [];
 
+              const seatIndex = playersBySeat.findIndex(
+                (p) => p.id === player.id
+              );
               return (
                 <PlayerSeat
                   key={player.id}
@@ -173,6 +207,8 @@ export default function PokerGamePage() {
                   cards={playerCards as any}
                   positionStyle={position as any}
                   activeKey={`${dbGame?.id}-${activePlayerIndex}-${phase}`}
+                  isSmallBlind={getIsSB(seatIndex)}
+                  isBigBlind={getIsBB(seatIndex)}
                 />
               );
             })}
