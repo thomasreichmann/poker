@@ -11,8 +11,8 @@ declare module "@supabase/ssr" {
     opts: {
       cookies: {
         get(name: string): string | undefined;
-        set(name: string, value: string, options?: any): void;
-        remove(name: string, options?: any): void;
+        set(name: string, value: string, options?: never): void;
+        remove(name: string, options?: never): void;
       };
     }
   ): import("@supabase/supabase-js").SupabaseClient;

@@ -23,7 +23,7 @@ const url = (() => {
   }
 })();
 
-let browserClient: SupabaseClient = createBrowserClient(url, supabaseAnonKey);
+const browserClient: SupabaseClient = createBrowserClient(url, supabaseAnonKey);
 
 export function getSupabaseBrowserClient(): SupabaseClient {
   return browserClient;

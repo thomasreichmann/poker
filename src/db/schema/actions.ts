@@ -1,11 +1,11 @@
 import { relations } from "drizzle-orm";
 import { integer, pgTable, serial, timestamp, uuid } from "drizzle-orm/pg-core";
 import { z } from "zod";
-import { ActionType } from "./actionTypes";
+import { PgEnumAction } from "./actionTypes";
 import { games } from "./games";
 import { players } from "./players";
 
-export const ActionTypeSchema = z.enum(ActionType.enumValues);
+export const ActionTypeSchema = z.enum(PgEnumAction.enumValues);
 
 export const actions = pgTable("poker_actions", {
   id: serial("id").primaryKey(),
@@ -15,7 +15,7 @@ export const actions = pgTable("poker_actions", {
   playerId: uuid("player_id").references(() => players.id, {
     onDelete: "set null",
   }),
-  actionType: ActionType("action_type").notNull(),
+  actionType: PgEnumAction("action_type").notNull(),
   amount: integer("amount"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

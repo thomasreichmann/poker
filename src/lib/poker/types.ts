@@ -1,7 +1,20 @@
 // Pure TypeScript types for the poker game engine
 // These types are decoupled from database schema and external dependencies
 
-export type Rank = "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "10" | "J" | "Q" | "K" | "A";
+export type Rank =
+  | "2"
+  | "3"
+  | "4"
+  | "5"
+  | "6"
+  | "7"
+  | "8"
+  | "9"
+  | "10"
+  | "J"
+  | "Q"
+  | "K"
+  | "A";
 export type Suit = "hearts" | "diamonds" | "clubs" | "spades";
 
 export interface Card {
@@ -54,6 +67,7 @@ export interface GameState {
   players: Player[];
   communityCards: Card[];
   deck: Card[];
+  handId: number;
 }
 
 export interface ActionResult {

@@ -32,6 +32,7 @@ import {
   Shield,
   User,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -229,10 +230,13 @@ export default function RegisterPage() {
             <span>Voltar</span>
           </Link>
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">P</span>
-            </div>
-            <span className="text-xl font-bold">PokerPro</span>
+            <Image
+              src="/all-in.svg"
+              alt="ALL IN"
+              width={114}
+              height={32}
+              priority
+            />
           </div>
           <div className="w-16"></div>
         </div>
@@ -828,7 +832,7 @@ export default function RegisterPage() {
       <footer className="border-t border-slate-800 py-6">
         <div className="container mx-auto px-4 text-center text-sm text-slate-400">
           <p>
-            &copy; 2024 PokerPro. Todos os direitos reservados. Jogue com
+            &copy; 2024 ALL IN. Todos os direitos reservados. Jogue com
             responsabilidade. +18 anos.
           </p>
         </div>

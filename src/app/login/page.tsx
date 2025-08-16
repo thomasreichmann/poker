@@ -25,6 +25,7 @@ import {
   Mail,
   Shield,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -38,11 +39,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [devOpen, setDevOpen] = useState(false);
-  const [devUsers, setDevUsers] = useState<
-    Array<{ id: string; email: string }>
-  >([]);
-  const [devLoading, setDevLoading] = useState(false);
-  const [devSearch, setDevSearch] = useState("");
+  const [, setDevUsers] = useState<Array<{ id: string; email: string }>>([]);
+  const [, setDevLoading] = useState(false);
 
   const supabase = getSupabaseBrowserClient();
   const router = useRouter();
@@ -74,12 +72,6 @@ export default function LoginPage() {
       void loadDevUsers();
     }
   }, [devOpen]);
-
-  const filteredDevUsers = devUsers.filter((u) => {
-    const q = devSearch.toLowerCase().trim();
-    if (!q) return true;
-    return u.email.toLowerCase().includes(q) || u.id.toLowerCase().includes(q);
-  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,10 +127,13 @@ export default function LoginPage() {
             <span>Voltar</span>
           </Link>
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">P</span>
-            </div>
-            <span className="text-xl font-bold">PokerPro</span>
+            <Image
+              src="/all-in.svg"
+              alt="ALL IN"
+              width={114}
+              height={32}
+              priority
+            />
           </div>
           <div className="w-16"></div> {/* Spacer for centering */}
         </div>
@@ -355,7 +350,7 @@ export default function LoginPage() {
       <footer className="border-t border-slate-800 py-6">
         <div className="container mx-auto px-4 text-center text-sm text-slate-400">
           <p>
-            &copy; 2024 PokerPro. Todos os direitos reservados. Jogue com
+            &copy; 2024 ALL IN. Todos os direitos reservados. Jogue com
             responsabilidade. +18 anos.
           </p>
         </div>

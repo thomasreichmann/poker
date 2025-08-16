@@ -7,6 +7,26 @@ import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 
+import { Action } from "@/db/schema/actions";
+import { PokerAction } from "@/db/schema/actionTypes";
+import { Card } from "@/db/schema/cards";
+import { Game } from "@/db/schema/games";
+import { Player } from "@/db/schema/players";
+import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
+
+type BroadcastPayload = {
+  event: string;
+  payload: {
+    id: string;
+    old_record: never;
+    operation: string;
+    record: never;
+    schema: string;
+    table: string;
+  };
+  type: string;
+};
+
 export function useGameData(id: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -22,9 +42,13 @@ export function useGameData(id: string) {
     refetchOnMount: false,
   });
 
-  const dbGame = gameData?.game ?? null;
-  const dbPlayers = gameData?.players ?? [];
-  const dbCards = gameData?.cards ?? [];
+  const getHoleCards = useQuery(
+    trpc.game.getHoleCards.queryOptions({ gameId: id })
+  );
+
+  const dbGame = useMemo(() => gameData?.game ?? null, [gameData?.game]);
+  const dbPlayers = useMemo(() => gameData?.players ?? [], [gameData?.players]);
+  const dbCards = useMemo(() => gameData?.cards ?? [], [gameData?.cards]);
 
   const yourDbPlayer = useMemo(
     () => dbPlayers.find((p) => p.userId === me?.id) || null,
@@ -41,8 +65,8 @@ export function useGameData(id: string) {
       dbCards
         .filter((c) => c.playerId === null)
         .map((c, idx) => ({
-          suit: c.suit,
-          rank: c.rank,
+          suit: c.suit as IPlayingCard["suit"],
+          rank: c.rank as IPlayingCard["rank"],
           id: `${c.rank}-${c.suit}-${idx}`,
         })),
     [dbCards]
@@ -90,7 +114,7 @@ export function useGameData(id: string) {
   );
 
   const playerIdToCards = useMemo(() => {
-    const map = new Map<string, { suit: string; rank: string; id: string }[]>();
+    const map = new Map<string, IPlayingCard[]>();
     const counters = new Map<string, number>();
     for (const c of dbCards) {
       if (!c.playerId) continue;
@@ -98,8 +122,8 @@ export function useGameData(id: string) {
       counters.set(c.playerId, idx);
       const arr = map.get(c.playerId) ?? [];
       arr.push({
-        suit: c.suit,
-        rank: c.rank,
+        suit: c.suit as IPlayingCard["suit"],
+        rank: c.rank as IPlayingCard["rank"],
         id: `${c.rank}-${c.suit}-${c.playerId}-${idx - 1}`,
       });
       map.set(c.playerId, arr);
@@ -149,11 +173,6 @@ export function useGameData(id: string) {
     return tableBet > (yourDbPlayer.currentBet ?? 0) && yourDbPlayer.stack > 0;
   }, [dbGame, yourDbPlayer]);
 
-  const invalidateGame = () =>
-    queryClient.invalidateQueries({
-      queryKey: trpc.game.getById.queryKey({ id }),
-    });
-
   const joinMutation = useMutation(trpc.game.join.mutationOptions());
   const actMutation = useMutation(trpc.game.act.mutationOptions());
   const advanceMutation = useMutation(trpc.game.advance.mutationOptions());
@@ -190,8 +209,10 @@ export function useGameData(id: string) {
     }
     try {
       await action();
-    } catch (e: any) {
-      showError(e?.message ?? "Ocorreu um erro. Tente novamente.");
+    } catch (e) {
+      showError(
+        e instanceof Error ? e.message : "Ocorreu um erro. Tente novamente."
+      );
     }
   };
 
@@ -204,15 +225,13 @@ export function useGameData(id: string) {
         }
       );
     },
-    act: async (
-      action: "check" | "call" | "fold" | "raise" | "bet",
-      totalAmount?: number
-    ) => {
+    act: async (action: PokerAction, totalAmount?: number) => {
       if (!dbGame || !yourDbPlayer) return;
-      const payload: { gameId: string; action: any; amount?: number } = {
-        gameId: dbGame.id,
-        action,
-      };
+      const payload: { gameId: string; action: PokerAction; amount?: number } =
+        {
+          gameId: dbGame.id,
+          action,
+        };
       if (action === "raise" || action === "bet") {
         const targetTotal = Math.max(
           minRaiseTotal,
@@ -252,60 +271,17 @@ export function useGameData(id: string) {
     },
   };
 
-  // Fetch own hole cards on demand when missing (retry briefly at start of hand)
-  const holeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holeRetryCountRef = useRef<number>(0);
-  const holeFetchKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!dbGame || !yourDbPlayer) return;
-    const key = `${dbGame.id}:${dbGame.currentRound}:${yourDbPlayer.id}`;
-    const fetchMine = async () => {
-      const yourHoleCount = dbCards.filter((c) => c.playerId === yourDbPlayer.id).length;
-      if (yourHoleCount >= 2) return true;
-      try {
-        const opts = trpc.game.getMyHoleCards.queryOptions({ gameId: dbGame.id });
-        const mine = await queryClient.fetchQuery(opts);
-        if (mine && mine.length > 0) {
-          const queryKey = trpc.game.getById.queryKey({ id });
-          queryClient.setQueryData(queryKey, (prev: any) => {
-            if (!prev) return prev;
-            const existingIds = new Set(prev.cards.map((c: any) => c.id));
-            const merged = prev.cards.concat(mine.filter((c: any) => !existingIds.has(c.id)));
-            return { ...prev, cards: merged };
-          });
-          return true;
-        }
-      } catch {
-        // ignore
-      }
-      return false;
-    };
-
-    const startRetriesIfNeeded = async () => {
-      // Avoid re-running for the same hand
-      if (holeFetchKeyRef.current === key) return;
-      holeFetchKeyRef.current = key;
-      holeRetryCountRef.current = 0;
-
-      const attempt = async () => {
-        const done = await fetchMine();
-        if (done) return;
-        holeRetryCountRef.current += 1;
-        if (holeRetryCountRef.current > 5) return; // cap retries
-        const delayMs = 300 * holeRetryCountRef.current; // 300ms, 600ms, ...
-        holeRetryTimerRef.current = setTimeout(() => void attempt(), delayMs);
-      };
-      void attempt();
-    };
-
-    void startRetriesIfNeeded();
-    return () => {
-      if (holeRetryTimerRef.current) {
-        clearTimeout(holeRetryTimerRef.current);
-        holeRetryTimerRef.current = null;
-      }
-    };
-  }, [dbGame?.id, dbGame?.currentRound, yourDbPlayer?.id, dbCards, id, queryClient, trpc.game]);
+    // Update the player hole cards in the getById query
+    if (!getHoleCards.data) {
+      console.log("holeCards is undefined");
+      return;
+    }
+    queryClient.setQueryData(trpc.game.getById.queryKey({ id }), (prev) => {
+      if (!prev) return prev;
+      return { ...prev, cards: getHoleCards.data };
+    });
+  }, [getHoleCards.data, id, queryClient, trpc.game.getById]);
 
   // Realtime Broadcast subscription (private channel per game)
   useEffect(() => {
@@ -314,7 +290,9 @@ export function useGameData(id: string) {
     const supabase = getSupabaseBrowserClient();
 
     // Ensure Realtime Authorization token is set for private channels
-    let unsubscribeAuth: (() => void) | undefined;
+    const unsubscribeAuth = () => {
+      authListener?.subscription.unsubscribe();
+    };
     void supabase.auth.getSession().then(({ data }) => {
       const token = data.session?.access_token;
       if (token) {
@@ -329,93 +307,58 @@ export function useGameData(id: string) {
         }
       }
     );
-    unsubscribeAuth = () => authListener?.subscription.unsubscribe();
 
     // Utilities to update the TRPC cache directly from broadcast payloads
     const queryKey = trpc.game.getById.queryKey({ id });
     const toCamel = (s: string) =>
       s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    const toCamelObject = (obj: Record<string, unknown>) => {
+      return Object.fromEntries(
+        Object.entries(obj).map(([k, v]) => [toCamel(k), v])
+      );
+    };
 
-    const mapGameRow = (row: any) => ({
-      id: row.id,
-      status: row.status,
-      currentRound: row.current_round,
-      currentHighestBet: row.current_highest_bet,
-      currentPlayerTurn: row.current_player_turn,
-      pot: row.pot,
-      bigBlind: row.big_blind,
-      smallBlind: row.small_blind,
-      updatedAt: row.updated_at,
-      lastAction: row.last_action,
-      lastBetAmount: row.last_bet_amount,
-    });
-    const mapPlayerRow = (row: any) => ({
-      id: row.id,
-      userId: row.user_id,
-      gameId: row.game_id,
-      seat: row.seat,
-      stack: row.stack,
-      currentBet: row.current_bet,
-      hasFolded: row.has_folded,
-      isConnected: row.is_connected,
-      lastSeen: row.last_seen,
-      isButton: row.is_button,
-      hasWon: row.has_won,
-      showCards: row.show_cards,
-      displayName: row.display_name,
-      handRank: row.hand_rank,
-      handValue: row.hand_value,
-      handName: row.hand_name,
-    });
-    const mapCardRow = (row: any) => ({
-      id: row.id,
-      gameId: row.game_id,
-      playerId: row.player_id,
-      rank: row.rank,
-      suit: row.suit,
-    });
-    const mapActionRow = (row: any) => ({
-      id: row.id,
-      gameId: row.game_id,
-      playerId: row.player_id,
-      actionType: row.action_type,
-      amount: row.amount,
-      createdAt: row.created_at,
-    });
-
-    const upsertById = <T extends { id: any }>(list: T[], item: T) => {
+    const upsertById = <T extends { id: string | number }>(
+      list: T[],
+      item: T
+    ) => {
       const idx = list.findIndex((x) => x.id === item.id);
       if (idx === -1) return [...list, item];
       const copy = list.slice();
       copy[idx] = item;
       return copy;
     };
-    const removeById = <T extends { id: any }>(list: T[], id: any) =>
-      list.filter((x) => x.id !== id);
+    const removeById = <T extends { id: string | number }>(
+      list: T[],
+      id: string | number
+    ) => list.filter((x) => x.id !== id);
 
     function applyBroadcast(
       event: string,
       table: string,
-      newRow: any,
-      oldRow: any
+      newRow: { id: string },
+      oldRow: { id: string }
     ) {
-      queryClient.setQueryData(queryKey, (prev: any) => {
+      queryClient.setQueryData(queryKey, (prev) => {
         if (!prev) return prev;
         switch (table) {
           case "poker_games": {
-            const row = (newRow ?? oldRow) as any;
-            const mapped = mapGameRow(row);
-            const prevGame = prev.game as any;
+            // New and old game FROM DB broadcast
+            const game = newRow ?? oldRow;
+            const mapped = toCamelObject(game) as Game;
+
+            // Next and previous game from TRPC cache
+            const prevGame = prev.game as Game;
             const nextGame = { ...prevGame, ...mapped };
-            const transitionedToNewHand =
-              prevGame?.currentRound === "showdown" &&
-              nextGame.currentRound === "pre-flop";
+            const transitionedToNewHand = prevGame.handId !== nextGame.handId;
             if (transitionedToNewHand) {
-              // Clear all cards at hand reset; fresh INSERTs will repopulate
+              // Clear all cards at hand reset; Will need to manually re-fetch hole cards
               // Also drop players flagged to leaveAfterHand to reflect server removals immediately
-              const filteredPlayers = (prev.players as any[]).filter(
+              void getHoleCards.refetch();
+              const filteredPlayers = prev.players.filter(
                 (p) => !p.leaveAfterHand
               );
+
               return {
                 ...prev,
                 game: nextGame,
@@ -427,10 +370,11 @@ export function useGameData(id: string) {
           }
           case "poker_players": {
             if (event === "DELETE") {
-              const idToRemove = oldRow?.id;
+              const row = oldRow ?? newRow;
+              const idToRemove = row.id;
               return { ...prev, players: removeById(prev.players, idToRemove) };
             }
-            const mapped = mapPlayerRow(newRow);
+            const mapped = toCamelObject(newRow) as Player;
             return {
               ...prev,
               players: upsertById(prev.players, mapped).sort(
@@ -439,9 +383,9 @@ export function useGameData(id: string) {
             };
           }
           case "poker_cards": {
-            const normalize = (cardsList: any[]) => {
-              const byPlayer = new Map<string, any[]>();
-              const community: any[] = [];
+            const normalize = (cardsList: Card[]) => {
+              const byPlayer = new Map<string, Card[]>();
+              const community: Card[] = [];
               for (const c of cardsList) {
                 if (c.playerId) {
                   const pid = String(c.playerId);
@@ -452,7 +396,7 @@ export function useGameData(id: string) {
                   community.push(c);
                 }
               }
-              const limited: any[] = [];
+              const limited: Card[] = [];
               for (const [, arr] of byPlayer) {
                 arr.sort((a, b) => Number(a.id) - Number(b.id));
                 const kept = arr.slice(-2);
@@ -468,18 +412,18 @@ export function useGameData(id: string) {
               const next = removeById(prev.cards, idToRemove);
               return { ...prev, cards: normalize(next) };
             }
-            const mapped = mapCardRow(newRow);
+            const mapped = toCamelObject(newRow) as Card;
             const next = upsertById(prev.cards, mapped);
             return { ...prev, cards: normalize(next) };
           }
           case "poker_actions": {
+            const mapped = toCamelObject(newRow) as Action;
+
             if (event === "INSERT") {
-              const mapped = mapActionRow(newRow);
               const next = [mapped, ...prev.actions].slice(0, 50);
               return { ...prev, actions: next };
             }
             if (event === "UPDATE") {
-              const mapped = mapActionRow(newRow);
               return { ...prev, actions: upsertById(prev.actions, mapped) };
             }
             if (event === "DELETE") {
@@ -494,22 +438,12 @@ export function useGameData(id: string) {
       });
     }
 
-    function onBroadcast(payload: any) {
-      // payload structure from realtime.broadcast_changes
-      const p = payload?.payload ?? payload;
-      const event = p?.event || p?.operation || payload?.event || "";
-      const table = p?.table || p?.table_name || "";
-      const schema = p?.schema || p?.table_schema || "public";
-      if (schema !== "public") return;
-      const newRow = p?.new || p?.record || undefined;
-      const oldRow = p?.old || undefined;
-      if (!table) return;
-      applyBroadcast(
-        String(event).toUpperCase(),
-        String(table),
-        newRow,
-        oldRow
-      );
+    function onBroadcast(payload: BroadcastPayload) {
+      console.log("onBroadcast", payload.event, payload.payload.table, payload);
+      const p = payload.payload;
+      if (p.schema !== "public") return;
+      if (!p.table) return;
+      applyBroadcast(payload.event, p.table, p.record, p.old_record);
     }
 
     const channel = supabase
@@ -528,69 +462,123 @@ export function useGameData(id: string) {
 
   // Show showdown feedback and auto-advance to next hand
   const showdownHandledRef = useRef<string | null>(null);
+  const showdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (!dbGame) return;
     const isShowdown = (dbGame.currentRound ?? "pre-flop") === "showdown";
     if (!isShowdown) {
       showdownHandledRef.current = null;
+      // Clear any pending showdown timeout
+      if (showdownTimeoutRef.current) {
+        clearTimeout(showdownTimeoutRef.current);
+        showdownTimeoutRef.current = null;
+      }
       return;
     }
 
-    const key = `${dbGame.id}-${String((dbGame as any).updatedAt ?? "")}`;
+    const key = `${dbGame.id}-${String(dbGame.updatedAt ?? "")}`;
     if (showdownHandledRef.current === key) return;
-    showdownHandledRef.current = key;
 
-    // Determine winners (prefer server flag, fallback to client eval)
-    const community = dbCards.filter((c) => c.playerId === null);
-    const activePlayers = dbPlayers.filter((p) => !p.hasFolded);
-    let winners = dbPlayers.filter((p) => p.hasWon);
-    let handName: string | undefined;
-
-    try {
-      if (winners.length === 0 && activePlayers.length > 0) {
-        const evals = activePlayers.map((p) => {
-          const hole = dbCards.filter((c) => c.playerId === p.id);
-          return {
-            player: p,
-            eval: evaluateHand([...hole, ...community] as any),
-          };
-        });
-        const bestRank = Math.max(...evals.map((e) => e.eval.rank));
-        const bests = evals.filter((e) => e.eval.rank === bestRank);
-        const bestValue = Math.max(...bests.map((e) => e.eval.value));
-        const finalWinners = bests.filter((e) => e.eval.value === bestValue);
-        winners = finalWinners.map((e) => e.player);
-        handName = finalWinners[0]?.eval.name;
-      } else if (winners[0]) {
-        const hole = dbCards.filter((c) => c.playerId === winners[0]!.id);
-        const ev = evaluateHand([...hole, ...community] as any);
-        handName = ev.name;
-      }
-    } catch {
-      // ignore eval errors
+    // Clear any existing timeout to restart the debounce period
+    if (showdownTimeoutRef.current) {
+      clearTimeout(showdownTimeoutRef.current);
     }
 
-    const winnerNames = winners
-      .map((p) => (p.email ? p.email.split("@")[0] : `Player ${p.seat}`))
-      .join(", ");
-    const description = handName
-      ? `Winner: ${winnerNames} — ${handName}`
-      : `Winner: ${winnerNames}`;
-    toast({
-      variant: "success",
-      title: "Showdown",
-      description,
-      duration: 5000,
-    });
+    // Debounce showdown processing to wait for all related updates
+    showdownTimeoutRef.current = setTimeout(() => {
+      // Double-check we haven't already handled this showdown
+      if (showdownHandledRef.current === key) return;
+      showdownHandledRef.current = key;
 
-    // Schedule immediate advance when the client receives showdown state
-    // Use a short delay to let the toast render, but don't wait for it to finish
-    const timer = setTimeout(() => {
-      void actions.advance();
-    }, 2000);
-    return () => clearTimeout(timer);
+      // Determine winners (prefer server flag, fallback to client eval)
+      const community = dbCards.filter((c) => c.playerId === null);
+      const activePlayers = dbPlayers.filter(
+        (p) => p.hasFolded === false || p.hasFolded === null
+      );
+      let winners = dbPlayers.filter((p) => p.hasWon);
+      let handName: string | undefined;
+
+      try {
+        if (winners.length === 0 && activePlayers.length > 0) {
+          // If only one player remains (others folded), they win by default
+          if (activePlayers.length === 1) {
+            winners = [activePlayers[0]!];
+            handName = "Winner by default";
+          } else {
+            // Multiple players remain, evaluate hands
+            const evals = activePlayers.map((p) => {
+              const hole = dbCards.filter((c) => c.playerId === p.id);
+              return {
+                player: p,
+                eval: evaluateHand([...hole, ...community]),
+              };
+            });
+            const bestRank = Math.max(...evals.map((e) => e.eval.rank));
+            const bests = evals.filter((e) => e.eval.rank === bestRank);
+            const bestValue = Math.max(...bests.map((e) => e.eval.value));
+            const finalWinners = bests.filter(
+              (e) => e.eval.value === bestValue
+            );
+            winners = finalWinners.map((e) => e.player);
+            handName = finalWinners[0]?.eval.name;
+          }
+        } else if (winners[0]) {
+          const hole = dbCards.filter((c) => c.playerId === winners[0]!.id);
+          const ev = evaluateHand([...hole, ...community]);
+          handName = ev.name;
+        }
+      } catch {
+        // ignore eval errors - fallback to single non-folded player if we still have none
+        if (winners.length === 0 && activePlayers.length > 0) {
+          if (activePlayers.length === 1) {
+            winners = [activePlayers[0]!];
+            handName = "Winner by default";
+          } else {
+            // Multiple active players but eval failed - pick first non-folded as fallback
+            winners = [activePlayers[0]!];
+            handName = "Winner by default";
+          }
+        }
+      }
+
+      // Show all identified winners for debugging purposes
+      const winnerNames = winners
+        .map((p) => (p.displayName ? p.displayName : `Player ${p.seat}`))
+        .join(", ");
+
+      // Fallback if we still don't have winners for some reason
+      const finalWinnerNames = winnerNames || "Unknown Player";
+
+      const description = handName
+        ? `Winner: ${finalWinnerNames} — ${handName}`
+        : `Winner: ${finalWinnerNames}`;
+      toast({
+        variant: "success",
+        title: "Showdown",
+        description,
+        duration: 5000,
+      });
+
+      // Schedule immediate advance when the client receives showdown state
+      // Use a short delay to let the toast render, but don't wait for it to finish
+      const advanceTimer = setTimeout(() => {
+        void actions.advance();
+      }, 2000);
+
+      // Clear advance timer on cleanup (though this timeout function will complete)
+      setTimeout(() => clearTimeout(advanceTimer), 3000);
+    }, 150); // 150ms debounce delay to wait for related player/card updates
+
+    // Cleanup function
+    return () => {
+      if (showdownTimeoutRef.current) {
+        clearTimeout(showdownTimeoutRef.current);
+        showdownTimeoutRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dbGame?.id, dbGame?.currentRound, (dbGame as any)?.updatedAt]);
+  }, [dbGame?.id, dbGame?.currentRound, dbGame?.updatedAt, dbPlayers, dbCards]);
 
   return {
     me,

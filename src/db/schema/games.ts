@@ -1,6 +1,6 @@
 import { relations } from "drizzle-orm";
 import { integer, pgEnum, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
-import { ActionType } from "./actionTypes";
+import { PgEnumAction } from "./actionTypes";
 import { actions } from "./actions";
 import { type Card, cards } from "./cards";
 import { type Player, players } from "./players";
@@ -22,6 +22,7 @@ export const gameStatusEnum = pgEnum("game_status", [
 
 export const games = pgTable("poker_games", {
   id: uuid("id").defaultRandom().primaryKey(),
+  handId: integer("hand_id").default(0).notNull(),
   status: gameStatusEnum("status").default("waiting"),
   currentRound: roundTypeEnum("current_round").default("pre-flop"),
   currentHighestBet: integer("current_highest_bet").default(0).notNull(),
@@ -30,7 +31,7 @@ export const games = pgTable("poker_games", {
   bigBlind: integer("big_blind").default(20).notNull(),
   smallBlind: integer("small_blind").default(10).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  lastAction: ActionType("last_action").default("check"),
+  lastAction: PgEnumAction("last_action").default("check"),
   lastBetAmount: integer("last_bet_amount").default(0),
 });
 

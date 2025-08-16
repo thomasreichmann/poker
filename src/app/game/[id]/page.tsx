@@ -1,5 +1,6 @@
 "use client";
 
+import { MultiPlayerTestPanel } from "@/components/dev/MultiPlayerTestPanel";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ActionPanel } from "./_components/ActionPanel";
@@ -16,8 +17,6 @@ export default function PokerGamePage() {
 
   const {
     dbGame,
-    dbPlayers,
-    dbCards,
     yourDbPlayer,
     isYourTurn,
     communityCards,
@@ -48,6 +47,8 @@ export default function PokerGamePage() {
     dbGame?.currentHighestBet,
     yourDbPlayer?.id,
     canCall,
+    callAmount,
+    minRaiseTotal,
   ]);
 
   const handleRaiseAmountChange = (delta: number) => {
@@ -72,7 +73,6 @@ export default function PokerGamePage() {
     await actions.act(action, totalAmount ?? raiseAmount);
   };
 
-  const isAnimating = false;
   const phase = dbGame?.currentRound ?? "pre-flop";
   const showActionPanel: boolean = !!(
     isYourTurn &&
@@ -83,8 +83,6 @@ export default function PokerGamePage() {
 
   const handleJoin = async () => actions.join();
   const handleLeave = async () => actions.leave();
-
-  const handleAdvance = async () => actions.advance();
 
   const handleReset = async () => actions.reset();
 
@@ -150,7 +148,7 @@ export default function PokerGamePage() {
               currentHighestBet={dbGame?.currentHighestBet ?? 0}
               phaseLabel={phaseLabel}
             />
-            <CommunityCards cards={communityCards as any} isAnimating={false} />
+            <CommunityCards cards={communityCards} isAnimating={false} />
 
             {/* Players */}
             {playersByView.map((player, index) => {
@@ -204,8 +202,8 @@ export default function PokerGamePage() {
                   isCurrent={isCurrentPlayer}
                   isYou={isYou}
                   phase={phase}
-                  cards={playerCards as any}
-                  positionStyle={position as any}
+                  cards={playerCards}
+                  positionStyle={position}
                   activeKey={`${dbGame?.id}-${activePlayerIndex}-${phase}`}
                   isSmallBlind={getIsSB(seatIndex)}
                   isBigBlind={getIsBB(seatIndex)}
@@ -237,6 +235,16 @@ export default function PokerGamePage() {
       </div>
 
       {/* Winner dialog removed in server-driven version */}
+
+      {/* Development Testing Panel */}
+      {process.env.NODE_ENV !== "production" && (
+        <MultiPlayerTestPanel
+          gameId={id}
+          game={dbGame}
+          players={playersBySeat}
+          currentPlayerId={dbGame?.currentPlayerTurn ?? undefined}
+        />
+      )}
     </div>
   );
 }

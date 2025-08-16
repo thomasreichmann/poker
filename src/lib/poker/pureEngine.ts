@@ -60,6 +60,7 @@ export function createInitialGameState(
     players: [],
     communityCards: [],
     deck: generateDeck(),
+    handId: 0,
   };
 }
 
@@ -499,7 +500,7 @@ export function processAction(
       newGameState = processCall(gameState, action);
       break;
     case "check":
-      newGameState = processCheck(gameState, action);
+      newGameState = processCheck(gameState);
       break;
     case "fold":
       newGameState = processFold(gameState, action);
@@ -570,7 +571,7 @@ function processCall(gameState: GameState, action: GameAction): GameState {
   return newGameState;
 }
 
-function processCheck(gameState: GameState, _action: GameAction): GameState {
+function processCheck(gameState: GameState): GameState {
   return {
     ...gameState,
     lastAction: "check",
@@ -798,7 +799,33 @@ export function distributeWinnings(
 
 export function handleShowdown(gameState: GameState): GameState {
   const { winners } = findWinners(gameState);
-  return distributeWinnings(gameState, winners);
+  const afterPayout = distributeWinnings(gameState, winners);
+  return handleMuck(afterPayout);
+}
+
+/** Function that is called after finding the winners, which decides based on the game state whether to muck or show a player's cards */
+export function handleMuck(gameState: GameState): GameState {
+  const activePlayers = getActivePlayers(gameState);
+
+  // If the pot was won uncontested (everyone folded), no cards are revealed
+  if (activePlayers.length <= 1) {
+    return {
+      ...gameState,
+      players: gameState.players.map((p) => ({ ...p, showCards: false })),
+    };
+  }
+
+  // Otherwise we are at showdown with multiple contenders: reveal winners, muck others
+  const { winners } = findWinners(gameState);
+  const winnerIds = new Set(winners.map((w) => w.id));
+
+  return {
+    ...gameState,
+    players: gameState.players.map((p) => ({
+      ...p,
+      showCards: winnerIds.has(p.id),
+    })),
+  };
 }
 
 export function handleSinglePlayerWin(gameState: GameState): GameState {

@@ -12,11 +12,11 @@ export async function getSupabaseServerClient(): Promise<SupabaseClient> {
       get(name: string) {
         return cookieStore.get(name)?.value;
       },
-      set(name: string, value: string, options: any) {
+      set() {
         // next/headers cookies() in RSC is readonly; middleware is where we set cookies
         // No-op here to satisfy the interface
       },
-      remove(name: string, options: any) {
+      remove() {
         // No-op
       },
     },

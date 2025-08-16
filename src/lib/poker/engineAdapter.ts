@@ -1,10 +1,12 @@
 import { db } from "@/db";
 import { actions } from "@/db/schema/actions";
+import { type PokerAction } from "@/db/schema/actionTypes";
 import { cards as cardsTable } from "@/db/schema/cards";
 import { games, type Game } from "@/db/schema/games";
 import { players as playersTable, type Player } from "@/db/schema/players";
-import { and, eq, sql } from "drizzle-orm";
-import { generateDeck, getAvailableCards } from "./cards";
+import { hasArrayChanges, shallowEqualByKeys } from "@/lib/utils";
+import { and, eq, inArray, not, sql } from "drizzle-orm";
+import { CardBase, generateDeck, getAvailableCards } from "./cards";
 import {
   addPlayerToGame,
   advanceToNextPlayer,
@@ -19,14 +21,17 @@ import {
   type GameState,
 } from "./pureEngine";
 import type {
+  ActionType,
   ActionType as EngineActionType,
   GameStatus,
+  Rank,
   RoundType,
+  Suit,
 } from "./types";
 
 type ActionInput = {
   gameId: string;
-  action: "bet" | "check" | "fold" | "call" | "raise";
+  action: PokerAction;
   amount?: number;
 };
 
@@ -74,10 +79,11 @@ export async function dbGameToPureGame(gameId: string): Promise<GameState> {
     ...communityCards,
     ...players.flatMap((pl) => pl.holeCards),
   ];
-  const deck = getAvailableCards(generateDeck(), dealtCards);
+  const deck = getAvailableCards(generateDeck(), dealtCards as CardBase[]);
 
   const pureState: GameState = {
     id: game.id,
+    handId: game.handId ?? 0,
     status: (game.status ?? "waiting") as GameStatus,
     currentRound: (game.currentRound ?? "pre-flop") as RoundType,
     currentHighestBet: game.currentHighestBet ?? 0,
@@ -93,7 +99,7 @@ export async function dbGameToPureGame(gameId: string): Promise<GameState> {
     lastBetAmount: game.lastBetAmount ?? 0,
     players,
     communityCards,
-    deck: deck.map((c) => ({ rank: c.rank as any, suit: c.suit as any })),
+    deck: deck.map((c) => ({ rank: c.rank, suit: c.suit })),
   };
 
   return pureState;
@@ -109,10 +115,66 @@ export async function persistPureGameState(
       sql`select pg_advisory_xact_lock(hashtext(${pureGameState.id}))`
     );
 
+    // Skip early if no changes (when we have previous state)
+    if (_previousState) {
+      const gameChanged = !shallowEqualByKeys(_previousState, pureGameState, [
+        "status",
+        "currentRound",
+        "currentHighestBet",
+        "currentPlayerTurn",
+        "pot",
+        "bigBlind",
+        "smallBlind",
+        "lastAction",
+        "lastBetAmount",
+      ]);
+
+      const playersChanged = hasArrayChanges(
+        _previousState.players,
+        pureGameState.players,
+        (p) => p.id,
+        (a, b) =>
+          shallowEqualByKeys(a, b, [
+            "seat",
+            "stack",
+            "currentBet",
+            "hasFolded",
+            "isButton",
+            "hasWon",
+            "showCards",
+            "handRank",
+            "handValue",
+            "handName",
+          ])
+      );
+
+      const cardsChanged = hasArrayChanges(
+        _previousState.communityCards.concat(
+          _previousState.players.flatMap((p) => p.holeCards)
+        ) as Array<{ rank: Rank; suit: Suit }>,
+        pureGameState.communityCards.concat(
+          pureGameState.players.flatMap((p) => p.holeCards)
+        ) as Array<{ rank: Rank; suit: Suit }>,
+        (c) => `${c.rank}:${c.suit}`,
+        (a, b) => a.rank === b.rank && a.suit === b.suit
+      );
+
+      if (!gameChanged && !playersChanged && !cardsChanged) {
+        // Nothing to persist
+        const [unchanged] = await tx
+          .select()
+          .from(games)
+          .where(eq(games.id, pureGameState.id))
+          .limit(1);
+        return unchanged as Game;
+      }
+    }
+
     const [updated] = await tx
       .update(games)
       .set({
         status: pureGameState.status,
+        handId: pureGameState.handId,
         currentRound: pureGameState.currentRound,
         currentHighestBet: pureGameState.currentHighestBet,
         currentPlayerTurn: pureGameState.currentPlayerTurn ?? null,
@@ -126,57 +188,216 @@ export async function persistPureGameState(
       .where(eq(games.id, pureGameState.id))
       .returning();
 
-    // Update players
+    // Update only changed players when previous state is available
+    const previousPlayersById = new Map(
+      (_previousState?.players ?? []).map((pp) => [pp.id, pp])
+    );
     for (const p of pureGameState.players) {
-      await tx
-        .update(playersTable)
-        .set({
-          seat: p.seat,
-          stack: p.stack,
-          currentBet: p.currentBet,
-          hasFolded: p.hasFolded,
-          isButton: p.isButton,
-          hasWon: p.hasWon,
-          showCards: p.showCards,
-          handRank: p.handRank ?? null,
-          handValue: p.handValue ?? null,
-          handName: p.handName ?? null,
-        })
-        .where(eq(playersTable.id, p.id));
-    }
+      const prev = previousPlayersById.get(p.id);
+      const playerChanged =
+        !prev ||
+        prev.seat !== p.seat ||
+        prev.stack !== p.stack ||
+        (prev.currentBet ?? 0) !== (p.currentBet ?? 0) ||
+        (prev.hasFolded ?? false) !== (p.hasFolded ?? false) ||
+        (prev.isButton ?? false) !== (p.isButton ?? false) ||
+        (prev.hasWon ?? false) !== (p.hasWon ?? false) ||
+        (prev.showCards ?? false) !== (p.showCards ?? false) ||
+        (prev.handRank ?? null) !== (p.handRank ?? null) ||
+        (prev.handValue ?? null) !== (p.handValue ?? null) ||
+        (prev.handName ?? null) !== (p.handName ?? null);
 
-    // Replace dealt cards for this game atomically
-    await tx.delete(cardsTable).where(eq(cardsTable.gameId, pureGameState.id));
-
-    const newCards: Array<
-      Parameters<typeof db.insert>[0] extends never
-        ? never
-        : { gameId: string; playerId: string | null; rank: any; suit: any }
-    > = [];
-
-    // Community cards
-    for (const c of pureGameState.communityCards) {
-      newCards.push({
-        gameId: pureGameState.id,
-        playerId: null,
-        rank: c.rank as any,
-        suit: c.suit as any,
-      });
-    }
-    // Hole cards
-    for (const pl of pureGameState.players) {
-      for (const c of pl.holeCards) {
-        newCards.push({
-          gameId: pureGameState.id,
-          playerId: pl.id,
-          rank: c.rank as any,
-          suit: c.suit as any,
-        });
+      if (playerChanged) {
+        await tx
+          .update(playersTable)
+          .set({
+            seat: p.seat,
+            stack: p.stack,
+            currentBet: p.currentBet,
+            hasFolded: p.hasFolded,
+            isButton: p.isButton,
+            hasWon: p.hasWon,
+            showCards: p.showCards,
+            handRank: p.handRank ?? null,
+            handValue: p.handValue ?? null,
+            handName: p.handName ?? null,
+          })
+          .where(eq(playersTable.id, p.id));
       }
     }
 
-    if (newCards.length > 0) {
-      await tx.insert(cardsTable).values(newCards);
+    // Cards: perform a minimal diff when previous state is available; otherwise replace
+    type DbCardRow = {
+      gameId: string;
+      playerId: string | null;
+      rank: Rank;
+      suit: Suit;
+      handId: number;
+    };
+
+    const extractCardRows = (state: GameState): DbCardRow[] => {
+      const rows: DbCardRow[] = [];
+      for (const c of state.communityCards) {
+        rows.push({
+          gameId: state.id,
+          handId: state.handId,
+          playerId: null,
+          rank: c.rank,
+          suit: c.suit,
+        });
+      }
+      for (const pl of state.players) {
+        for (const c of pl.holeCards) {
+          rows.push({
+            gameId: state.id,
+            handId: state.handId,
+            playerId: pl.id,
+            rank: c.rank,
+            suit: c.suit,
+          });
+        }
+      }
+      return rows;
+    };
+
+    const nextCardRows = extractCardRows(pureGameState);
+    if (_previousState) {
+      // Build set of existing cards for this game and current hand directly from DB
+      // to make operations idempotent in the presence of concurrent requests.
+      const existingThisHand = await tx
+        .select()
+        .from(cardsTable)
+        .where(
+          and(
+            eq(cardsTable.gameId, pureGameState.id),
+            eq(cardsTable.handId, pureGameState.handId)
+          )
+        );
+
+      const keyOf = (r: DbCardRow) =>
+        `${r.playerId ?? "community"}:${r.rank}:${r.suit}`;
+
+      const existingSet = new Set(
+        existingThisHand.map((r) =>
+          keyOf({
+            gameId: r.gameId!,
+            handId: r.handId,
+            playerId: r.playerId ?? null,
+            rank: r.rank,
+            suit: r.suit,
+          })
+        )
+      );
+
+      // Always delete cards from past hands (cleanup)
+      await tx
+        .delete(cardsTable)
+        .where(
+          and(
+            eq(cardsTable.gameId, pureGameState.id),
+            not(eq(cardsTable.handId, pureGameState.handId))
+          )
+        );
+
+      // Insert only missing cards for the current hand; never delete current-hand cards.
+      const toInsert: DbCardRow[] = [];
+      // Track counts to avoid inserting more than allowed per player/board in edge cases
+      const playerCounts = new Map<string, number>();
+      let communityCount = 0;
+      for (const r of existingThisHand) {
+        if (r.playerId === null) communityCount += 1;
+        else
+          playerCounts.set(r.playerId, (playerCounts.get(r.playerId) ?? 0) + 1);
+      }
+
+      for (const r of nextCardRows) {
+        const k = keyOf(r);
+        if (existingSet.has(k)) continue;
+
+        if (r.playerId === null) {
+          // Limit to max 5 community cards
+          if (communityCount >= 5) continue;
+          communityCount += 1;
+          toInsert.push(r);
+        } else {
+          // Limit to max 2 hole cards per player
+          const pid = r.playerId;
+          const count = playerCounts.get(pid) ?? 0;
+          if (count >= 2) continue;
+          playerCounts.set(pid, count + 1);
+          toInsert.push(r);
+        }
+      }
+
+      if (toInsert.length > 0) {
+        await tx.insert(cardsTable).values(toInsert);
+      }
+
+      // Reveal logic: only toggle for players whose visibility changed, and only at showdown
+      if (pureGameState.currentRound === "showdown") {
+        const prevShowById = new Map(
+          (_previousState?.players ?? []).map((pp) => [pp.id, !!pp.showCards])
+        );
+        const newlyRevealIds = pureGameState.players
+          .filter((p) => p.showCards && !prevShowById.get(p.id))
+          .map((p) => p.id);
+        const newlyHideIds = pureGameState.players
+          .filter((p) => !p.showCards && prevShowById.get(p.id))
+          .map((p) => p.id);
+
+        if (newlyRevealIds.length > 0) {
+          await tx
+            .update(cardsTable)
+            .set({ revealAtShowdown: true })
+            .where(
+              and(
+                eq(cardsTable.gameId, pureGameState.id),
+                eq(cardsTable.handId, pureGameState.handId),
+                inArray(cardsTable.playerId, newlyRevealIds)
+              )
+            );
+        }
+
+        if (newlyHideIds.length > 0) {
+          await tx
+            .update(cardsTable)
+            .set({ revealAtShowdown: false })
+            .where(
+              and(
+                eq(cardsTable.gameId, pureGameState.id),
+                eq(cardsTable.handId, pureGameState.handId),
+                inArray(cardsTable.playerId, newlyHideIds)
+              )
+            );
+        }
+      }
+    } else {
+      // No previous state; fallback to replace
+      await tx
+        .delete(cardsTable)
+        .where(eq(cardsTable.gameId, pureGameState.id));
+      if (nextCardRows.length > 0) {
+        await tx.insert(cardsTable).values(nextCardRows);
+      }
+
+      // Even without previous state, only set reveal flags during showdown and only for those that should be revealed
+      if (pureGameState.currentRound === "showdown") {
+        const toRevealIds = pureGameState.players
+          .filter((p) => p.showCards)
+          .map((p) => p.id);
+        if (toRevealIds.length > 0) {
+          await tx
+            .update(cardsTable)
+            .set({ revealAtShowdown: true })
+            .where(
+              and(
+                eq(cardsTable.gameId, pureGameState.id),
+                eq(cardsTable.handId, pureGameState.handId),
+                inArray(cardsTable.playerId, toRevealIds)
+              )
+            );
+        }
+      }
     }
 
     return updated;
@@ -209,7 +430,7 @@ export async function handleActionPure(
 
   const pureAction: GameAction = {
     playerId: input.playerId,
-    action: input.action,
+    action: input.action as ActionType,
     amount: input.amount,
   };
 
@@ -252,7 +473,8 @@ export async function resetGamePure(gameId: string): Promise<Game> {
       currentGameState.bigBlind,
       currentGameState.smallBlind
     ),
-    // Preserve stacks, clear round-specific state, and set next button
+    // Preserve stacks, clear round-specific state, set next button and increment handId
+    handId: (currentGameState.handId ?? 0) + 1,
     players: sortedPlayers.map((player, index) => ({
       ...player,
       currentBet: 0,
@@ -281,7 +503,7 @@ export async function resetGamePure(gameId: string): Promise<Game> {
       .where(
         and(
           eq(playersTable.gameId, gameId),
-          eq(playersTable.leaveAfterHand as any, true)
+          eq(playersTable.leaveAfterHand, true)
         )
       );
 

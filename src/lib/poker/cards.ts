@@ -205,7 +205,7 @@ export function evaluateHand(cards: Card[]): HandRank {
 
   // Check for two pair
   const pairs = Array.from(rankCounts.entries())
-    .filter(([_, count]) => count >= 2)
+    .filter(([, count]) => count >= 2)
     .map(([value]) => value)
     .sort((a, b) => b - a);
   if (pairs.length >= 2) {
@@ -245,13 +245,16 @@ export function compareHands(hand1: Card[], hand2: Card[]): number {
   return evaluation1.value - evaluation2.value;
 }
 
-export type CardBase = Omit<Card, "id" | "gameId" | "playerId">;
+export type CardBase = Omit<
+  Card,
+  "id" | "gameId" | "playerId" | "handId" | "revealAtShowdown"
+>;
 
 // Generate a full deck of cards
 export function generateDeck(): CardBase[] {
   const ranks = Rank.enumValues;
   const suits = Suit.enumValues;
-  const deck: Omit<Card, "id" | "gameId" | "playerId">[] = [];
+  const deck: CardBase[] = [];
 
   for (const rank of ranks) {
     for (const suit of suits) {

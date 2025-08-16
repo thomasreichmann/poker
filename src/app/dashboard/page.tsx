@@ -41,6 +41,7 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -48,11 +49,8 @@ import { useEffect, useState } from "react";
 export default function DashboardPage() {
   const [selectedStake, setSelectedStake] = useState("all");
   const [devOpen, setDevOpen] = useState(false);
-  const [devUsers, setDevUsers] = useState<
-    Array<{ id: string; email: string }>
-  >([]);
+  const [, setDevUsers] = useState<Array<{ id: string; email: string }>>([]);
   const [devLoading, setDevLoading] = useState(false);
-  const [devSearch, setDevSearch] = useState("");
   const { data: authUser, isLoading: meLoading } = useQuery(meQueryOptions);
   const router = useRouter();
   const trpc = useTRPC();
@@ -87,12 +85,6 @@ export default function DashboardPage() {
       void loadDevUsers();
     }
   }, [devOpen]);
-
-  const filteredDevUsers = devUsers.filter((u) => {
-    const q = devSearch.toLowerCase().trim();
-    if (!q) return true;
-    return u.email.toLowerCase().includes(q) || u.id.toLowerCase().includes(q);
-  });
 
   if (meLoading) {
     return (
@@ -195,11 +187,15 @@ export default function DashboardPage() {
       <header className="border-b border-slate-800 bg-slate-900/95 backdrop-blur sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-6">
+            {devLoading && <div>Loading...</div>}
             <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">P</span>
-              </div>
-              <span className="text-xl font-bold">PokerPro</span>
+              <Image
+                src="/all-in.svg"
+                alt="ALL IN"
+                width={114}
+                height={32}
+                priority
+              />
             </Link>
 
             <nav className="hidden md:flex items-center space-x-6">
@@ -441,7 +437,7 @@ export default function DashboardPage() {
               {gamesLoading && (
                 <div className="text-slate-400">Carregando mesas...</div>
               )}
-              {games?.map((table: any) => (
+              {games?.map((table) => (
                 <Card
                   key={table.id}
                   className="bg-slate-800 border-slate-700 hover:border-emerald-600/50 transition-colors"

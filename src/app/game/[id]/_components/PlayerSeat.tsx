@@ -3,13 +3,15 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { PlayingCard } from "@/components/ui/playing-card";
+import { Player } from "@/db/schema/players";
+import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
 
 type PlayerSeatProps = {
-  player: any;
+  player: Player;
   isCurrent: boolean;
   isYou: boolean;
   phase: string;
-  cards: Array<{ suit: string; rank: string; id: string }>;
+  cards: IPlayingCard[];
   positionStyle: React.CSSProperties;
   activeKey: string;
   isSmallBlind?: boolean;
@@ -39,15 +41,23 @@ export function PlayerSeat({
             isCurrent
               ? "border-emerald-400 shadow-lg shadow-emerald-400/20"
               : player.hasFolded
-              ? "border-red-500 opacity-50"
+              ? "border-slate-500 opacity-50 pointer-events-none grayscale"
               : "border-slate-600"
           }`}
         >
-          <CardContent className="grid grid-cols-[auto_auto] gap-x-4 gap-y-2">
+          <CardContent
+            className={`grid grid-cols-[auto_auto] gap-x-4 gap-y-2 ${
+              player.hasFolded ? "text-slate-500" : ""
+            }`}
+          >
             <div className="flex items-center space-x-3">
               <div className="relative">
                 <Avatar className="w-12 h-12">
-                  <AvatarFallback className="bg-emerald-600 text-white">
+                  <AvatarFallback
+                    className={`text-white ${
+                      player.hasFolded ? "bg-slate-600" : "bg-emerald-600"
+                    }`}
+                  >
                     {String(player.seat).padStart(2, "0")}
                   </AvatarFallback>
                 </Avatar>
@@ -71,8 +81,6 @@ export function PlayerSeat({
                 <div className="text-sm font-semibold text-white truncate">
                   {player.displayName
                     ? player.displayName
-                    : player.email
-                    ? player.email.split("@")[0] + "@"
                     : `Player ${player.seat}`}
                 </div>
                 <div className="text-xs text-emerald-400">
@@ -87,16 +95,27 @@ export function PlayerSeat({
             </div>
 
             <div className="flex justify-center-safe gap-x-1">
-              {cards.map((card, cardIndex) => (
-                <PlayingCard
-                  key={card.id}
-                  card={card as any}
-                  size="sm"
-                  isVisible={isYou || phase === "showdown"}
-                  isAnimating={false}
-                  animationDelay={cardIndex * 100}
-                />
-              ))}
+              {cards.length > 0
+                ? cards.map((card, cardIndex) => (
+                    <PlayingCard
+                      key={card.id}
+                      card={card}
+                      size="sm"
+                      isVisible={isYou || phase === "showdown"}
+                      isAnimating={false}
+                      animationDelay={cardIndex * 100}
+                    />
+                  ))
+                : [1, 2].map((i) => (
+                    <PlayingCard
+                      key={String(i)}
+                      card={{ id: String(i), suit: "clubs", rank: "2" }}
+                      size="sm"
+                      isVisible={false}
+                      isAnimating={false}
+                      animationDelay={i * 100}
+                    />
+                  ))}
             </div>
 
             {isCurrent && phase !== "showdown" && (

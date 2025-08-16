@@ -18,6 +18,7 @@ import {
   Users,
 } from "lucide-react";
 
+import Image from "next/image";
 import Link from "next/link";
 
 export default function PokerLandingPage() {
@@ -27,10 +28,13 @@ export default function PokerLandingPage() {
       <header className="border-b border-slate-800 bg-slate-900/95 backdrop-blur supports-[backdrop-filter]:bg-slate-900/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">P</span>
-            </div>
-            <span className="text-xl font-bold">PokerPro</span>
+            <Image
+              src="/all-in.svg"
+              alt="ALL IN"
+              width={114}
+              height={32}
+              priority
+            />
           </div>
           <div className="flex items-center space-x-2">
             <Button
@@ -354,10 +358,7 @@ export default function PokerLandingPage() {
           <div className="grid md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">P</span>
-                </div>
-                <span className="text-xl font-bold">PokerPro</span>
+                <Image src="/all-in.svg" alt="ALL IN" width={114} height={32} />
               </div>
               <p className="text-slate-400 text-sm">
                 A plataforma de poker online mais confiável do Brasil para
@@ -446,7 +447,7 @@ export default function PokerLandingPage() {
 
           <div className="border-t border-slate-800 mt-8 pt-8 text-center text-sm text-slate-400">
             <p>
-              &copy; 2024 PokerPro. Todos os direitos reservados. Jogue com
+              &copy; 2024 ALL IN. Todos os direitos reservados. Jogue com
               responsabilidade. +18 anos.
             </p>
           </div>
