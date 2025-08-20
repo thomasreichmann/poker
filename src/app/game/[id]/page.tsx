@@ -237,14 +237,12 @@ export default function PokerGamePage() {
       {/* Winner dialog removed in server-driven version */}
 
       {/* Development Testing Panel */}
-      {process.env.NODE_ENV !== "production" && (
-        <MultiPlayerTestPanel
-          gameId={id}
-          game={dbGame}
-          players={playersBySeat}
-          currentPlayerId={dbGame?.currentPlayerTurn ?? undefined}
-        />
-      )}
+      <MultiPlayerTestPanel
+        gameId={id}
+        game={dbGame}
+        players={playersBySeat}
+        currentPlayerId={dbGame?.currentPlayerTurn ?? undefined}
+      />
     </div>
   );
 }

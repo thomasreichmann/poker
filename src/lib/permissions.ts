@@ -64,7 +64,7 @@ export function canAccessDevFeatures(role: UserRole): boolean {
  * Check if user has permission for admin features
  */
 export function canAccessAdminFeatures(role: UserRole): boolean {
-  return role === "admin";
+  return role == "admin" || role == "dev";
 }
 
 /**
