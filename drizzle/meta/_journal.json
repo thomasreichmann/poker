@@ -57,6 +57,13 @@
       "when": 1755022008211,
       "tag": "0007_cards-broadcast-community-only",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1755374122923,
+      "tag": "0008_create-user-roles-table",
+      "breakpoints": true
     }
   ]
 }

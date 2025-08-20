@@ -10,8 +10,14 @@
     "db:push": "drizzle-kit push --config=drizzle.config.ts",
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+    "db:studio": "drizzle-kit studio --config=drizzle.config.ts",
+    "db:push:prod": "NODE_ENV=production drizzle-kit push --config=drizzle.config.ts",
+    "db:generate:prod": "NODE_ENV=production drizzle-kit generate --config=drizzle.config.ts",
+    "db:migrate:prod": "NODE_ENV=production drizzle-kit migrate --config=drizzle.config.ts",
+    "db:studio:prod": "NODE_ENV=production drizzle-kit studio --config=drizzle.config.ts",
     "test": "vitest run",
-    "db:studio": "drizzle-kit studio --config=drizzle.config.ts"
+    "set-admin": "npx tsx --env-file=.env.local scripts/set-admin.ts",
+    "set-admin:prod": "NODE_ENV=production npx tsx --env-file=.env.local scripts/set-admin.ts"
   },
   "dependencies": {
     "@next/env": "^15.4.6",
@@ -58,6 +64,7 @@
     "eslint": "^9.33.0",
     "eslint-config-next": "15.4.3",
     "tailwindcss": "^4.1.12",
+    "tsx": "^4.19.2",
     "tw-animate-css": "^1.3.6",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"

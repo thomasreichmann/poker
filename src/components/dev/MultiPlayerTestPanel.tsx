@@ -16,6 +16,7 @@ import { useToast } from "@/components/ui/toast";
 import { PokerAction } from "@/db/schema/actionTypes";
 import { Game } from "@/db/schema/games";
 import { Player } from "@/db/schema/players";
+import { useDevAccess } from "@/hooks/useDevAccess";
 import { useTRPC } from "@/trpc/client";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -49,10 +50,11 @@ export function MultiPlayerTestPanel({
 
   const trpc = useTRPC();
   const { toast } = useToast();
+  const { isLoading: isLoadingAccess, canShowDevFeatures } = useDevAccess();
 
-  const actMutation = useMutation(trpc.game.act.mutationOptions());
-  const advanceMutation = useMutation(trpc.game.advance.mutationOptions());
-  const resetMutation = useMutation(trpc.game.reset.mutationOptions());
+  const actMutation = useMutation(trpc.dev.actAsPlayer.mutationOptions());
+  const advanceMutation = useMutation(trpc.dev.advanceGame.mutationOptions());
+  const resetMutation = useMutation(trpc.dev.resetGame.mutationOptions());
 
   // Initialize selected player
   useEffect(() => {
@@ -127,22 +129,16 @@ export function MultiPlayerTestPanel({
     if (!game || !selectedPlayer) return;
 
     try {
-      // Temporarily impersonate the target player for this action
-      const targetUserId = selectedPlayer.userId;
-      const originalUserId =
-        typeof window !== "undefined"
-          ? window.sessionStorage.getItem("dev_impersonate_user_id")
-          : null;
-
-      if (typeof window !== "undefined") {
-        window.sessionStorage.setItem("dev_impersonate_user_id", targetUserId);
-      }
-
-      const payload: { gameId: string; action: PokerAction; amount?: number } =
-        {
-          gameId: game.id,
-          action,
-        };
+      const payload: {
+        gameId: string;
+        targetPlayerId: string;
+        action: PokerAction;
+        amount?: number;
+      } = {
+        gameId: game.id,
+        targetPlayerId: selectedPlayer.id,
+        action,
+      };
 
       if (action === "raise" || action === "bet") {
         const targetTotal = Math.max(
@@ -157,18 +153,6 @@ export function MultiPlayerTestPanel({
       }
 
       await actMutation.mutateAsync(payload);
-
-      // Restore original impersonation
-      if (typeof window !== "undefined") {
-        if (originalUserId) {
-          window.sessionStorage.setItem(
-            "dev_impersonate_user_id",
-            originalUserId
-          );
-        } else {
-          window.sessionStorage.removeItem("dev_impersonate_user_id");
-        }
-      }
 
       toast({
         title: "Action executed",
@@ -235,7 +219,13 @@ export function MultiPlayerTestPanel({
     }
   };
 
-  if (process.env.NODE_ENV === "production") {
+  // Loading state while checking permissions
+  if (isLoadingAccess) {
+    return null;
+  }
+
+  // Hide panel if user doesn't have dev access
+  if (!canShowDevFeatures) {
     return null;
   }
 
