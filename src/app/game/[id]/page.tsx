@@ -1,6 +1,7 @@
 "use client";
 
 import { MultiPlayerTestPanel } from "@/components/dev/MultiPlayerTestPanel";
+import { ImpersonateDialog } from "@/components/dev/ImpersonateDialog";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ActionPanel } from "./_components/ActionPanel";
@@ -14,6 +15,7 @@ export default function PokerGamePage() {
   const { id } = useParams() as { id: string };
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [raiseAmount, setRaiseAmount] = useState<number>(0);
+  const [impersonateOpen, setImpersonateOpen] = useState(false);
 
   const {
     dbGame,
@@ -136,6 +138,11 @@ export default function PokerGamePage() {
         onLeaveAction={handleLeave}
         canReset={!!dbGame}
         onResetAction={handleReset}
+        onImpersonateAction={
+          process.env.NODE_ENV !== "production"
+            ? () => setImpersonateOpen(true)
+            : undefined
+        }
       />
 
       {/* Poker Table */}
@@ -243,6 +250,14 @@ export default function PokerGamePage() {
         players={playersBySeat}
         currentPlayerId={dbGame?.currentPlayerTurn ?? undefined}
       />
+
+      {process.env.NODE_ENV !== "production" && (
+        <ImpersonateDialog
+          open={impersonateOpen}
+          onOpenChangeAction={setImpersonateOpen}
+          onImpersonatedAction={() => window.location.reload()}
+        />
+      )}
     </div>
   );
 }

@@ -36,6 +36,7 @@ type HeaderProps = {
   onLeaveAction?: () => Promise<void> | void;
   canReset?: boolean;
   onResetAction?: () => Promise<void> | void;
+  onImpersonateAction?: () => void;
 };
 
 export function Header({
@@ -53,6 +54,7 @@ export function Header({
   onLeaveAction,
   canReset = false,
   onResetAction,
+  onImpersonateAction,
 }: HeaderProps) {
   const router = useRouter();
   return (
@@ -139,16 +141,27 @@ export function Header({
               <DropdownMenuContent className="bg-slate-800 border-slate-700 text-slate-200">
                 <DropdownMenuLabel>Configurações</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {process.env.NODE_ENV !== "production" && canReset && (
+                {process.env.NODE_ENV !== "production" && (canReset || onImpersonateAction) && (
                   <>
                     <DropdownMenuLabel>Developer</DropdownMenuLabel>
-                    <DropdownMenuItem
-                      onClick={() => onResetAction?.()}
-                      className="text-amber-300 focus:text-amber-200"
-                    >
-                      <RotateCcw className="h-4 w-4" />
-                      Reset game
-                    </DropdownMenuItem>
+                    {canReset && (
+                      <DropdownMenuItem
+                        onClick={() => onResetAction?.()}
+                        className="text-amber-300 focus:text-amber-200"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                        Reset game
+                      </DropdownMenuItem>
+                    )}
+                    {onImpersonateAction && (
+                      <DropdownMenuItem
+                        onClick={() => onImpersonateAction?.()}
+                        className="text-emerald-300 focus:text-emerald-200"
+                      >
+                        <Users className="h-4 w-4" />
+                        Impersonate (dev)
+                      </DropdownMenuItem>
+                    )}
                   </>
                 )}
               </DropdownMenuContent>
