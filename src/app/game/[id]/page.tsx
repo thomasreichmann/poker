@@ -1,6 +1,7 @@
 "use client";
 
 import { MultiPlayerTestPanel } from "@/components/dev/MultiPlayerTestPanel";
+import { SimulatorPanel } from "@/components/dev/SimulatorPanel";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ActionPanel } from "./_components/ActionPanel";
@@ -243,6 +244,14 @@ export default function PokerGamePage() {
         players={playersBySeat}
         currentPlayerId={dbGame?.currentPlayerTurn ?? undefined}
       />
+
+      {/* Simulator Panel (dev-only) */}
+      {process.env.NODE_ENV !== "production" && (
+        <SimulatorPanel
+          tableId={id}
+          playerIds={playersBySeat.map((p) => p.id)}
+        />
+      )}
     </div>
   );
 }

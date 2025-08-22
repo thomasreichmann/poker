@@ -160,7 +160,11 @@ export const gameRouter = createTRPCRouter({
         .limit(1);
       const player = rows[0];
       if (!player) throw new Error("Player not found in this game");
-      return await handleActionPure({ ...input, playerId: player.id });
+      return await handleActionPure({
+        ...input,
+        playerId: player.id,
+        actorSource: "human",
+      });
     }),
 
   // Advance game state (next player/round/showdown)
