@@ -19,6 +19,7 @@ import {
   validateAction,
   type GameAction,
   type GameState,
+  forceFoldPlayer,
 } from "./pureEngine";
 import type {
   ActionType,
@@ -556,7 +557,7 @@ export async function leaveGamePure(
   userId: string,
   gameId: string
 ): Promise<Game> {
-  // Soft-leave: mark player to be removed after the current hand. Do not modify engine state.
+  // Mark player to leave after hand and fold them immediately from current hand if active
   const existing = await db
     .select()
     .from(playersTable)
@@ -566,18 +567,49 @@ export async function leaveGamePure(
     .limit(1);
 
   const player = existing[0];
-  if (player) {
-    await db
-      .update(playersTable)
-      .set({ leaveAfterHand: true, isConnected: false, lastSeen: new Date() })
-      .where(eq(playersTable.id, player.id));
+  if (!player) {
+    const [game] = await db.select().from(games).where(eq(games.id, gameId)).limit(1);
+    if (!game) throw new Error("Game not found");
+    return game;
   }
 
-  const [game] = await db
-    .select()
-    .from(games)
-    .where(eq(games.id, gameId))
-    .limit(1);
+  await db
+    .update(playersTable)
+    .set({ leaveAfterHand: true, isConnected: false, lastSeen: new Date() })
+    .where(eq(playersTable.id, player.id));
+
+  // If hand is active, fold them out immediately and progress the game if needed
+  const prev = await dbGameToPureGame(gameId);
+  if (prev.status === "active") {
+    let next = forceFoldPlayer(prev, player.id);
+
+    // If only one player remains after fold, end game
+    const remaining = next.players.filter((p) => !p.hasFolded);
+    if (remaining.length === 1) {
+      next = handleSinglePlayerWin(next);
+    } else {
+      // If it was their turn, move to the next eligible player or advance rounds as needed
+      if (prev.currentPlayerTurn === player.id) {
+        const activePlayers = remaining;
+        const allBetsEqual = activePlayers.every(
+          (p) => p.currentBet === next.currentHighestBet || p.stack === 0
+        );
+        if (allBetsEqual) {
+          if (next.currentRound === "river") {
+            next = handleShowdown(next);
+          } else {
+            next = advanceToNextRound(next);
+          }
+        } else {
+          next = advanceToNextPlayer(next);
+        }
+      }
+    }
+
+    return await persistPureGameState(next, prev);
+  }
+
+  const [game] = await db.select().from(games).where(eq(games.id, gameId)).limit(1);
   if (!game) throw new Error("Game not found");
   return game;
 }

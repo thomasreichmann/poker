@@ -74,7 +74,7 @@ export function addPlayerToGame(
     seat: gameState.players.length,
     stack,
     currentBet: 0,
-    hasFolded: false,
+    hasFolded: gameState.status === "active" ? true : false,
     isButton: false,
     hasWon: false,
     showCards: false,
@@ -177,19 +177,22 @@ export function setFirstPlayerToAct(gameState: GameState): GameState {
     throw new Error("No button player found");
   }
 
-  const findNthActiveAfter = (startIndex: number, n: number): Player => {
+  const findNthEligibleAfter = (startIndex: number, n: number): Player => {
     const total = gameState.players.length;
     let found = 0;
     for (let offset = 1; offset <= total * 2; offset++) {
       const idx = (startIndex + offset) % total;
       const candidate = gameState.players[idx]!;
-      if (!candidate.hasFolded) {
+      if (!candidate.hasFolded && candidate.stack > 0) {
         found++;
         if (found === n) return candidate;
       }
     }
     // Fallback to first active if something goes wrong
-    return activePlayers[0]!;
+    const firstEligible = gameState.players.find(
+      (p) => !p.hasFolded && p.stack > 0
+    );
+    return firstEligible ?? activePlayers[0]!;
   };
 
   let firstToAct: Player;
@@ -197,16 +200,16 @@ export function setFirstPlayerToAct(gameState: GameState): GameState {
     if (activePlayers.length === 2) {
       // Heads-up preflop: button (SB) acts first
       const buttonPlayerAll = gameState.players[buttonIndexAll]!;
-      firstToAct = buttonPlayerAll.hasFolded
-        ? activePlayers[0]!
+      firstToAct = buttonPlayerAll.hasFolded || buttonPlayerAll.stack === 0
+        ? findNthEligibleAfter(buttonIndexAll, 1)
         : buttonPlayerAll;
     } else {
-      // Multi-way preflop: UTG is first active player after big blind (third after button)
-      firstToAct = findNthActiveAfter(buttonIndexAll, 3);
+      // Multi-way preflop: UTG is first eligible player after big blind (third after button)
+      firstToAct = findNthEligibleAfter(buttonIndexAll, 3);
     }
   } else {
-    // Post-flop: first active player to the left of the button
-    firstToAct = findNthActiveAfter(buttonIndexAll, 1);
+    // Post-flop: first eligible player to the left of the button
+    firstToAct = findNthEligibleAfter(buttonIndexAll, 1);
   }
 
   return {
@@ -227,7 +230,7 @@ export function setNextPlayer(gameState: GameState): GameState {
     return setFirstPlayerToAct(gameState);
   }
 
-  // Determine next active player by scanning the full seating order
+  // Determine next eligible player by scanning the full seating order
   const allPlayers = gameState.players;
   const currentIndexInAll = allPlayers.findIndex(
     (p) => p.id === gameState.currentPlayerTurn
@@ -242,7 +245,7 @@ export function setNextPlayer(gameState: GameState): GameState {
   for (let offset = 1; offset <= playerCount; offset++) {
     const nextIndex = (currentIndexInAll + offset) % playerCount;
     const candidate = allPlayers[nextIndex]!;
-    if (!candidate.hasFolded) {
+    if (!candidate.hasFolded && candidate.stack > 0) {
       return { ...gameState, currentPlayerTurn: candidate.id };
     }
   }
@@ -616,47 +619,48 @@ function determineNextAction(
   }
 
   // Unified rotation completion check: if all bets are equal and the next
-  // active player equals the round's first-to-act, the round is complete.
+  // eligible player equals the round's first-to-act, the round is complete.
   const buttonIndexAll = gameState.players.findIndex((p) => p.isButton);
   if (buttonIndexAll === -1) {
     throw new Error("No button player found");
   }
 
-  const findNthActiveAfter = (startIndex: number, n: number): Player => {
+  const findNthEligibleAfter = (startIndex: number, n: number): Player => {
     const total = gameState.players.length;
     let found = 0;
     for (let offset = 1; offset <= total * 2; offset++) {
       const idx = (startIndex + offset) % total;
       const candidate = gameState.players[idx]!;
-      if (!candidate.hasFolded) {
+      if (!candidate.hasFolded && candidate.stack > 0) {
         found++;
         if (found === n) return candidate;
       }
     }
-    return activePlayers[0]!;
+    return activePlayers.find((p) => p.stack > 0) ?? activePlayers[0]!;
   };
 
   const isHeadsUp = activePlayers.length === 2;
   const firstToActId =
     gameState.currentRound === "pre-flop"
       ? isHeadsUp
-        ? gameState.players[buttonIndexAll]!.hasFolded
-          ? activePlayers[0]!.id
+        ? gameState.players[buttonIndexAll]!.hasFolded ||
+          gameState.players[buttonIndexAll]!.stack === 0
+          ? findNthEligibleAfter(buttonIndexAll, 1).id
           : gameState.players[buttonIndexAll]!.id
-        : findNthActiveAfter(buttonIndexAll, 3).id
-      : findNthActiveAfter(buttonIndexAll, 1).id;
+        : findNthEligibleAfter(buttonIndexAll, 3).id
+      : findNthEligibleAfter(buttonIndexAll, 1).id;
 
-  // Compute next active player after the current player
+  // Compute next eligible player after the current player
   const currentIndexAll = gameState.players.findIndex(
     (p) => p.id === gameState.currentPlayerTurn
   );
-  let nextActiveId = activePlayers[0]!.id;
+  let nextActiveId = activePlayers.find((p) => p.stack > 0)?.id ?? activePlayers[0]!.id;
   if (currentIndexAll !== -1) {
     const total = gameState.players.length;
     for (let offset = 1; offset <= total * 2; offset++) {
       const idx = (currentIndexAll + offset) % total;
       const candidate = gameState.players[idx]!;
-      if (!candidate.hasFolded) {
+      if (!candidate.hasFolded && candidate.stack > 0) {
         nextActiveId = candidate.id;
         break;
       }
@@ -837,6 +841,21 @@ export function handleSinglePlayerWin(gameState: GameState): GameState {
 
   const winner = activePlayers[0]!;
   return distributeWinnings(gameState, [winner]);
+}
+
+/**
+ * Force-fold a player regardless of turn. Does not advance the turn automatically.
+ * Use when a player disconnects or leaves out of turn. Caller may decide to advance.
+ */
+export function forceFoldPlayer(gameState: GameState, playerId: string): GameState {
+  const player = getPlayerById(gameState, playerId);
+  if (!player || player.hasFolded) return gameState;
+  const newGameState = updatePlayer(gameState, playerId, { hasFolded: true });
+  return {
+    ...newGameState,
+    lastAction: "fold",
+    lastBetAmount: 0,
+  };
 }
 
 // ============================================================================
