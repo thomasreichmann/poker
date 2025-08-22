@@ -1,5 +1,6 @@
 import { users } from "@/db/schema/users";
 import { pgEnum, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { z } from "zod";
 
 export const PgEnumUserRole = pgEnum("user_role", ["user", "admin", "dev"]);
 
@@ -16,3 +17,5 @@ export const userRoles = pgTable("user_roles", {
 
 export type UserRole = typeof userRoles.$inferSelect;
 export type NewUserRole = typeof userRoles.$inferInsert;
+export const ZodUserRole = z.enum(PgEnumUserRole.enumValues);
+export type UserRoleEnum = z.infer<typeof ZodUserRole>;

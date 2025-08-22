@@ -59,6 +59,14 @@ export function Header({
     <header className="absolute top-0 left-0 right-0 z-50 border-b border-slate-800 bg-slate-900/95 backdrop-blur">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center space-x-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-slate-300 hover:text-white flex items-center space-x-2"
+            onClick={() => router.push("/dashboard")}
+          >
+            <span>Dashboard</span>
+          </Button>
           {canLeave ? (
             <Button
               variant="ghost"

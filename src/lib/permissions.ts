@@ -1,12 +1,10 @@
 import { db } from "@/db";
-import { userRoles } from "@/db/schema/userRoles";
+import { UserRoleEnum, userRoles } from "@/db/schema/userRoles";
 import { eq } from "drizzle-orm";
-
-export type UserRole = "user" | "admin" | "dev";
 
 export interface PermissionContext {
   userId: string;
-  userRole?: UserRole;
+  userRole?: UserRoleEnum;
 }
 
 /**
@@ -34,7 +32,7 @@ export async function ensureUserRole(userId: string): Promise<void> {
 /**
  * Get user role from database - server-side only
  */
-export async function getUserRole(userId: string): Promise<UserRole> {
+export async function getUserRole(userId: string): Promise<UserRoleEnum> {
   try {
     // Ensure user role record exists
     await ensureUserRole(userId);
@@ -45,7 +43,7 @@ export async function getUserRole(userId: string): Promise<UserRole> {
       .where(eq(userRoles.userId, userId))
       .limit(1);
 
-    const role = result[0]?.role as UserRole;
+    const role = result[0]?.role as UserRoleEnum;
     return role || "user";
   } catch (error) {
     console.error("Error fetching user role:", error);
@@ -56,14 +54,14 @@ export async function getUserRole(userId: string): Promise<UserRole> {
 /**
  * Check if user has permission for development features
  */
-export function canAccessDevFeatures(role: UserRole): boolean {
+export function canAccessDevFeatures(role: UserRoleEnum): boolean {
   return role === "admin" || role === "dev";
 }
 
 /**
  * Check if user has permission for admin features
  */
-export function canAccessAdminFeatures(role: UserRole): boolean {
+export function canAccessAdminFeatures(role: UserRoleEnum): boolean {
   return role == "admin" || role == "dev";
 }
 
@@ -117,7 +115,7 @@ export async function requireAdminAccess(
  */
 export async function setUserRole(
   userId: string,
-  role: UserRole
+  role: UserRoleEnum
 ): Promise<void> {
   try {
     // Ensure user role record exists
