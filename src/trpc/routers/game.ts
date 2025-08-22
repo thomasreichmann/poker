@@ -9,6 +9,7 @@ import {
   handleActionPure,
   handleJoinGamePure,
   resetGamePure,
+  leaveGamePure,
 } from "@/lib/poker/engineAdapter";
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -177,25 +178,11 @@ export const gameRouter = createTRPCRouter({
       return await resetGamePure(input.gameId);
     }),
 
-  // Leave a game (removes player's seat; advances turn or awards pot if needed)
+  // Leave a game (fold immediately if active; remove after hand)
   leave: protectedProcedure
     .input(z.object({ gameId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
-      // Soft-leave: mark player to be removed after current hand
-      const rows = await db
-        .select()
-        .from(players)
-        .where(
-          and(eq(players.gameId, input.gameId), eq(players.userId, ctx.user.id))
-        )
-        .limit(1);
-      const player = rows[0];
-      if (!player) throw new Error("Player not found in this game");
-      await db
-        .update(players)
-        .set({ leaveAfterHand: true, isConnected: false, lastSeen: new Date() })
-        .where(eq(players.id, player.id));
-      return { success: true };
+      return await leaveGamePure(ctx.user.id, input.gameId);
     }),
 
   // Get player's hole cards
