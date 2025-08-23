@@ -29,6 +29,7 @@ import type {
   RoundType,
   Suit,
 } from "./types";
+import { enqueueSimulatorJob } from "@/lib/simulator/queue";
 
 type ActionInput = {
   gameId: string;
@@ -407,7 +408,14 @@ export async function persistPureGameState(
       }
     }
 
-    return updated;
+    // After state persisted, enqueue a simulator job if it's a bot's turn
+    try {
+      if (updated?.currentPlayerTurn) {
+        await enqueueSimulatorJob({ gameId: updated.id, runAtMs: 150 });
+      }
+    } catch {}
+
+    return updated as Game;
   });
 }
 
