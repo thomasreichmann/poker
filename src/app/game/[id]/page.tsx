@@ -1,6 +1,7 @@
 "use client";
 
 import { MultiPlayerTestPanel } from "@/components/dev/MultiPlayerTestPanel";
+import { SimulatorPanel } from "@/components/dev/SimulatorPanel";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ActionPanel } from "./_components/ActionPanel";
@@ -236,13 +237,27 @@ export default function PokerGamePage() {
 
       {/* Winner dialog removed in server-driven version */}
 
-      {/* Development Testing Panel */}
-      <MultiPlayerTestPanel
-        gameId={id}
-        game={dbGame}
-        players={playersBySeat}
-        currentPlayerId={dbGame?.currentPlayerTurn ?? undefined}
-      />
+      {/* Dev panels container */}
+      <div className="fixed top-20 right-4 z-50 flex flex-col gap-3">
+        <MultiPlayerTestPanel
+          gameId={id}
+          game={dbGame}
+          players={playersBySeat}
+          currentPlayerId={dbGame?.currentPlayerTurn ?? undefined}
+          floating={false}
+        />
+
+        {process.env.NODE_ENV !== "production" && (
+          <SimulatorPanel
+            tableId={id}
+            players={playersBySeat.map((p) => ({
+              id: p.id,
+              displayName: p.displayName,
+            }))}
+            floating={false}
+          />
+        )}
+      </div>
     </div>
   );
 }

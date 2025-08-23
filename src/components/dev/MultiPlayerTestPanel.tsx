@@ -17,6 +17,7 @@ import { PokerAction } from "@/db/schema/actionTypes";
 import { Game } from "@/db/schema/games";
 import { Player } from "@/db/schema/players";
 import { useDevAccess } from "@/hooks/useDevAccess";
+import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -35,6 +36,7 @@ type MultiPlayerTestPanelProps = {
   game: Game | null;
   players: Player[];
   currentPlayerId?: string;
+  floating?: boolean;
 };
 
 export function MultiPlayerTestPanel({
@@ -42,8 +44,9 @@ export function MultiPlayerTestPanel({
   game,
   players,
   currentPlayerId,
+  floating = true,
 }: MultiPlayerTestPanelProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
   const [quickRaiseAmount, setQuickRaiseAmount] = useState<number>(0);
   const [autoFollowTurn, setAutoFollowTurn] = useState(true);
@@ -230,7 +233,12 @@ export function MultiPlayerTestPanel({
   }
 
   return (
-    <Card className="fixed top-20 right-4 w-96 bg-slate-800 border-slate-700 text-white shadow-xl z-50">
+    <Card
+      className={cn(
+        "w-96 bg-slate-800 border-slate-700 text-white shadow-xl z-50",
+        floating && "fixed top-20 right-4"
+      )}
+    >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { integer, pgEnum, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgEnum, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
 import { PgEnumAction } from "./actionTypes";
 import { actions } from "./actions";
 import { type Card, cards } from "./cards";
@@ -33,6 +33,8 @@ export const games = pgTable("poker_games", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   lastAction: PgEnumAction("last_action").default("check"),
   lastBetAmount: integer("last_bet_amount").default(0),
+  // New: simulator configuration stored per table (dev/staging only consumers)
+  simulatorConfig: jsonb("simulator_config"),
 });
 
 export type Game = typeof games.$inferSelect;
