@@ -157,3 +157,21 @@
     width: 100%;
   }
 }
+
+/* Motion tokens */
+:root {
+  --motion-dur-fast: 120ms;
+  --motion-dur-base: 200ms;
+  --motion-dur-slow: 320ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --motion-stagger-deal: 40ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-dur-fast: 60ms;
+    --motion-dur-base: 80ms;
+    --motion-dur-slow: 80ms;
+  }
+}

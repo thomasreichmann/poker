@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PlayingCard } from "@/components/ui/playing-card";
 import { Player } from "@/db/schema/players";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
+import { TurnPulse } from "@/lib/motion/TurnPulse";
+import { AnimatePresence, motion } from "framer-motion";
 
 type PlayerSeatProps = {
   player: Player;
@@ -30,12 +32,15 @@ export function PlayerSeat({
   isBigBlind = false,
 }: PlayerSeatProps) {
   return (
-    <div className="absolute" style={positionStyle}>
+    <div className="absolute" style={positionStyle} data-seat-center data-seat-id={player.id}>
       <div
         className={`relative transition-all duration-300 ${
           isCurrent ? "scale-110" : "scale-100"
         }`}
       >
+        {isCurrent && (
+          <TurnPulse active className="absolute -inset-1 rounded-xl z-0" />
+        )}
         <Card
           className={`bg-slate-800 border-2 transition-all duration-300 relative overflow-hidden ${
             isCurrent
@@ -83,9 +88,7 @@ export function PlayerSeat({
                     ? player.displayName
                     : `Player ${player.seat}`}
                 </div>
-                <div className="text-xs text-emerald-400">
-                  R$ {player.stack}
-                </div>
+                <div className="text-xs text-emerald-400">R$ {player.stack}</div>
                 {(player.currentBet ?? 0) > 0 && (
                   <div className="text-xs text-yellow-400">
                     Bet: R$ {player.currentBet}
@@ -95,27 +98,52 @@ export function PlayerSeat({
             </div>
 
             <div className="flex justify-center-safe gap-x-1">
-              {cards.length > 0
-                ? cards.map((card, cardIndex) => (
-                    <PlayingCard
-                      key={card.id}
-                      card={card}
-                      size="sm"
-                      isVisible={isYou || phase === "showdown"}
-                      isAnimating={false}
-                      animationDelay={cardIndex * 100}
-                    />
-                  ))
-                : [1, 2].map((i) => (
-                    <PlayingCard
-                      key={String(i)}
-                      card={{ id: String(i), suit: "clubs", rank: "2" }}
-                      size="sm"
-                      isVisible={false}
-                      isAnimating={false}
-                      animationDelay={i * 100}
-                    />
-                  ))}
+              <AnimatePresence initial={false}>
+                {!player.hasFolded ? (
+                  <motion.div
+                    key="hand"
+                    initial={{ opacity: 1, x: 0, y: 0 }}
+                    exit={{ opacity: 0, x: 0, y: -20 }}
+                    transition={{ duration: 0.14, ease: "easeOut" }}
+                    className="flex gap-x-1"
+                  >
+                    {cards.length > 0
+                      ? cards.map((card, cardIndex) => (
+                          <PlayingCard
+                            key={card.id}
+                            card={card}
+                            size="sm"
+                            isVisible={isYou || phase === "showdown"}
+                            isAnimating={false}
+                            animationDelay={cardIndex * 40}
+                          />
+                        ))
+                      : [1, 2].map((i) => (
+                          <PlayingCard
+                            key={String(i)}
+                            card={{ id: String(i), suit: "clubs", rank: "2" }}
+                            size="sm"
+                            isVisible={false}
+                            isAnimating={false}
+                            animationDelay={i * 40}
+                          />
+                        ))}
+                  </motion.div>
+                ) : (
+                  <div key="placeholders" className="flex gap-x-1 opacity-60">
+                    {[1, 2].map((i) => (
+                      <PlayingCard
+                        key={String(i)}
+                        card={{ id: String(i), suit: "clubs", rank: "2" }}
+                        size="sm"
+                        isVisible={false}
+                        isAnimating={false}
+                        animationDelay={i * 40}
+                      />)
+                    )}
+                  </div>
+                )}
+              </AnimatePresence>
             </div>
 
             {isCurrent && phase !== "showdown" && (
