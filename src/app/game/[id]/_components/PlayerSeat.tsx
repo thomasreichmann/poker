@@ -3,6 +3,8 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { PlayingCard } from "@/components/ui/playing-card";
+import { TurnHalo } from "@/lib/motion/TurnHalo";
+import { AnimatedCard } from "@/lib/motion/AnimatedCard";
 import { Player } from "@/db/schema/players";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
 
@@ -36,6 +38,7 @@ export function PlayerSeat({
           isCurrent ? "scale-110" : "scale-100"
         }`}
       >
+        <TurnHalo active={isCurrent && phase !== "showdown"} />
         <Card
           className={`bg-slate-800 border-2 transition-all duration-300 relative overflow-hidden ${
             isCurrent
@@ -83,9 +86,7 @@ export function PlayerSeat({
                     ? player.displayName
                     : `Player ${player.seat}`}
                 </div>
-                <div className="text-xs text-emerald-400">
-                  R$ {player.stack}
-                </div>
+                <div className="text-xs text-emerald-400">R$ {player.stack}</div>
                 {(player.currentBet ?? 0) > 0 && (
                   <div className="text-xs text-yellow-400">
                     Bet: R$ {player.currentBet}
@@ -97,14 +98,21 @@ export function PlayerSeat({
             <div className="flex justify-center-safe gap-x-1">
               {cards.length > 0
                 ? cards.map((card, cardIndex) => (
-                    <PlayingCard
+                    <AnimatedCard
                       key={card.id}
-                      card={card}
-                      size="sm"
-                      isVisible={isYou || phase === "showdown"}
-                      isAnimating={false}
-                      animationDelay={cardIndex * 100}
-                    />
+                      phase={"deal"}
+                      delayMs={cardIndex * 80}
+                      from={{ x: 0, y: -80, rotate: -6, scale: 0.9 }}
+                      to={{ x: 0, y: 0, rotate: 0, scale: 1 }}
+                    >
+                      <PlayingCard
+                        card={card}
+                        size="sm"
+                        isVisible={isYou || phase === "showdown"}
+                        isAnimating={false}
+                        animationDelay={0}
+                      />
+                    </AnimatedCard>
                   ))
                 : [1, 2].map((i) => (
                     <PlayingCard

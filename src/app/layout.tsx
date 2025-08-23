@@ -1,5 +1,6 @@
 import { ToastProvider } from "@/components/ui/toast";
 import { AuthProvider } from "@/lib/auth-context";
+import { MotionProvider } from "@/lib/motion/reducedMotion";
 import { TRPCReactProvider } from "@/trpc/client";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -32,7 +33,9 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ToastProvider>
-            <TRPCReactProvider>{children}</TRPCReactProvider>
+            <MotionProvider>
+              <TRPCReactProvider>{children}</TRPCReactProvider>
+            </MotionProvider>
           </ToastProvider>
         </AuthProvider>
       </body>
