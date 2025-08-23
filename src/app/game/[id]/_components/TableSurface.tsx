@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { AnimatedPot } from "@/lib/motion/AnimatedPot";
 
 type TableSurfaceProps = {
   pot: number;
@@ -21,26 +22,28 @@ export function TableSurface({
         <div className="absolute top-[150px] left-1/2 -translate-x-1/2 -translate-y-1/2">
           <div className="relative">
             <div className="absolute inset-0 rounded-full blur-xl bg-yellow-500/10" />
-            <div className="relative flex items-center gap-3 bg-slate-900/70 backdrop-blur-sm border border-amber-400/40 rounded-full px-5 py-3 shadow-[0_0_30px_rgba(234,179,8,0.12)]">
-              <div className="flex -space-x-2 select-none">
-                <span className="w-7 h-7 rounded-full border-2 border-white/90 bg-red-500 shadow-inner" />
-                <span className="w-7 h-7 rounded-full border-2 border-white/90 bg-blue-500 shadow-inner translate-y-1" />
-                <span className="w-7 h-7 rounded-full border-2 border-white/90 bg-yellow-400 shadow-inner -translate-y-1" />
+            <AnimatedPot value={pot}>
+              <div className="relative flex items-center gap-3 bg-slate-900/70 backdrop-blur-sm border border-amber-400/40 rounded-full px-5 py-3 shadow-[0_0_30px_rgba(234,179,8,0.12)]">
+                <div className="flex -space-x-2 select-none">
+                  <span className="w-7 h-7 rounded-full border-2 border-white/90 bg-red-500 shadow-inner" />
+                  <span className="w-7 h-7 rounded-full border-2 border-white/90 bg-blue-500 shadow-inner translate-y-1" />
+                  <span className="w-7 h-7 rounded-full border-2 border-white/90 bg-yellow-400 shadow-inner -translate-y-1" />
+                </div>
+                <div className="text-center min-w-[140px]">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-amber-200/80">
+                    Pot
+                  </div>
+                  <div className="text-2xl font-extrabold text-amber-300 tabular-nums">
+                    R$ {pot}
+                  </div>
+                </div>
+                {currentHighestBet > 0 && (
+                  <div className="ml-1 text-xs text-amber-200/90 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-400/30 whitespace-nowrap">
+                    Current Bet: R$ {currentHighestBet}
+                  </div>
+                )}
               </div>
-              <div className="text-center min-w-[140px]">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-amber-200/80">
-                  Pot
-                </div>
-                <div className="text-2xl font-extrabold text-amber-300 tabular-nums">
-                  R$ {pot}
-                </div>
-              </div>
-              {currentHighestBet > 0 && (
-                <div className="ml-1 text-xs text-amber-200/90 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-400/30 whitespace-nowrap">
-                  Current Bet: R$ {currentHighestBet}
-                </div>
-              )}
-            </div>
+            </AnimatedPot>
           </div>
         </div>
 

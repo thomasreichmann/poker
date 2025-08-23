@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useMotionSettings } from "@/lib/motion/reducedMotion";
 
 type HeaderProps = {
   tableId: string;
@@ -55,6 +56,7 @@ export function Header({
   onResetAction,
 }: HeaderProps) {
   const router = useRouter();
+  const { enabled: motionEnabled, reduced, setEnabled, setReduced } = useMotionSettings();
   return (
     <header className="absolute top-0 left-0 right-0 z-50 border-b border-slate-800 bg-slate-900/95 backdrop-blur">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -138,6 +140,14 @@ export function Header({
               </DropdownMenuTrigger>
               <DropdownMenuContent className="bg-slate-800 border-slate-700 text-slate-200">
                 <DropdownMenuLabel>Configurações</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Motion</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => setEnabled(!motionEnabled)}>
+                  {motionEnabled ? "Disable" : "Enable"} Motion
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setReduced(!reduced)}>
+                  {reduced ? "Prefer Full Motion" : "Prefer Reduced Motion"}
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {process.env.NODE_ENV !== "production" && canReset && (
                   <>
