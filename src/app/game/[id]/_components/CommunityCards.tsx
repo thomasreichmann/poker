@@ -21,8 +21,8 @@ export function CommunityCards({
             card={card}
             size="md"
             isVisible={true}
-            isAnimating={isAnimating}
-            animationDelay={index * 200}
+            isAnimating={!isAnimating}
+            animationDelay={index * 40}
           />
         ))}
         {Array.from({ length: 5 - cards.length }).map((_, index) => (

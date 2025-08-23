@@ -2,13 +2,14 @@
 
 import { MultiPlayerTestPanel } from "@/components/dev/MultiPlayerTestPanel";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActionPanel } from "./_components/ActionPanel";
 import { CommunityCards } from "./_components/CommunityCards";
 import { Header } from "./_components/Header";
 import { PlayerSeat } from "./_components/PlayerSeat";
 import { TableSurface } from "./_components/TableSurface";
 import { useGameData } from "./_hooks/useGameData";
+import { ChipFlightsOverlay, type ChipFlight } from "@/lib/motion/ChipFlightsOverlay";
 
 export default function PokerGamePage() {
   const { id } = useParams() as { id: string };
@@ -65,6 +66,11 @@ export default function PokerGamePage() {
     const num = Number.parseInt(value) || 0;
     setRaiseAmount(Math.max(minRaiseTotal, Math.min(maxRaiseTotal, num)));
   };
+
+  // Future integration: derive chip flights from actions
+  const chipFlights: ChipFlight[] = useMemo(() => {
+    return [];
+  }, []);
 
   const handlePlayerAction = async (
     action: "check" | "call" | "fold" | "raise" | "bet",
@@ -148,7 +154,8 @@ export default function PokerGamePage() {
               currentHighestBet={dbGame?.currentHighestBet ?? 0}
               phaseLabel={phaseLabel}
             />
-            <CommunityCards cards={communityCards} isAnimating={false} />
+            <CommunityCards cards={communityCards} isAnimating={phase !== "pre-flop" && phase !== "showdown"} />
+            <ChipFlightsOverlay flights={chipFlights} />
 
             {/* Players */}
             {playersByView.map((player, index) => {

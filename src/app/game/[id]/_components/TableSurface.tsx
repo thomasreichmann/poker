@@ -18,7 +18,7 @@ export function TableSurface({
       <div className="w-[800px] h-[500px] bg-gradient-to-br from-emerald-800 to-emerald-900 rounded-full border-8 border-amber-950 shadow-2xl relative">
         <div className="absolute inset-4 bg-emerald-700 rounded-full opacity-30" />
 
-        <div className="absolute top-[150px] left-1/2 -translate-x-1/2 -translate-y-1/2">
+        <div className="absolute top-[150px] left-1/2 -translate-x-1/2 -translate-y-1/2" data-pot-center>
           <div className="relative">
             <div className="absolute inset-0 rounded-full blur-xl bg-yellow-500/10" />
             <div className="relative flex items-center gap-3 bg-slate-900/70 backdrop-blur-sm border border-amber-400/40 rounded-full px-5 py-3 shadow-[0_0_30px_rgba(234,179,8,0.12)]">

@@ -1,6 +1,7 @@
 import { PlayingCard as PlayingCardType } from "@/lib/gameTypes";
 import { getCardColor, getCardSymbol } from "@/lib/gameUtils";
 import { cn } from "@/lib/utils";
+import { MotionCard } from "@/lib/motion/MotionCard";
 
 interface PlayingCardProps {
   card: PlayingCardType;
@@ -26,32 +27,27 @@ export function PlayingCard({
   };
 
   const baseClasses = cn(
-    "rounded border flex flex-col items-center justify-center font-bold shadow-lg transform transition-all duration-500",
+    "rounded border flex flex-col items-center justify-center font-bold shadow-lg",
     sizeClasses[size],
-    isAnimating ? "scale-0 rotate-180" : "scale-100 rotate-0",
     isVisible ? "bg-white border-gray-300" : "bg-blue-900 border-blue-700",
     className
   );
 
   return (
-    <div
+    <MotionCard
+      size={size}
+      delayMs={animationDelay}
+      visible={!isAnimating}
       className={baseClasses}
-      style={{
-        animationDelay: `${animationDelay}ms`,
-      }}
     >
       {isVisible ? (
         <>
-          <div className={cn(getCardColor(card.suit), "text-base")}>
-            {card.rank}
-          </div>
-          <div className={cn(getCardColor(card.suit), "text-lg")}>
-            {getCardSymbol(card.suit)}
-          </div>
+          <div className={cn(getCardColor(card.suit), "text-base")}>{card.rank}</div>
+          <div className={cn(getCardColor(card.suit), "text-lg")}>{getCardSymbol(card.suit)}</div>
         </>
       ) : (
         <div className="text-blue-300">?</div>
       )}
-    </div>
+    </MotionCard>
   );
 }
