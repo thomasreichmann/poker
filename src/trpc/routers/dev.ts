@@ -64,6 +64,7 @@ export const devRouter = createTRPCRouter({
         playerId: input.targetPlayerId,
         action: input.action,
         amount: input.amount,
+        actorSource: "human",
       });
     }),
 

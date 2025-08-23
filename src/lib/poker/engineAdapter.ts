@@ -33,6 +33,12 @@ type ActionInput = {
   gameId: string;
   action: PokerAction;
   amount?: number;
+  // Optional actor metadata (dev/QA simulator)
+  actorSource?: "human" | "bot";
+  botStrategy?: string | null;
+  // Back-compat shim used by BotManager until callers are updated
+  __actorSource?: "human" | "bot";
+  __botStrategy?: string | null;
 };
 
 export async function dbGameToPureGame(gameId: string): Promise<GameState> {
@@ -439,11 +445,17 @@ export async function handleActionPure(
     throw new Error(validation.error ?? "Invalid action");
   }
 
+  const actorSource = input.actorSource ?? input.__actorSource ?? "human";
+  const botStrategy = input.botStrategy ?? input.__botStrategy ?? null;
+
   await db.insert(actions).values({
     gameId: input.gameId,
     playerId: input.playerId,
+    handId: previousState.handId ?? 0,
     actionType: input.action,
     amount: input.amount ?? null,
+    actorSource,
+    botStrategy,
   });
 
   const newGameState = executeGameAction(previousState, pureAction);

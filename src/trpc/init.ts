@@ -73,3 +73,19 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
     },
   });
 });
+
+// Non-production only procedure
+export const nonProdProcedure = t.procedure.use(({ next }) => {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Operation not allowed in production");
+  }
+  return next();
+});
+
+// Dev-only procedure (non-prod + role check via server guard at call sites)
+export const devOnlyProcedure = protectedProcedure.use(({ next }) => {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Operation not allowed in production");
+  }
+  return next();
+});
