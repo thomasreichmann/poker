@@ -71,6 +71,13 @@
       "when": 1755906602456,
       "tag": "0009_simulator-config-and-actor-source",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1755914172547,
+      "tag": "0010_simulator-jobs",
+      "breakpoints": true
     }
   ]
 }

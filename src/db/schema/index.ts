@@ -6,6 +6,7 @@ import * as players from "./players";
 import * as timeouts from "./timeouts";
 import * as userRoles from "./userRoles";
 import * as users from "./users";
+import * as simulatorJobs from "./simulatorJobs";
 
 export const schema = {
   ...actions,
@@ -16,4 +17,5 @@ export const schema = {
   ...users,
   ...userRoles,
   ...actionTypes,
+  ...simulatorJobs,
 };
