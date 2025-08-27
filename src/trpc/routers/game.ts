@@ -14,6 +14,7 @@ import {
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { baseProcedure, createTRPCRouter, protectedProcedure } from "../init";
+import { maybeScheduleBot } from "@/lib/simulator/scheduler";
 
 export const gameRouter = createTRPCRouter({
   // List games with basic info and player counts
@@ -161,11 +162,13 @@ export const gameRouter = createTRPCRouter({
         .limit(1);
       const player = rows[0];
       if (!player) throw new Error("Player not found in this game");
-      return await handleActionPure({
+      const result = await handleActionPure({
         ...input,
         playerId: player.id,
         actorSource: "human",
       });
+      await maybeScheduleBot(input.gameId);
+      return result;
     }),
 
   // Advance game state (next player/round/showdown)

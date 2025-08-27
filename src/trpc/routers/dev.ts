@@ -10,6 +10,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../init";
+import { maybeScheduleBot } from "@/lib/simulator/scheduler";
 
 export const devRouter = createTRPCRouter({
   // Check if current user has dev access
@@ -59,13 +60,15 @@ export const devRouter = createTRPCRouter({
       }
 
       // Execute the action as the target player
-      return await handleActionPure({
+      const result = await handleActionPure({
         gameId: input.gameId,
         playerId: input.targetPlayerId,
         action: input.action,
         amount: input.amount,
         actorSource: "human",
       });
+      await maybeScheduleBot(input.gameId);
+      return result;
     }),
 
   // Advance game state (dev only)
