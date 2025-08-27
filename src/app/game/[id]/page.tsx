@@ -3,6 +3,7 @@
 import { MultiPlayerTestPanel } from "@/components/dev/MultiPlayerTestPanel";
 import { SimulatorPanel } from "@/components/dev/SimulatorPanel";
 import { useParams } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { ActionPanel } from "./_components/ActionPanel";
 import { CommunityCards } from "./_components/CommunityCards";
@@ -152,6 +153,7 @@ export default function PokerGamePage() {
             <CommunityCards cards={communityCards} isAnimating={false} />
 
             {/* Players */}
+            <AnimatePresence initial={false}>
             {playersByView.map((player, index) => {
               const positions = [
                 {
@@ -197,20 +199,28 @@ export default function PokerGamePage() {
                 (p) => p.id === player.id
               );
               return (
-                <PlayerSeat
+                <motion.div
                   key={player.id}
-                  player={player}
-                  isCurrent={isCurrentPlayer}
-                  isYou={isYou}
-                  phase={phase}
-                  cards={playerCards}
-                  positionStyle={position}
-                  activeKey={`${dbGame?.id}-${activePlayerIndex}-${phase}`}
-                  isSmallBlind={getIsSB(seatIndex)}
-                  isBigBlind={getIsBB(seatIndex)}
-                />
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ type: "spring", stiffness: 280, damping: 24 }}
+                >
+                  <PlayerSeat
+                    player={player}
+                    isCurrent={isCurrentPlayer}
+                    isYou={isYou}
+                    phase={phase}
+                    cards={playerCards}
+                    positionStyle={position}
+                    activeKey={`${dbGame?.id}-${activePlayerIndex}-${phase}`}
+                    isSmallBlind={getIsSB(seatIndex)}
+                    isBigBlind={getIsBB(seatIndex)}
+                  />
+                </motion.div>
               );
             })}
+            </AnimatePresence>
           </div>
         </div>
 

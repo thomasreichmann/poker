@@ -1,6 +1,7 @@
 import { PlayingCard as PlayingCardType } from "@/lib/gameTypes";
 import { getCardColor, getCardSymbol } from "@/lib/gameUtils";
 import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
 
 interface PlayingCardProps {
   card: PlayingCardType;
@@ -26,19 +27,21 @@ export function PlayingCard({
   };
 
   const baseClasses = cn(
-    "rounded border flex flex-col items-center justify-center font-bold shadow-lg transform transition-all duration-500",
+    "rounded border flex flex-col items-center justify-center font-bold shadow-lg",
     sizeClasses[size],
-    isAnimating ? "scale-0 rotate-180" : "scale-100 rotate-0",
     isVisible ? "bg-white border-gray-300" : "bg-blue-900 border-blue-700",
     className
   );
 
   return (
-    <div
+    <motion.div
       className={baseClasses}
-      style={{
-        animationDelay: `${animationDelay}ms`,
-      }}
+      initial={{ opacity: 0, scale: 0.8, rotate: -8, y: 8 }}
+      animate={{ opacity: 1, scale: 1, rotate: 0, y: 0 }}
+      exit={{ opacity: 0, scale: 0.8, rotate: 6, y: 8 }}
+      whileHover={{ y: -4, rotate: 2 }}
+      transition={{ type: "spring", stiffness: 360, damping: 28, delay: animationDelay / 1000 }}
+      layout
     >
       {isVisible ? (
         <>
@@ -52,6 +55,6 @@ export function PlayingCard({
       ) : (
         <div className="text-blue-300">?</div>
       )}
-    </div>
+    </motion.div>
   );
 }

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Minus, Plus } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 
 type ActionPanelProps = {
   visible: boolean;
@@ -44,73 +45,88 @@ export function ActionPanel({
   onCallAction,
   onRaiseToAction,
 }: ActionPanelProps) {
-  if (!visible) return null;
-
   return (
-    <div className="fixed right-4 bottom-4 z-40 w-full max-w-md md:max-w-lg">
-      <Card className="bg-slate-800 border-slate-600 shadow-2xl py-0">
-        <CardContent className="p-3">
+    <AnimatePresence initial={false}>
+      {visible ? (
+        <motion.div
+          key="action-panel"
+          className="fixed right-4 bottom-4 z-40 w-full max-w-md md:max-w-lg"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 40 }}
+          transition={{ type: "spring", stiffness: 320, damping: 26 }}
+        >
+          <Card className="bg-slate-800 border-slate-600 shadow-2xl py-0">
+            <CardContent className="p-3">
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent px-2 py-1 text-xs flex-grow"
-                onClick={() => onChangeAmountAction(String(sliderMin))}
-              >
-                Min
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent px-2 py-1 text-xs flex-grow"
-                onClick={() =>
-                  onChangeAmountAction(
-                    String(
-                      Math.max(
-                        minRaiseTotal,
-                        Math.min(maxRaiseTotal, Math.floor((pot || 0) * 0.5))
+              <motion.div whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 500, damping: 30 }} className="flex-grow">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent px-2 py-1 text-xs w-full"
+                  onClick={() => onChangeAmountAction(String(sliderMin))}
+                >
+                  Min
+                </Button>
+              </motion.div>
+              <motion.div whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 500, damping: 30 }} className="flex-grow">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent px-2 py-1 text-xs w-full"
+                  onClick={() =>
+                    onChangeAmountAction(
+                      String(
+                        Math.max(
+                          minRaiseTotal,
+                          Math.min(maxRaiseTotal, Math.floor((pot || 0) * 0.5))
+                        )
                       )
                     )
-                  )
-                }
-              >
-                1/2 Pot
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent px-2 py-1 text-xs flex-grow"
-                onClick={() =>
-                  onChangeAmountAction(
-                    String(
-                      Math.max(
-                        minRaiseTotal,
-                        Math.min(maxRaiseTotal, Math.floor(pot || 0))
+                  }
+                >
+                  1/2 Pot
+                </Button>
+              </motion.div>
+              <motion.div whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 500, damping: 30 }} className="flex-grow">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent px-2 py-1 text-xs w-full"
+                  onClick={() =>
+                    onChangeAmountAction(
+                      String(
+                        Math.max(
+                          minRaiseTotal,
+                          Math.min(maxRaiseTotal, Math.floor(pot || 0))
+                        )
                       )
                     )
-                  )
-                }
-              >
-                Pot
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent px-2 py-1 text-xs flex-grow"
-                onClick={() =>
-                  onChangeAmountAction(
-                    String(
-                      Math.max(
-                        sliderMin,
-                        Math.min(maxRaiseTotal, maxRaiseTotal)
+                  }
+                >
+                  Pot
+                </Button>
+              </motion.div>
+              <motion.div whileTap={{ scale: 0.96 }} transition={{ type: "spring", stiffness: 500, damping: 30 }} className="flex-grow">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent px-2 py-1 text-xs w-full"
+                  onClick={() =>
+                    onChangeAmountAction(
+                      String(
+                        Math.max(
+                          sliderMin,
+                          Math.min(maxRaiseTotal, maxRaiseTotal)
+                        )
                       )
                     )
-                  )
-                }
-              >
-                Max
-              </Button>
+                  }
+                >
+                  Max
+                </Button>
+              </motion.div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -162,25 +178,63 @@ export function ActionPanel({
 
             <div className="grid grid-cols-2 gap-2">
               {canCheck ? (
-                <Button
-                  variant="outline"
-                  onClick={onCheckAction}
-                  className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent h-20 w-full text-base md:text-lg font-semibold"
-                >
-                  Check
-                </Button>
+                <motion.div whileTap={{ scale: 0.98 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
+                  <Button
+                    variant="outline"
+                    onClick={onCheckAction}
+                    className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent h-20 w-full text-base md:text-lg font-semibold"
+                  >
+                    Check
+                  </Button>
+                </motion.div>
               ) : (
-                <Button
-                  variant="destructive"
-                  onClick={onFoldAction}
-                  className="bg-red-600 hover:bg-red-700 h-20 w-full text-base md:text-lg font-semibold"
-                >
-                  Fold
-                </Button>
+                <motion.div whileTap={{ scale: 0.98 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
+                  <Button
+                    variant="destructive"
+                    onClick={onFoldAction}
+                    className="bg-red-600 hover:bg-red-700 h-20 w-full text-base md:text-lg font-semibold"
+                  >
+                    Fold
+                  </Button>
+                </motion.div>
               )}
 
               {canCall ? (
                 sliderValue > sliderMin ? (
+                  <motion.div whileTap={{ scale: 0.98 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
+                    <Button
+                      onClick={() =>
+                        onRaiseToAction(
+                          Math.max(
+                            minRaiseTotal,
+                            Math.min(maxRaiseTotal, sliderValue)
+                          )
+                        )
+                      }
+                      className="bg-emerald-600 hover:bg-emerald-700 h-20 w-full text-base md:text-lg font-semibold"
+                      disabled={
+                        sliderValue < minRaiseTotal || sliderValue > maxRaiseTotal
+                      }
+                    >
+                      Raise to R${" "}
+                      {Math.max(
+                        minRaiseTotal,
+                        Math.min(maxRaiseTotal, sliderValue)
+                      )}
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <motion.div whileTap={{ scale: 0.98 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
+                    <Button
+                      onClick={onCallAction}
+                      className="bg-blue-600 hover:bg-blue-700 h-20 w-full text-base md:text-lg font-semibold"
+                    >
+                      Call R$ {callAmount}
+                    </Button>
+                  </motion.div>
+                )
+              ) : (
+                <motion.div whileTap={{ scale: 0.98 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
                   <Button
                     onClick={() =>
                       onRaiseToAction(
@@ -195,46 +249,20 @@ export function ActionPanel({
                       sliderValue < minRaiseTotal || sliderValue > maxRaiseTotal
                     }
                   >
-                    Raise to R${" "}
+                    {currentHighestBet === 0 ? "Bet" : "Raise to"} R${" "}
                     {Math.max(
                       minRaiseTotal,
                       Math.min(maxRaiseTotal, sliderValue)
                     )}
                   </Button>
-                ) : (
-                  <Button
-                    onClick={onCallAction}
-                    className="bg-blue-600 hover:bg-blue-700 h-20 w-full text-base md:text-lg font-semibold"
-                  >
-                    Call R$ {callAmount}
-                  </Button>
-                )
-              ) : (
-                <Button
-                  onClick={() =>
-                    onRaiseToAction(
-                      Math.max(
-                        minRaiseTotal,
-                        Math.min(maxRaiseTotal, sliderValue)
-                      )
-                    )
-                  }
-                  className="bg-emerald-600 hover:bg-emerald-700 h-20 w-full text-base md:text-lg font-semibold"
-                  disabled={
-                    sliderValue < minRaiseTotal || sliderValue > maxRaiseTotal
-                  }
-                >
-                  {currentHighestBet === 0 ? "Bet" : "Raise to"} R${" "}
-                  {Math.max(
-                    minRaiseTotal,
-                    Math.min(maxRaiseTotal, sliderValue)
-                  )}
-                </Button>
+                </motion.div>
               )}
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 }
