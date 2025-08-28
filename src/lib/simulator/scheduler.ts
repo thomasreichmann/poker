@@ -15,12 +15,12 @@ function botsGloballyEnabled(): boolean {
 }
 
 function getPublicBaseUrl(): string {
-  // Prefer Vercel provided url in hosted environments
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  // Allow explicit override
+  // Explicit env for simulator webhook base URL
+  if (process.env.SIM_BOT_BASE_URL) return String(process.env.SIM_BOT_BASE_URL);
+  // Back-compat: accept PUBLIC_BASE_URL if provided
   if (process.env.PUBLIC_BASE_URL) return String(process.env.PUBLIC_BASE_URL);
-  // Fallback local
-  return "http://localhost:3000";
+  // As a last resort, do not guess. Return empty string so caller can skip.
+  return "";
 }
 
 type SchedulePayload = {
@@ -67,7 +67,12 @@ export async function maybeScheduleBot(gameId: string): Promise<void> {
     }
 
     const client = new Client({ token });
-    const url = `${getPublicBaseUrl()}/api/sim/bot-act`;
+    const baseUrl = getPublicBaseUrl();
+    if (!baseUrl) {
+      console.log("[sim-bot] SIM_BOT_BASE_URL not set; skipping schedule", { gameId, scheduleKey });
+      return;
+    }
+    const url = `${baseUrl}/api/sim/bot-act`;
     const payload: SchedulePayload = {
       gameId,
       expectedPlayerId: currentPlayerId,

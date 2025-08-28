@@ -23,7 +23,8 @@ QSTASH_TOKEN=your_qstash_token
 QSTASH_CURRENT_SIGNING_KEY=your_current_signing_key
 QSTASH_NEXT_SIGNING_KEY=your_next_signing_key
 # Optional override for public URL (defaults to Vercel URL or http://localhost:3000)
-PUBLIC_BASE_URL=https://your-dev-domain
+SIM_BOT_BASE_URL=https://your-dev-domain
+PUBLIC_BASE_URL=https://your-dev-domain # optional back-compat
 ```
 
 API endpoint: `POST /api/sim/bot-act`
