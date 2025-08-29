@@ -7,6 +7,7 @@ import {
   handleActionPure,
   resetGamePure,
 } from "@/lib/poker/engineAdapter";
+import { scheduleNextBotMoveIfNeeded } from "@/lib/simulator/scheduler";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../init";
@@ -59,13 +60,15 @@ export const devRouter = createTRPCRouter({
       }
 
       // Execute the action as the target player
-      return await handleActionPure({
+      const res = await handleActionPure({
         gameId: input.gameId,
         playerId: input.targetPlayerId,
         action: input.action,
         amount: input.amount,
         actorSource: "human",
       });
+      await scheduleNextBotMoveIfNeeded(input.gameId);
+      return res;
     }),
 
   // Advance game state (dev only)
@@ -75,7 +78,9 @@ export const devRouter = createTRPCRouter({
       // Verify dev access
       await requireDevAccess(ctx.user.id);
 
-      return await advanceGameStatePure(input.gameId);
+      const res = await advanceGameStatePure(input.gameId);
+      await scheduleNextBotMoveIfNeeded(input.gameId);
+      return res;
     }),
 
   // Reset game (dev only)
@@ -85,7 +90,9 @@ export const devRouter = createTRPCRouter({
       // Verify dev access
       await requireDevAccess(ctx.user.id);
 
-      return await resetGamePure(input.gameId);
+      const res = await resetGamePure(input.gameId);
+      await scheduleNextBotMoveIfNeeded(input.gameId);
+      return res;
     }),
 
   // Get all players in a game (for dev panel player selection)

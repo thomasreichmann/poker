@@ -1,22 +1,10 @@
-import { BotManager } from "./manager";
+// Legacy BotManager disabled in favor of serverless scheduling with waitUntil.
+// Keeping exports as no-ops to avoid breaking imports.
 
-const managers = new Map<string, BotManager>();
-
-export function getManager(tableId: string): BotManager {
-  let mgr = managers.get(tableId);
-  if (!mgr) {
-    mgr = new BotManager({ tableId });
-    managers.set(tableId, mgr);
-  }
-  return mgr;
+export function startManager(_tableId: string) {
+  // no-op
 }
 
-export function startManager(tableId: string) {
-  const mgr = getManager(tableId);
-  void mgr.start();
-}
-
-export function stopManager(tableId: string) {
-  const mgr = managers.get(tableId);
-  if (mgr) mgr.stop();
+export function stopManager(_tableId: string) {
+  // no-op
 }

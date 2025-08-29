@@ -49,6 +49,8 @@ export const createTRPCContext = async () => {
   return {
     user,
     supabase,
+    // Internal simulator auth flag; only set true by internal routes
+    internalSimAuth: false as boolean,
   };
 };
 
@@ -86,6 +88,17 @@ export const nonProdProcedure = t.procedure.use(({ next }) => {
 export const devOnlyProcedure = protectedProcedure.use(({ next }) => {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Operation not allowed in production");
+  }
+  return next();
+});
+
+// Internal-only procedure for simulator bot invocations (non-prod only)
+export const simInternalProcedure = t.procedure.use(({ ctx, next }) => {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Operation not allowed in production");
+  }
+  if (!ctx.internalSimAuth) {
+    throw new Error("Unauthorized internal simulator call");
   }
   return next();
 });

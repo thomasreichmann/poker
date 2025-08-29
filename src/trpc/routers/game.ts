@@ -11,6 +11,7 @@ import {
   resetGamePure,
   leaveGamePure,
 } from "@/lib/poker/engineAdapter";
+import { scheduleNextBotMoveIfNeeded } from "@/lib/simulator/scheduler";
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { baseProcedure, createTRPCRouter, protectedProcedure } from "../init";
@@ -161,25 +162,32 @@ export const gameRouter = createTRPCRouter({
         .limit(1);
       const player = rows[0];
       if (!player) throw new Error("Player not found in this game");
-      return await handleActionPure({
+      const res = await handleActionPure({
         ...input,
         playerId: player.id,
         actorSource: "human",
       });
+      // After a human move, schedule potential bot move
+      await scheduleNextBotMoveIfNeeded(input.gameId);
+      return res;
     }),
 
   // Advance game state (next player/round/showdown)
   advance: protectedProcedure
     .input(z.object({ gameId: z.string().uuid() }))
     .mutation(async ({ input }) => {
-      return await advanceGameStatePure(input.gameId);
+      const res = await advanceGameStatePure(input.gameId);
+      await scheduleNextBotMoveIfNeeded(input.gameId);
+      return res;
     }),
 
   // Reset a game back to initial state and optionally auto-start if >= 2 players
   reset: protectedProcedure
     .input(z.object({ gameId: z.string().uuid() }))
     .mutation(async ({ input }) => {
-      return await resetGamePure(input.gameId);
+      const res = await resetGamePure(input.gameId);
+      await scheduleNextBotMoveIfNeeded(input.gameId);
+      return res;
     }),
 
   // Leave a game (fold immediately if active; remove after hand)

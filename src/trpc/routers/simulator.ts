@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { games } from "@/db/schema/games";
 import { requireDevAccess } from "@/lib/permissions";
-import { startManager } from "@/lib/simulator/registry";
+// Legacy manager disabled; replaced by serverless scheduler
 import type { SimulatorConfig } from "@/lib/simulator/types";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -29,7 +29,7 @@ export const simulatorRouter = createTRPCRouter({
         .set({ simulatorConfig: config as unknown as object })
         .where(eq(games.id, input.tableId));
 
-      startManager(input.tableId);
+      // no-op: scheduling is serverless now
       return { success: true };
     }),
 
@@ -57,7 +57,7 @@ export const simulatorRouter = createTRPCRouter({
         .update(games)
         .set({ simulatorConfig: next as unknown as object })
         .where(eq(games.id, input.tableId));
-      startManager(input.tableId);
+      // no-op: scheduling is serverless now
       return { success: true };
     }),
 
@@ -88,7 +88,7 @@ export const simulatorRouter = createTRPCRouter({
         .update(games)
         .set({ simulatorConfig: next as unknown as object })
         .where(eq(games.id, input.tableId));
-      startManager(input.tableId);
+      // no-op: scheduling is serverless now
       return { success: true };
     }),
 
