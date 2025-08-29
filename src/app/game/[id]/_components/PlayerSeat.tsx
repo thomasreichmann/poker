@@ -31,11 +31,7 @@ export function PlayerSeat({
 }: PlayerSeatProps) {
   return (
     <div className="absolute" style={positionStyle}>
-      <div
-        className={`relative transition-all duration-300 ${
-          isCurrent ? "scale-110" : "scale-100"
-        }`}
-      >
+      <div className={`relative`}>
         <Card
           className={`bg-slate-800 border-2 transition-all duration-300 relative overflow-hidden ${
             isCurrent

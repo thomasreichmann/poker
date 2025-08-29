@@ -41,7 +41,6 @@ export function PlayingCard({
       exit={{ opacity: 0, scale: 0.8, rotate: 6, y: 8 }}
       whileHover={{ y: -4, rotate: 2 }}
       transition={{ type: "spring", stiffness: 360, damping: 28, delay: animationDelay / 1000 }}
-      layout
     >
       {isVisible ? (
         <>

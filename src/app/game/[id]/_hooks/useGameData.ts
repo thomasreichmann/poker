@@ -67,7 +67,7 @@ export function useGameData(id: string) {
         .map((c, idx) => ({
           suit: c.suit as IPlayingCard["suit"],
           rank: c.rank as IPlayingCard["rank"],
-          id: `${c.rank}-${c.suit}-${idx}`,
+          id: String(c.id),
         })),
     [dbCards]
   );
@@ -124,7 +124,7 @@ export function useGameData(id: string) {
       arr.push({
         suit: c.suit as IPlayingCard["suit"],
         rank: c.rank as IPlayingCard["rank"],
-        id: `${c.rank}-${c.suit}-${c.playerId}-${idx - 1}`,
+        id: String(c.id),
       });
       map.set(c.playerId, arr);
     }
