@@ -36,6 +36,17 @@ export const devRouter = createTRPCRouter({
         targetPlayerId: z.string().uuid(),
         action: ZodActionSchema,
         amount: z.number().int().positive().optional(),
+        actorSource: z.enum(["human", "bot"]).optional(),
+        botStrategy: z
+          .enum([
+            "always_fold",
+            "call_any",
+            "tight_aggro",
+            "loose_passive",
+            "human",
+            "scripted",
+          ])
+          .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -58,14 +69,15 @@ export const devRouter = createTRPCRouter({
         throw new Error("Target player not found in this game");
       }
 
-      // Execute the action as the target player
+      // Execute the action as the target player (optionally annotate as bot)
       return await handleActionPure({
         gameId: input.gameId,
         playerId: input.targetPlayerId,
         action: input.action,
         amount: input.amount,
-        actorSource: "human",
-      });
+        actorSource: input.actorSource ?? "human",
+        botStrategy: input.botStrategy ?? undefined,
+      } as unknown as Parameters<typeof handleActionPure>[0]);
     }),
 
   // Advance game state (dev only)
