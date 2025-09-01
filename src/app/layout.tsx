@@ -1,4 +1,5 @@
 import { ToastProvider } from "@/components/ui/toast";
+import { MotionProvider } from "@/lib/motion/provider";
 import { AuthProvider } from "@/lib/auth-context";
 import { TRPCReactProvider } from "@/trpc/client";
 import type { Metadata } from "next";
@@ -32,7 +33,9 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ToastProvider>
-            <TRPCReactProvider>{children}</TRPCReactProvider>
+            <MotionProvider>
+              <TRPCReactProvider>{children}</TRPCReactProvider>
+            </MotionProvider>
           </ToastProvider>
         </AuthProvider>
       </body>

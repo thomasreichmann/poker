@@ -2,6 +2,8 @@
 
 import { PlayingCard } from "@/components/ui/playing-card";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
+import { useEffect, useRef } from "react";
+import { useMotion } from "@/lib/motion/provider";
 
 type CommunityCardsProps = {
   cards: IPlayingCard[];
@@ -12,8 +14,21 @@ export function CommunityCards({
   cards,
   isAnimating = false,
 }: CommunityCardsProps) {
+  const { getAnimAttrs, emit } = useMotion();
+  const prevCount = useRef(0);
+
+  useEffect(() => {
+    if (cards.length > prevCount.current) {
+      emit("community:reveal");
+    }
+    prevCount.current = cards.length;
+  }, [cards.length, emit]);
+
   return (
-    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 mt-20">
+    <div
+      {...getAnimAttrs("community")}
+      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 mt-20"
+    >
       <div className="flex space-x-2">
         {cards.map((card, index) => (
           <PlayingCard

@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PlayingCard } from "@/components/ui/playing-card";
 import { Player } from "@/db/schema/players";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
+import { useEffect, useRef } from "react";
+import { useMotion } from "@/lib/motion/provider";
 
 type PlayerSeatProps = {
   player: Player;
@@ -29,8 +31,30 @@ export function PlayerSeat({
   isSmallBlind = false,
   isBigBlind = false,
 }: PlayerSeatProps) {
+  const { getAnimAttrs, emit } = useMotion();
+  const prevIsCurrent = useRef<boolean>(false);
+  const prevHasFolded = useRef<boolean>(player.hasFolded);
+
+  useEffect(() => {
+    if (!prevIsCurrent.current && isCurrent) {
+      emit("seat:turn", { playerId: player.id });
+    }
+    prevIsCurrent.current = isCurrent;
+  }, [isCurrent, player.id, emit]);
+
+  useEffect(() => {
+    if (!prevHasFolded.current && player.hasFolded) {
+      emit("seat:fold", { playerId: player.id });
+    }
+    prevHasFolded.current = player.hasFolded;
+  }, [player.hasFolded, player.id, emit]);
+
   return (
-    <div className="absolute" style={positionStyle}>
+    <div
+      {...getAnimAttrs("seat", { id: player.id })}
+      className="absolute"
+      style={positionStyle}
+    >
       <div
         className={`relative transition-all duration-300 ${
           isCurrent ? "scale-110" : "scale-100"
