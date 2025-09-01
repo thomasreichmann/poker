@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PlayingCard } from "@/components/ui/playing-card";
 import { Player } from "@/db/schema/players";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
+import { useMotion } from "@/lib/motion/provider";
 
 type PlayerSeatProps = {
   player: Player;
@@ -29,8 +30,9 @@ export function PlayerSeat({
   isSmallBlind = false,
   isBigBlind = false,
 }: PlayerSeatProps) {
+  const { getAnimAttrs } = useMotion();
   return (
-    <div className="absolute" style={positionStyle}>
+    <div className="absolute" style={positionStyle} {...getAnimAttrs("seat", { id: player.id, role: isYou ? "you" : "opponent" })}>
       <div
         className={`relative transition-all duration-300 ${
           isCurrent ? "scale-110" : "scale-100"

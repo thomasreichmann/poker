@@ -9,6 +9,7 @@ import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { MultiPlayerTestPanel } from "./MultiPlayerTestPanel";
 import { SimulatorPanel } from "./SimulatorPanel";
+import { AnimationsPanel } from "./AnimationsPanel";
 
 type DevToolsPanelProps = {
   tableId: string;
@@ -65,7 +66,7 @@ export function DevToolsPanel({
       >
         <CardContent className={cn(open ? "p-3" : "p-0")}>
           <Tabs defaultValue="sim" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-slate-900 border border-slate-700">
+            <TabsList className="grid w-full grid-cols-3 bg-slate-900 border border-slate-700">
               <TabsTrigger
                 value="sim"
                 className="data-[state=active]:bg-slate-700"
@@ -77,6 +78,12 @@ export function DevToolsPanel({
                 className="data-[state=active]:bg-slate-700"
               >
                 Multi-player
+              </TabsTrigger>
+              <TabsTrigger
+                value="anim"
+                className="data-[state=active]:bg-slate-700"
+              >
+                Animations
               </TabsTrigger>
             </TabsList>
             <TabsContent value="sim" className="pt-3">
@@ -99,6 +106,9 @@ export function DevToolsPanel({
                 floating={false}
                 embedded
               />
+            </TabsContent>
+            <TabsContent value="anim" className="pt-3">
+              <AnimationsPanel embedded />
             </TabsContent>
           </Tabs>
         </CardContent>
