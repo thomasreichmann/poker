@@ -37,6 +37,7 @@ type MultiPlayerTestPanelProps = {
   players: Player[];
   currentPlayerId?: string;
   floating?: boolean;
+  embedded?: boolean;
 };
 
 export function MultiPlayerTestPanel({
@@ -45,6 +46,7 @@ export function MultiPlayerTestPanel({
   players,
   currentPlayerId,
   floating = true,
+  embedded = false,
 }: MultiPlayerTestPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
@@ -232,6 +234,209 @@ export function MultiPlayerTestPanel({
     return null;
   }
 
+  const body = (
+    <>
+      {/* Game Info */}
+      <div className="flex items-center gap-2 text-xs text-slate-400">
+        <Users className="h-3 w-3" />
+        <span>{players.length} players</span>
+        <span>•</span>
+        <span>Pot: ${game?.pot ?? 0}</span>
+        <span>•</span>
+        <span>{game?.currentRound ?? "pre-flop"}</span>
+      </div>
+      {/* Active Player Info */}
+      {activePlayer && (
+        <div className="flex items-center gap-2 p-2 bg-slate-700 rounded">
+          <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+          <span className="text-sm">
+            Turn: {activePlayer.displayName || `Seat ${activePlayer.seat}`}
+          </span>
+          <Badge variant="outline" className="text-xs">
+            ${activePlayer.stack}
+          </Badge>
+          {autoFollowTurn && selectedPlayerId === currentPlayerId && (
+            <div className="flex items-center gap-1">
+              <Zap className="h-3 w-3 text-blue-400" />
+              <span className="text-xs text-blue-400">Following</span>
+            </div>
+          )}
+        </div>
+      )}
+      {/* Player Selector */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium">Control Player:</label>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="auto-follow"
+              checked={autoFollowTurn}
+              onCheckedChange={(checked) => setAutoFollowTurn(checked === true)}
+              className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+            />
+            <label
+              htmlFor="auto-follow"
+              className="text-xs text-slate-400 cursor-pointer"
+            >
+              Auto-follow turn
+            </label>
+          </div>
+        </div>
+        <Select
+          value={selectedPlayerId}
+          onValueChange={(value) => {
+            setSelectedPlayerId(value);
+            if (autoFollowTurn && value !== currentPlayerId) {
+              setAutoFollowTurn(false);
+            }
+          }}
+        >
+          <SelectTrigger className="bg-slate-700 border-slate-600">
+            <SelectValue placeholder="Select player" />
+          </SelectTrigger>
+          <SelectContent>
+            {players.map((player) => (
+              <SelectItem key={player.id} value={player.id}>
+                <div className="flex items-center gap-2">
+                  <span>{player.displayName || `Seat ${player.seat}`}</span>
+                  <Badge
+                    variant={
+                      player.id === currentPlayerId ? "default" : "outline"
+                    }
+                    className="text-xs"
+                  >
+                    ${player.stack}
+                  </Badge>
+                  {player.hasFolded && (
+                    <span className="text-red-400 text-xs">(Folded)</span>
+                  )}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {/* Quick Actions */}
+      {selectedPlayer && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => executeAction("fold")}
+              disabled={selectedPlayer.id !== currentPlayerId}
+              className="text-xs bg-red-600 hover:bg-red-700 text-white border-0"
+            >
+              Fold
+            </Button>
+            {canCheck ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => executeAction("check")}
+                disabled={selectedPlayer.id !== currentPlayerId}
+                className="text-xs bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
+              >
+                Check
+              </Button>
+            ) : (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => executeAction("call")}
+                disabled={selectedPlayer.id !== currentPlayerId || !canCall}
+                className="text-xs bg-blue-600 hover:bg-blue-700 text-white border-0"
+              >
+                Call ${callAmount}
+              </Button>
+            )}
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                value={quickRaiseAmount}
+                onChange={(e) =>
+                  setQuickRaiseAmount(Number(e.target.value) || 0)
+                }
+                className="bg-slate-700 border-slate-600 text-xs"
+                min={minRaiseTotal}
+                max={maxRaiseTotal}
+              />
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => executeAction("raise", quickRaiseAmount)}
+                disabled={
+                  selectedPlayer.id !== currentPlayerId ||
+                  quickRaiseAmount < minRaiseTotal
+                }
+                className="text-xs bg-green-600 hover:bg-green-700 text-white border-0"
+              >
+                Raise
+              </Button>
+            </div>
+            <div className="flex gap-1">
+              {[2, 3, 5].map((multiplier) => (
+                <Button
+                  key={multiplier}
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setQuickRaiseAmount(
+                      game?.bigBlind ? game.bigBlind * multiplier : 0
+                    )
+                  }
+                  className="text-xs px-2 bg-slate-600 hover:bg-slate-500 text-white border-slate-500"
+                >
+                  {multiplier}BB
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setQuickRaiseAmount(maxRaiseTotal)}
+                className="text-xs px-2 bg-amber-600 hover:bg-amber-700 text-white border-amber-500"
+              >
+                All-in
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Game Controls */}
+      <div className="flex gap-2 pt-2 border-t border-slate-700">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleAdvanceGame}
+          className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500"
+        >
+          <Play className="h-3 w-3 mr-1" />
+          Advance
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleResetGame}
+          className="flex-1 text-xs bg-orange-600 hover:bg-orange-700 text-white border-orange-500"
+        >
+          <RotateCcw className="h-3 w-3 mr-1" />
+          Reset
+        </Button>
+      </div>
+      {actMutation.isPending && (
+        <div className="text-xs text-blue-400 text-center">
+          Executing action...
+        </div>
+      )}
+    </>
+  );
+
+  if (embedded) {
+    return <div className="space-y-4">{body}</div>;
+  }
+
   return (
     <Card
       className={cn(
@@ -260,216 +465,7 @@ export function MultiPlayerTestPanel({
         </div>
       </CardHeader>
 
-      {!isCollapsed && (
-        <CardContent className="space-y-4">
-          {/* Game Info */}
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <Users className="h-3 w-3" />
-            <span>{players.length} players</span>
-            <span>•</span>
-            <span>Pot: ${game?.pot ?? 0}</span>
-            <span>•</span>
-            <span>{game?.currentRound ?? "pre-flop"}</span>
-          </div>
-
-          {/* Active Player Info */}
-          {activePlayer && (
-            <div className="flex items-center gap-2 p-2 bg-slate-700 rounded">
-              <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-sm">
-                Turn: {activePlayer.displayName || `Seat ${activePlayer.seat}`}
-              </span>
-              <Badge variant="outline" className="text-xs">
-                ${activePlayer.stack}
-              </Badge>
-              {autoFollowTurn && selectedPlayerId === currentPlayerId && (
-                <div className="flex items-center gap-1">
-                  <Zap className="h-3 w-3 text-blue-400" />
-                  <span className="text-xs text-blue-400">Following</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Player Selector */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Control Player:</label>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="auto-follow"
-                  checked={autoFollowTurn}
-                  onCheckedChange={(checked) =>
-                    setAutoFollowTurn(checked === true)
-                  }
-                  className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                />
-                <label
-                  htmlFor="auto-follow"
-                  className="text-xs text-slate-400 cursor-pointer"
-                >
-                  Auto-follow turn
-                </label>
-              </div>
-            </div>
-            <Select
-              value={selectedPlayerId}
-              onValueChange={(value) => {
-                setSelectedPlayerId(value);
-                // Temporarily disable auto-follow when manually selecting
-                if (autoFollowTurn && value !== currentPlayerId) {
-                  setAutoFollowTurn(false);
-                }
-              }}
-            >
-              <SelectTrigger className="bg-slate-700 border-slate-600">
-                <SelectValue placeholder="Select player" />
-              </SelectTrigger>
-              <SelectContent>
-                {players.map((player) => (
-                  <SelectItem key={player.id} value={player.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{player.displayName || `Seat ${player.seat}`}</span>
-                      <Badge
-                        variant={
-                          player.id === currentPlayerId ? "default" : "outline"
-                        }
-                        className="text-xs"
-                      >
-                        ${player.stack}
-                      </Badge>
-                      {player.hasFolded && (
-                        <span className="text-red-400 text-xs">(Folded)</span>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Quick Actions */}
-          {selectedPlayer && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => executeAction("fold")}
-                  disabled={selectedPlayer.id !== currentPlayerId}
-                  className="text-xs bg-red-600 hover:bg-red-700 text-white border-0"
-                >
-                  Fold
-                </Button>
-
-                {canCheck ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => executeAction("check")}
-                    disabled={selectedPlayer.id !== currentPlayerId}
-                    className="text-xs bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
-                  >
-                    Check
-                  </Button>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => executeAction("call")}
-                    disabled={selectedPlayer.id !== currentPlayerId || !canCall}
-                    className="text-xs bg-blue-600 hover:bg-blue-700 text-white border-0"
-                  >
-                    Call ${callAmount}
-                  </Button>
-                )}
-              </div>
-
-              {/* Raise Controls */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    value={quickRaiseAmount}
-                    onChange={(e) =>
-                      setQuickRaiseAmount(Number(e.target.value) || 0)
-                    }
-                    className="bg-slate-700 border-slate-600 text-xs"
-                    min={minRaiseTotal}
-                    max={maxRaiseTotal}
-                  />
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => executeAction("raise", quickRaiseAmount)}
-                    disabled={
-                      selectedPlayer.id !== currentPlayerId ||
-                      quickRaiseAmount < minRaiseTotal
-                    }
-                    className="text-xs bg-green-600 hover:bg-green-700 text-white border-0"
-                  >
-                    Raise
-                  </Button>
-                </div>
-                <div className="flex gap-1">
-                  {[2, 3, 5].map((multiplier) => (
-                    <Button
-                      key={multiplier}
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setQuickRaiseAmount(
-                          game?.bigBlind ? game.bigBlind * multiplier : 0
-                        )
-                      }
-                      className="text-xs px-2 bg-slate-600 hover:bg-slate-500 text-white border-slate-500"
-                    >
-                      {multiplier}BB
-                    </Button>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setQuickRaiseAmount(maxRaiseTotal)}
-                    className="text-xs px-2 bg-amber-600 hover:bg-amber-700 text-white border-amber-500"
-                  >
-                    All-in
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Game Controls */}
-          <div className="flex gap-2 pt-2 border-t border-slate-700">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAdvanceGame}
-              className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500"
-            >
-              <Play className="h-3 w-3 mr-1" />
-              Advance
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleResetGame}
-              className="flex-1 text-xs bg-orange-600 hover:bg-orange-700 text-white border-orange-500"
-            >
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Reset
-            </Button>
-          </div>
-
-          {/* Status */}
-          {actMutation.isPending && (
-            <div className="text-xs text-blue-400 text-center">
-              Executing action...
-            </div>
-          )}
-        </CardContent>
-      )}
+      {!isCollapsed && <CardContent className="space-y-4">{body}</CardContent>}
     </Card>
   );
 }

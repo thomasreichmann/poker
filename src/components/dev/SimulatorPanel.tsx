@@ -40,12 +40,14 @@ type SimulatorPanelProps = {
   tableId: string;
   players: { id: string; displayName?: string | null }[];
   floating?: boolean;
+  embedded?: boolean;
 };
 
 export function SimulatorPanel({
   tableId,
   players,
   floating = true,
+  embedded = false,
 }: SimulatorPanelProps) {
   const { canShowDevFeatures } = useDevAccess();
   const trpc = useTRPC();
@@ -215,6 +217,141 @@ export function SimulatorPanel({
 
   if (!canShowDevFeatures) return null;
 
+  const body = (
+    <>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs">Min delay (ms)</label>
+          <Input
+            type="number"
+            value={minDelay}
+            onChange={(e) => setMinDelay(Number(e.target.value) || 0)}
+            className="bg-slate-700 border-slate-600 text-xs"
+          />
+        </div>
+        <div>
+          <label className="text-xs">Max delay (ms)</label>
+          <Input
+            type="number"
+            value={maxDelay}
+            onChange={(e) => setMaxDelay(Number(e.target.value) || 0)}
+            className="bg-slate-700 border-slate-600 text-xs"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs">Seed</label>
+        <Input
+          value={seed}
+          onChange={(e) => setSeed(e.target.value)}
+          placeholder="optional"
+          className="bg-slate-700 border-slate-600 text-xs"
+        />
+      </div>
+
+      <div>
+        <label className="text-xs">Default strategy</label>
+        <Select
+          value={defaultStrategy}
+          onValueChange={(v: StrategyId) => setDefaultStrategy(v)}
+        >
+          <SelectTrigger className="bg-slate-700 border-slate-600">
+            <SelectValue placeholder="Strategy" />
+          </SelectTrigger>
+          <SelectContent>
+            {STRATEGIES.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-xs">Per-seat overrides</div>
+        {players.map((p) => (
+          <div key={p.id} className="grid grid-cols-2 gap-2 items-center">
+            <div className="truncate text-[10px] text-slate-400">
+              {p.displayName || p.id}
+            </div>
+            <Select
+              value={perSeat[p.id] || ""}
+              onValueChange={(v) =>
+                setPerSeat((prev) => ({
+                  ...prev,
+                  [p.id]: v === "inherit" ? "" : (v as StrategyId),
+                }))
+              }
+            >
+              <SelectTrigger className="bg-slate-700 border-slate-600">
+                <SelectValue placeholder="inherit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="inherit">inherit</SelectItem>
+                {STRATEGIES.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        <Button
+          onClick={onApply}
+          className="flex-1 bg-blue-600 hover:bg-blue-700"
+        >
+          Apply
+        </Button>
+        <Button
+          onClick={onPauseResume}
+          variant="outline"
+          className="flex-1 bg-slate-700 border-slate-600"
+        >
+          {paused ? (
+            <>
+              <Play className="h-3 w-3 mr-1" /> Resume
+            </>
+          ) : (
+            <>
+              <Pause className="h-3 w-3 mr-1" /> Pause
+            </>
+          )}
+        </Button>
+      </div>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-medium">Simulator</div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={enabled ? "default" : "outline"}
+              size="sm"
+              onClick={onToggleEnable}
+              className={
+                enabled
+                  ? "bg-emerald-600 border-emerald-600"
+                  : "bg-slate-700 border-slate-600 text-white"
+              }
+            >
+              {enabled ? "Disable" : "Enable"}
+            </Button>
+          </div>
+        </div>
+        {body}
+      </div>
+    );
+  }
+
   return (
     <Card
       className={cn(
@@ -256,115 +393,7 @@ export function SimulatorPanel({
           </div>
         </div>
       </CardHeader>
-      {!isCollapsed && (
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs">Min delay (ms)</label>
-              <Input
-                type="number"
-                value={minDelay}
-                onChange={(e) => setMinDelay(Number(e.target.value) || 0)}
-                className="bg-slate-700 border-slate-600 text-xs"
-              />
-            </div>
-            <div>
-              <label className="text-xs">Max delay (ms)</label>
-              <Input
-                type="number"
-                value={maxDelay}
-                onChange={(e) => setMaxDelay(Number(e.target.value) || 0)}
-                className="bg-slate-700 border-slate-600 text-xs"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs">Seed</label>
-            <Input
-              value={seed}
-              onChange={(e) => setSeed(e.target.value)}
-              placeholder="optional"
-              className="bg-slate-700 border-slate-600 text-xs"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs">Default strategy</label>
-            <Select
-              value={defaultStrategy}
-              onValueChange={(v: StrategyId) => setDefaultStrategy(v)}
-            >
-              <SelectTrigger className="bg-slate-700 border-slate-600">
-                <SelectValue placeholder="Strategy" />
-              </SelectTrigger>
-              <SelectContent>
-                {STRATEGIES.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs">Per-seat overrides</div>
-            {players.map((p) => (
-              <div key={p.id} className="grid grid-cols-2 gap-2 items-center">
-                <div className="truncate text-[10px] text-slate-400">
-                  {p.displayName || p.id}
-                </div>
-                <Select
-                  value={perSeat[p.id] || ""}
-                  onValueChange={(v) =>
-                    setPerSeat((prev) => ({
-                      ...prev,
-                      [p.id]: v === "inherit" ? "" : (v as StrategyId),
-                    }))
-                  }
-                >
-                  <SelectTrigger className="bg-slate-700 border-slate-600">
-                    <SelectValue placeholder="inherit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="inherit">inherit</SelectItem>
-                    {STRATEGIES.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              onClick={onApply}
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
-            >
-              Apply
-            </Button>
-            <Button
-              onClick={onPauseResume}
-              variant="outline"
-              className="flex-1 bg-slate-700 border-slate-600"
-            >
-              {paused ? (
-                <>
-                  <Play className="h-3 w-3 mr-1" /> Resume
-                </>
-              ) : (
-                <>
-                  <Pause className="h-3 w-3 mr-1" /> Pause
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      )}
+      {!isCollapsed && <CardContent className="space-y-3">{body}</CardContent>}
     </Card>
   );
 }
