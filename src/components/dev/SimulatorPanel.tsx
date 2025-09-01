@@ -1,5 +1,6 @@
 "use client";
 
+import { useGameData } from "@/app/game/[id]/_hooks/useGameData";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,12 +11,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { PokerAction } from "@/db/schema/actionTypes";
 import { useDevAccess } from "@/hooks/useDevAccess";
+import type {
+  GameState as PureGameState,
+  Player as PurePlayer,
+} from "@/lib/poker/types";
+import { makeRng } from "@/lib/simulator/rng";
+import { makeStrategy } from "@/lib/simulator/strategies";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Pause, Play, Settings } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const STRATEGIES = [
   { id: "human", label: "Human (manual)" },
@@ -41,13 +49,11 @@ export function SimulatorPanel({
 }: SimulatorPanelProps) {
   const { canShowDevFeatures } = useDevAccess();
   const trpc = useTRPC();
-
-  const enableMutation = useMutation(trpc.simulator.enable.mutationOptions());
-  const updateMutation = useMutation(
-    trpc.simulator.updateConfig.mutationOptions()
+  const actAsPlayerMutation = useMutation(
+    trpc.dev.actAsPlayer.mutationOptions()
   );
-  const pauseMutation = useMutation(trpc.simulator.pause.mutationOptions());
-  const resumeMutation = useMutation(trpc.simulator.resume.mutationOptions());
+
+  const { dbGame, dbPlayers, yourDbPlayer } = useGameData(tableId);
 
   const [enabled, setEnabled] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -60,64 +66,154 @@ export function SimulatorPanel({
   const [perSeat, setPerSeat] = useState<Record<string, StrategyId | "">>({});
 
   useEffect(() => {
-    const init: Record<string, StrategyId | ""> = {};
-    for (const p of players) init[p.id] = "";
-    setPerSeat(init);
+    // Preserve selections, add new players, prune removed
+    setPerSeat((prev) => {
+      const next: Record<string, StrategyId | ""> = { ...prev };
+      for (const p of players) {
+        if (!(p.id in next)) next[p.id] = "";
+      }
+      for (const key of Object.keys(next)) {
+        if (!players.find((p) => p.id === key)) delete next[key];
+      }
+      return next;
+    });
   }, [players]);
 
-  if (!canShowDevFeatures) return null;
+  // NOTE: hooks must remain unconditional; we gate rendering below
 
   const onToggleEnable = async () => {
-    if (!enabled) {
-      await enableMutation.mutateAsync({
-        tableId,
-        config: {
-          enabled: true,
-          delays: { minMs: minDelay, maxMs: maxDelay },
-          defaultStrategy: { id: defaultStrategy },
-          perSeatStrategy: Object.fromEntries(
-            Object.entries(perSeat)
-              .filter(([, v]) => !!v)
-              .map(([k, v]) => [k, { id: v as StrategyId }])
-          ),
-          seed: seed || undefined,
-        },
-      });
-      setEnabled(true);
-    } else {
-      await updateMutation.mutateAsync({
-        tableId,
-        config: { enabled: false },
-      });
-      setEnabled(false);
-    }
+    setEnabled((v) => !v);
   };
 
   const onApply = async () => {
-    await updateMutation.mutateAsync({
-      tableId,
-      config: {
-        delays: { minMs: minDelay, maxMs: maxDelay },
-        defaultStrategy: { id: defaultStrategy },
-        perSeatStrategy: Object.fromEntries(
-          Object.entries(perSeat)
-            .filter(([, v]) => !!v)
-            .map(([k, v]) => [k, { id: v as StrategyId }])
-        ),
-        seed: seed || undefined,
-      },
-    });
+    // no-op in client-orchestrated mode; settings are already in local state
   };
 
   const onPauseResume = async () => {
-    if (!paused) {
-      await pauseMutation.mutateAsync({ tableId });
-      setPaused(true);
-    } else {
-      await resumeMutation.mutateAsync({ tableId });
-      setPaused(false);
-    }
+    setPaused((v) => !v);
   };
+
+  // Build a minimal pure game state for strategy evaluation
+  const pureState: PureGameState | null = useMemo(() => {
+    if (!dbGame) return null;
+    const purePlayers: PurePlayer[] = dbPlayers.map((p) => ({
+      id: String(p.id),
+      seat: p.seat,
+      stack: p.stack ?? 0,
+      currentBet: p.currentBet ?? 0,
+      hasFolded: Boolean(p.hasFolded),
+      isButton: Boolean(p.isButton),
+      hasWon: Boolean(p.hasWon),
+      showCards: Boolean(p.showCards),
+      holeCards: [],
+    }));
+    const state: PureGameState = {
+      id: String(dbGame.id),
+      status: (dbGame.status as PureGameState["status"]) ?? "active",
+      currentRound:
+        (dbGame.currentRound as PureGameState["currentRound"]) ?? "pre-flop",
+      currentHighestBet: dbGame.currentHighestBet ?? 0,
+      currentPlayerTurn: dbGame.currentPlayerTurn
+        ? String(dbGame.currentPlayerTurn)
+        : undefined,
+      pot: dbGame.pot ?? 0,
+      bigBlind: dbGame.bigBlind ?? 0,
+      smallBlind: dbGame.smallBlind ?? 0,
+      lastAction: (dbGame.lastAction as PureGameState["lastAction"]) ?? "check",
+      lastBetAmount: dbGame.lastBetAmount ?? 0,
+      players: purePlayers,
+      communityCards: [],
+      deck: [],
+      handId: dbGame.handId ?? 0,
+    };
+    return state;
+  }, [dbGame, dbPlayers]);
+
+  // Orchestrator: the client who enabled acts as the master scheduler
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const latestTurnRef = useRef<string | null>(null);
+  const rngRef = useRef<() => number>(() => Math.random());
+
+  useEffect(() => {
+    rngRef.current = makeRng(seed || undefined);
+  }, [seed]);
+
+  // Clear pending timer on unmount or when disabling
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!canShowDevFeatures) return;
+    if (!enabled || paused) return;
+    if (!pureState || !pureState.currentPlayerTurn) return;
+
+    const currentTurn = pureState.currentPlayerTurn;
+
+    // Skip if it's our own turn (master remains manual)
+    if (yourDbPlayer && currentTurn === yourDbPlayer.id) return;
+
+    // Resolve strategy for the current seat
+    const seatStrategy: StrategyId | undefined =
+      (perSeat[currentTurn] as StrategyId | "") || undefined || defaultStrategy;
+
+    if (!seatStrategy || seatStrategy === "human") return;
+
+    const strat = makeStrategy({ id: seatStrategy });
+    const decision = strat.decide({ game: pureState, playerId: currentTurn });
+    if (!decision) return;
+
+    // Capture the latest observed turn for race-free validation later
+    latestTurnRef.current = currentTurn;
+
+    const jitter =
+      minDelay +
+      Math.floor(
+        rngRef.current() * Math.max(0, (maxDelay ?? minDelay) - minDelay + 1)
+      );
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      // Bail if turn changed since scheduling
+      if (latestTurnRef.current !== currentTurn) return;
+      // Also bail if the master is now up (no auto-acting for master)
+      if (yourDbPlayer && latestTurnRef.current === yourDbPlayer.id) return;
+      await actAsPlayerMutation.mutateAsync({
+        gameId: tableId,
+        targetPlayerId: currentTurn,
+        action: decision.action as PokerAction,
+        amount: decision.amount,
+        actorSource: "bot",
+        botStrategy: seatStrategy,
+      });
+    }, Math.max(0, jitter));
+
+    // Cleanup: cancel any pending scheduled action when dependencies change
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+    };
+  }, [
+    canShowDevFeatures,
+    enabled,
+    paused,
+    pureState?.id,
+    pureState?.currentPlayerTurn,
+    pureState?.currentHighestBet,
+    defaultStrategy,
+    perSeat,
+    minDelay,
+    maxDelay,
+    yourDbPlayer,
+    tableId,
+    actAsPlayerMutation,
+    pureState,
+  ]);
+
+  if (!canShowDevFeatures) return null;
 
   return (
     <Card
