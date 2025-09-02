@@ -162,15 +162,25 @@ export function evaluateHand(cards: Card[]): HandRank {
     };
   }
 
-  // Check for flush
+  // Check for flush: pick the actual suit with >=5 cards
   if (isFlush(cards)) {
-    const flushCards = sortedCards.filter((card) => getSuit(card) === suits[0]);
-    if (flushCards.length > 0) {
-      return {
-        rank: 5,
-        value: getRankValue(flushCards[0]!),
-        name: "Flush",
-      };
+    let flushSuit: string | null = null;
+    for (const s of Suit.enumValues) {
+      const count = cards.filter((c) => getSuit(c) === s).length;
+      if (count >= 5) {
+        flushSuit = s;
+        break;
+      }
+    }
+    if (flushSuit) {
+      const flushCards = sortedCards.filter((card) => getSuit(card) === flushSuit);
+      if (flushCards.length > 0) {
+        return {
+          rank: 5,
+          value: getRankValue(flushCards[0]!),
+          name: "Flush",
+        };
+      }
     }
   }
 
