@@ -164,11 +164,7 @@ export function evaluateHand(cards: Card[]): HandRank {
 
   // Check for flush: pick the actual suit with >=5 cards
   if (isFlush(cards)) {
-    const suitToCount = new Map<Suit["enumValues"][number], number>();
-    for (const s of suits) {
-      suitToCount.set(s, (suitToCount.get(s) ?? 0) + 1);
-    }
-    let flushSuit: typeof suits[number] | null = null;
+    let flushSuit: string | null = null;
     for (const s of Suit.enumValues) {
       const count = cards.filter((c) => getSuit(c) === s).length;
       if (count >= 5) {
