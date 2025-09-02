@@ -428,20 +428,50 @@ function validateBetOrRaise(
     return { isValid: false, error: "Bet amount exceeds player's stack" };
   }
 
+  // Cannot place a new bet when a bet already exists; must raise instead
+  if (action.action === "bet" && gameState.currentHighestBet > 0) {
+    return { isValid: false, error: "Cannot bet; there is already a bet. Use raise." };
+  }
+
   const totalBetNeeded = gameState.currentHighestBet - player.currentBet;
-  if (action.amount < totalBetNeeded && action.amount !== player.stack) {
+  if (
+    gameState.currentHighestBet > 0 &&
+    action.amount < totalBetNeeded &&
+    action.amount !== player.stack
+  ) {
     return {
       isValid: false,
-      error: `Must bet at least ${totalBetNeeded} to call current bet`,
+      error: `Must put in at least ${totalBetNeeded} to call`,
     };
+  }
+
+  // Enforce table minimums
+  if (action.action === "bet" && gameState.currentHighestBet === 0) {
+    if (action.amount < gameState.bigBlind && action.amount !== player.stack) {
+      return {
+        isValid: false,
+        error: `Minimum bet is ${gameState.bigBlind}`,
+      };
+    }
   }
 
   // For raises, ensure minimum raise amount
   if (
     action.action === "raise" &&
-    action.amount < gameState.currentHighestBet + gameState.bigBlind
+    // Require the new total to be at least 2x currentHighestBet (UI contract) or all-in
+    // This approximates NLHE min-raise without tracking last raise size
+    (player.currentBet + action.amount) < Math.max(
+      gameState.bigBlind,
+      gameState.currentHighestBet * 2
+    ) &&
+    action.amount !== player.stack
   ) {
-    return { isValid: false, error: `Minimum raise is ${gameState.bigBlind}` };
+    const minTargetTotal = Math.max(
+      gameState.bigBlind,
+      gameState.currentHighestBet * 2
+    );
+    const minRaiseDelta = Math.max(1, minTargetTotal - player.currentBet);
+    return { isValid: false, error: `Minimum raise is ${minRaiseDelta}` };
   }
 
   return { isValid: true };
@@ -455,9 +485,8 @@ function validateCall(
     return { isValid: false, error: "No bet to call" };
   }
 
-  const callAmount = gameState.currentHighestBet - player.currentBet;
-  if (callAmount > player.stack) {
-    return { isValid: false, error: "Insufficient stack to call" };
+  if (player.stack <= 0) {
+    return { isValid: false, error: "No chips left to call" };
   }
 
   return { isValid: true };
@@ -554,7 +583,9 @@ function processBetOrRaise(
 
 function processCall(gameState: GameState, action: GameAction): GameState {
   const player = getPlayerById(gameState, action.playerId)!;
-  const callAmount = gameState.currentHighestBet - player.currentBet;
+  // Allow all-in for less by capping call amount to player's stack
+  const toCall = Math.max(0, gameState.currentHighestBet - player.currentBet);
+  const callAmount = Math.min(toCall, player.stack);
 
   const newCurrentBet = player.currentBet + callAmount;
   const newStack = player.stack - callAmount;
