@@ -226,24 +226,31 @@ export function useGameData(id: string) {
       );
     },
     act: async (action: PokerAction, totalAmount?: number) => {
-      if (!dbGame || !yourDbPlayer) return;
-      const payload: { gameId: string; action: PokerAction; amount?: number } =
-        {
-          gameId: dbGame.id,
-          action,
-        };
-      if (action === "raise" || action === "bet") {
-        const targetTotal = Math.max(
-          minRaiseTotal,
-          Math.min(maxRaiseTotal, totalAmount ?? 0)
-        );
-        const delta =
-          action === "bet"
-            ? targetTotal
-            : targetTotal - (yourDbPlayer.currentBet ?? 0);
-        payload.amount = Math.max(1, delta);
-      }
-      await actMutation.mutateAsync(payload);
+      await withPreconditions(
+        { requiresAuth: true, requiresGame: true, requiresPlayer: true },
+        async () => {
+          const payload: {
+            gameId: string;
+            action: PokerAction;
+            amount?: number;
+          } = {
+            gameId: dbGame!.id,
+            action,
+          };
+          if (action === "raise" || action === "bet") {
+            const targetTotal = Math.max(
+              minRaiseTotal,
+              Math.min(maxRaiseTotal, totalAmount ?? 0)
+            );
+            const delta =
+              action === "bet"
+                ? targetTotal
+                : targetTotal - (yourDbPlayer!.currentBet ?? 0);
+            payload.amount = Math.max(1, delta);
+          }
+          await actMutation.mutateAsync(payload);
+        }
+      );
     },
     advance: async () => {
       await withPreconditions(

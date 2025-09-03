@@ -183,14 +183,19 @@ export function SimulatorPanel({
       if (latestTurnRef.current !== currentTurn) return;
       // Also bail if the master is now up (no auto-acting for master)
       if (yourDbPlayer && latestTurnRef.current === yourDbPlayer.id) return;
-      await actAsPlayerMutation.mutateAsync({
-        gameId: tableId,
-        targetPlayerId: currentTurn,
-        action: decision.action as PokerAction,
-        amount: decision.amount,
-        actorSource: "bot",
-        botStrategy: seatStrategy,
-      });
+      try {
+        await actAsPlayerMutation.mutateAsync({
+          gameId: tableId,
+          targetPlayerId: currentTurn,
+          action: decision.action as PokerAction,
+          amount: decision.amount,
+          actorSource: "bot",
+          botStrategy: seatStrategy,
+        });
+      } catch (err) {
+        // Avoid noisy toasts during automated simulation; just log for devs
+        console.warn("Simulator auto-action failed:", err);
+      }
     }, Math.max(0, jitter));
 
     // Cleanup: cancel any pending scheduled action when dependencies change
