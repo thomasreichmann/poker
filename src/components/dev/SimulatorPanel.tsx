@@ -67,6 +67,20 @@ export function SimulatorPanel({
     useState<StrategyId>("call_any");
   const [perSeat, setPerSeat] = useState<Record<string, StrategyId | "">>({});
 
+  // Persist enabled state across tab switches and reloads
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("sim.panel.enabled.v1");
+      if (raw != null) setEnabled(raw === "true");
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("sim.panel.enabled.v1", String(enabled));
+    } catch {}
+  }, [enabled]);
+
   useEffect(() => {
     // Preserve selections, add new players, prune removed
     setPerSeat((prev) => {

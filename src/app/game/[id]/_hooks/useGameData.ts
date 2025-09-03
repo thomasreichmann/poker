@@ -173,11 +173,54 @@ export function useGameData(id: string) {
     return tableBet > (yourDbPlayer.currentBet ?? 0) && yourDbPlayer.stack > 0;
   }, [dbGame, yourDbPlayer]);
 
-  const joinMutation = useMutation(trpc.game.join.mutationOptions());
-  const actMutation = useMutation(trpc.game.act.mutationOptions());
-  const advanceMutation = useMutation(trpc.game.advance.mutationOptions());
-  const resetMutation = useMutation(trpc.game.reset.mutationOptions());
-  const leaveMutation = useMutation(trpc.game.leave.mutationOptions());
+  const joinMutation = useMutation({
+    ...trpc.game.join.mutationOptions(),
+    onSuccess: (data, variables, context) => {
+      try {
+        // Ensure the main game query is fresh after joining
+        void queryClient.invalidateQueries({ queryKey: gameQueryOptions.queryKey });
+      } catch {}
+      trpc.game.join.mutationOptions().onSuccess?.(data, variables, context);
+    },
+  });
+  const actMutation = useMutation({
+    ...trpc.game.act.mutationOptions(),
+    onSuccess: (data, variables, context) => {
+      try {
+        // Actions often change turn, bets, pot, etc.
+        void queryClient.invalidateQueries({ queryKey: gameQueryOptions.queryKey });
+      } catch {}
+      trpc.game.act.mutationOptions().onSuccess?.(data, variables, context);
+    },
+  });
+  const advanceMutation = useMutation({
+    ...trpc.game.advance.mutationOptions(),
+    onSuccess: (data, variables, context) => {
+      try {
+        // Advancing round changes community cards expectations
+        void queryClient.invalidateQueries({ queryKey: gameQueryOptions.queryKey });
+      } catch {}
+      trpc.game.advance.mutationOptions().onSuccess?.(data, variables, context);
+    },
+  });
+  const resetMutation = useMutation({
+    ...trpc.game.reset.mutationOptions(),
+    onSuccess: (data, variables, context) => {
+      try {
+        void queryClient.invalidateQueries({ queryKey: gameQueryOptions.queryKey });
+      } catch {}
+      trpc.game.reset.mutationOptions().onSuccess?.(data, variables, context);
+    },
+  });
+  const leaveMutation = useMutation({
+    ...trpc.game.leave.mutationOptions(),
+    onSuccess: (data, variables, context) => {
+      try {
+        void queryClient.invalidateQueries({ queryKey: gameQueryOptions.queryKey });
+      } catch {}
+      trpc.game.leave.mutationOptions().onSuccess?.(data, variables, context);
+    },
+  });
 
   const showError = (message: string) => {
     toast({ variant: "destructive", description: message });
