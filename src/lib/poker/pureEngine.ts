@@ -923,3 +923,70 @@ export function executeGameAction(
 
   return newGameState;
 }
+
+// ============================================================================
+// FRONTEND-FRIENDLY RESULT WRAPPERS
+// ============================================================================
+
+export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
+
+export function ok<T>(value: T): Result<T> {
+  return { ok: true, value };
+}
+
+export function err<T = never>(error: unknown): Result<T> {
+  // Normalize unknown errors to a user-friendly string
+  const message =
+    typeof error === "string"
+      ? error
+      : error && typeof error === "object" && "message" in error
+      ? String((error as { message?: unknown }).message ?? "Unknown error")
+      : "Unknown error";
+  return { ok: false, error: message };
+}
+
+export function tryRun<T>(fn: () => T): Result<T> {
+  try {
+    return ok(fn());
+  } catch (e) {
+    return err<T>(e);
+  }
+}
+
+// Safe wrappers for core transitions and actions
+export function executeGameActionSafe(
+  gameState: GameState,
+  action: GameAction
+): Result<GameState> {
+  return tryRun(() => executeGameAction(gameState, action));
+}
+
+export function startNewGameSafe(gameState: GameState): Result<GameState> {
+  return tryRun(() => startNewGame(gameState));
+}
+
+export function advanceToNextRoundSafe(gameState: GameState): Result<GameState> {
+  return tryRun(() => advanceToNextRound(gameState));
+}
+
+export function advanceToNextPlayerSafe(gameState: GameState): Result<GameState> {
+  return tryRun(() => advanceToNextPlayer(gameState));
+}
+
+export function handleShowdownSafe(gameState: GameState): Result<GameState> {
+  return tryRun(() => handleShowdown(gameState));
+}
+
+export function handleSinglePlayerWinSafe(
+  gameState: GameState
+): Result<GameState> {
+  return tryRun(() => handleSinglePlayerWin(gameState));
+}
+
+export function dealCardsSafe(gameState: GameState): Result<GameState> {
+  return tryRun(() => dealCards(gameState));
+}
+
+export function postBlindsSafe(gameState: GameState): Result<GameState> {
+  return tryRun(() => postBlinds(gameState));
+}
