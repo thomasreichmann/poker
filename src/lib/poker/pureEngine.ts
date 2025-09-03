@@ -953,40 +953,17 @@ export function tryRun<T>(fn: () => T): Result<T> {
   }
 }
 
+function makeSafe<F extends (...args: any[]) => any>(fn: F) {
+  return (...args: Parameters<F>): Result<ReturnType<F>> =>
+    tryRun(() => fn(...args));
+}
+
 // Safe wrappers for core transitions and actions
-export function executeGameActionSafe(
-  gameState: GameState,
-  action: GameAction
-): Result<GameState> {
-  return tryRun(() => executeGameAction(gameState, action));
-}
-
-export function startNewGameSafe(gameState: GameState): Result<GameState> {
-  return tryRun(() => startNewGame(gameState));
-}
-
-export function advanceToNextRoundSafe(gameState: GameState): Result<GameState> {
-  return tryRun(() => advanceToNextRound(gameState));
-}
-
-export function advanceToNextPlayerSafe(gameState: GameState): Result<GameState> {
-  return tryRun(() => advanceToNextPlayer(gameState));
-}
-
-export function handleShowdownSafe(gameState: GameState): Result<GameState> {
-  return tryRun(() => handleShowdown(gameState));
-}
-
-export function handleSinglePlayerWinSafe(
-  gameState: GameState
-): Result<GameState> {
-  return tryRun(() => handleSinglePlayerWin(gameState));
-}
-
-export function dealCardsSafe(gameState: GameState): Result<GameState> {
-  return tryRun(() => dealCards(gameState));
-}
-
-export function postBlindsSafe(gameState: GameState): Result<GameState> {
-  return tryRun(() => postBlinds(gameState));
-}
+export const executeGameActionSafe = makeSafe(executeGameAction);
+export const startNewGameSafe = makeSafe(startNewGame);
+export const advanceToNextRoundSafe = makeSafe(advanceToNextRound);
+export const advanceToNextPlayerSafe = makeSafe(advanceToNextPlayer);
+export const handleShowdownSafe = makeSafe(handleShowdown);
+export const handleSinglePlayerWinSafe = makeSafe(handleSinglePlayerWin);
+export const dealCardsSafe = makeSafe(dealCards);
+export const postBlindsSafe = makeSafe(postBlinds);
