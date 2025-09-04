@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Settings } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const STRATEGIES = [
   { id: "human", label: "Human (manual)" },
@@ -149,7 +149,7 @@ export function SimulatorPanel({
   }, [dbGame, dbPlayers]);
 
   // Orchestrator: the client who enabled acts as the master scheduler
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestTurnRef = useRef<string | null>(null);
   const rngRef = useRef<() => number>(() => Math.random());
 
@@ -165,10 +165,37 @@ export function SimulatorPanel({
     };
   }, []);
 
+  // Clamp helpers for delays
+  const clampNumber = (value: number, min: number, max: number) =>
+    Math.min(max, Math.max(min, value));
+
+  const { effectiveMinDelay, effectiveMaxDelay } = useMemo(() => {
+    const clampedMin = clampNumber(minDelay, 0, 60000);
+    const clampedMax = clampNumber(maxDelay, 0, 60000);
+    return {
+      effectiveMinDelay: Math.min(clampedMin, clampedMax),
+      effectiveMaxDelay: Math.max(clampedMin, clampedMax),
+    };
+  }, [minDelay, maxDelay]);
+
+  // Resolve strategy for a given playerId
+  const resolveStrategyForSeat = useCallback(
+    (playerId: string): StrategyId | undefined => {
+      const override = perSeat[playerId];
+      const resolved = (override && override !== "" ? override : defaultStrategy) as
+        | StrategyId
+        | undefined;
+      return resolved;
+    },
+    [perSeat, defaultStrategy]
+  );
+
   useEffect(() => {
     if (!canShowDevFeatures) return;
     if (!enabled) return;
     if (!pureState || !pureState.currentPlayerTurn) return;
+    // Avoid concurrent mutations
+    if (actAsPlayerMutation.status === "pending") return;
 
     const currentTurn = pureState.currentPlayerTurn;
 
@@ -176,8 +203,7 @@ export function SimulatorPanel({
     if (yourDbPlayer && currentTurn === yourDbPlayer.id) return;
 
     // Resolve strategy for the current seat
-    const seatStrategy: StrategyId | undefined =
-      (perSeat[currentTurn] as StrategyId | "") || undefined || defaultStrategy;
+    const seatStrategy: StrategyId | undefined = resolveStrategyForSeat(currentTurn);
 
     if (!seatStrategy || seatStrategy === "human") return;
 
@@ -189,9 +215,9 @@ export function SimulatorPanel({
     latestTurnRef.current = currentTurn;
 
     const jitter =
-      minDelay +
+      effectiveMinDelay +
       Math.floor(
-        rngRef.current() * Math.max(0, (maxDelay ?? minDelay) - minDelay + 1)
+        rngRef.current() * Math.max(0, effectiveMaxDelay - effectiveMinDelay + 1)
       );
 
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -223,10 +249,12 @@ export function SimulatorPanel({
     pureState?.currentHighestBet,
     defaultStrategy,
     perSeat,
-    minDelay,
-    maxDelay,
+    effectiveMinDelay,
+    effectiveMaxDelay,
     yourDbPlayer,
     tableId,
+    actAsPlayerMutation.status,
+    resolveStrategyForSeat,
     actAsPlayerMutation,
     pureState,
   ]);
@@ -241,7 +269,12 @@ export function SimulatorPanel({
           <Input
             type="number"
             value={minDelay}
+            min={0}
+            step={50}
             onChange={(e) => setMinDelay(Number(e.target.value) || 0)}
+            onBlur={() =>
+              setMinDelay((v) => clampNumber(Number(v) || 0, 0, 60000))
+            }
             className="bg-slate-700 border-slate-600 text-xs h-8"
           />
         </div>
@@ -250,7 +283,12 @@ export function SimulatorPanel({
           <Input
             type="number"
             value={maxDelay}
+            min={0}
+            step={50}
             onChange={(e) => setMaxDelay(Number(e.target.value) || 0)}
+            onBlur={() =>
+              setMaxDelay((v) => clampNumber(Number(v) || 0, 0, 60000))
+            }
             className="bg-slate-700 border-slate-600 text-xs h-8"
           />
         </div>
@@ -270,7 +308,7 @@ export function SimulatorPanel({
           <label className="text-xs">Default strategy</label>
           <Select
             value={defaultStrategy}
-            onValueChange={(v: StrategyId) => setDefaultStrategy(v)}
+            onValueChange={(v) => setDefaultStrategy(v as StrategyId)}
           >
             <SelectTrigger className="bg-slate-700 border-slate-600 h-8 text-xs">
               <SelectValue placeholder="Strategy" />
