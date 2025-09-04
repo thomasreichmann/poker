@@ -52,6 +52,7 @@ export function createInitialGameState(
     currentRound: "pre-flop",
     currentHighestBet: 0,
     currentPlayerTurn: undefined,
+    lastAggressorId: undefined,
     pot: 0,
     bigBlind,
     smallBlind,
@@ -122,6 +123,7 @@ export function startNewGame(gameState: GameState): GameState {
     status: "active",
     currentRound: "pre-flop",
     currentHighestBet: 0,
+    lastAggressorId: undefined,
     pot: 0,
     lastAction: undefined,
     lastBetAmount: 0,
@@ -576,6 +578,7 @@ function processBetOrRaise(
     currentHighestBet: Math.max(gameState.currentHighestBet, newCurrentBet),
     lastAction: action.action,
     lastBetAmount: newCurrentBet,
+    lastAggressorId: action.playerId,
   };
 
   return newGameState;
@@ -649,6 +652,29 @@ function determineNextAction(
     return "next_player";
   }
 
+  // If there was aggression in this round, the betting ends when action
+  // returns to the last aggressor and all bets are equal (everyone called).
+  if (gameState.lastAggressorId) {
+    // Next eligible player after current
+    const currentIndexAll = gameState.players.findIndex(
+      (p) => p.id === gameState.currentPlayerTurn
+    );
+    if (currentIndexAll !== -1) {
+      const total = gameState.players.length;
+      for (let offset = 1; offset <= total * 2; offset++) {
+        const idx = (currentIndexAll + offset) % total;
+        const candidate = gameState.players[idx]!;
+        if (!candidate.hasFolded && candidate.stack > 0) {
+          if (candidate.id === gameState.lastAggressorId) {
+            return gameState.currentRound === "river" ? "showdown" : "advance_round";
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  // Otherwise (no aggression), the round completes when action returns to the round's first-to-act
   // Unified rotation completion check: if all bets are equal and the next
   // eligible player equals the round's first-to-act, the round is complete.
   const buttonIndexAll = gameState.players.findIndex((p) => p.isButton);
@@ -722,6 +748,7 @@ export function advanceToNextRound(gameState: GameState): GameState {
     ...gameState,
     currentRound: nextRound,
     currentHighestBet: 0,
+    lastAggressorId: undefined,
     players: resetPlayers,
   };
 

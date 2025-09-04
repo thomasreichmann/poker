@@ -27,6 +27,7 @@ export const games = pgTable("poker_games", {
   currentRound: roundTypeEnum("current_round").default("pre-flop"),
   currentHighestBet: integer("current_highest_bet").default(0).notNull(),
   currentPlayerTurn: uuid("current_player_turn"),
+  lastAggressorId: uuid("last_aggressor_id"),
   pot: integer("pot").default(0).notNull(),
   bigBlind: integer("big_blind").default(20).notNull(),
   smallBlind: integer("small_blind").default(10).notNull(),
@@ -43,6 +44,10 @@ export const gamesRelations = relations(games, ({ many, one }) => ({
   players: many(players),
   currentPlayer: one(players, {
     fields: [games.currentPlayerTurn],
+    references: [players.id],
+  }),
+  lastAggressor: one(players, {
+    fields: [games.lastAggressorId],
     references: [players.id],
   }),
   actions: many(actions),

@@ -71,6 +71,13 @@
       "when": 1755906602456,
       "tag": "0009_simulator-config-and-actor-source",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1756960890095,
+      "tag": "0010_add-last-aggressor-id",
+      "breakpoints": true
     }
   ]
 }
