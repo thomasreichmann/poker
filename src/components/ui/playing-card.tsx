@@ -13,6 +13,7 @@ interface PlayingCardProps {
   isAnimating?: boolean;
   animationDelay?: number;
   className?: string;
+  replaySeed?: number;
 }
 
 export function PlayingCard({
@@ -37,26 +38,19 @@ export function PlayingCard({
   );
 
   const replayAt = useReplaySignal();
-  const shouldAnimate = isAnimating || replayAt > 0;
+  const motionKey = `${card.id}:${replayAt}:${animationDelay}`;
 
   return (
     <motion.div
-      key={`${card.id}:${replayAt}:${animationDelay}`}
+      key={motionKey}
       className={baseClasses}
-      initial={
-        shouldAnimate
-          ? { opacity: 0, y: 10, rotate: -3, scale: 0.98 }
-          : undefined
-      }
-      animate={
-        shouldAnimate ? { opacity: 1, y: 0, rotate: 0, scale: 1 } : undefined
-      }
+      initial={{ opacity: 0, y: 10, rotate: -1.5, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, rotate: 0, scale: 1 }}
       transition={{
-        duration: 0.4,
+        duration: 0.33,
         ease: "easeInOut",
         delay: Math.max(0, animationDelay) / 1000,
       }}
-      layout
     >
       {isVisible ? (
         <>

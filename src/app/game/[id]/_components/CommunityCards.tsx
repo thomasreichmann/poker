@@ -18,10 +18,14 @@ export function CommunityCards({
   const prevCount = useRef(0);
   const prevIdsRef = useRef<string[]>([]);
   const board = useBoardState();
-  const displayCards = useMemo<IPlayingCard[]>(
-    () => (board.enabled ? (board.cards as IPlayingCard[]) : cards),
-    [board.enabled, board.cards, cards]
-  );
+  const displayCards = useMemo<IPlayingCard[]>(() => {
+    const overrideCards = (board.cards as IPlayingCard[]) || [];
+    if (board.enabled && overrideCards.length > 0) return overrideCards;
+    return cards;
+  }, [board.enabled, board.cards, cards]);
+
+  // Debug logging to diagnose rendering vs data flow
+  // Remove debug
 
   useEffect(() => {
     if (displayCards.length > prevCount.current) {
@@ -31,8 +35,13 @@ export function CommunityCards({
     prevIdsRef.current = displayCards.map((c) => c.id);
   }, [displayCards]);
 
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
   return (
-    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 mt-20">
+    <div
+      ref={containerRef}
+      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 mt-20 z-30"
+    >
       <motion.div
         className="flex space-x-2"
         initial={false}
@@ -40,21 +49,17 @@ export function CommunityCards({
         transition={{ duration: 0.2 }}
         layout
       >
-        {displayCards.map((card, index) => {
-          const replaced = prevIdsRef.current[index] !== card.id;
-          const shouldAnim =
-            isAnimating || index >= prevCount.current || replaced;
-          return (
-            <PlayingCard
-              key={card.id}
-              card={card}
-              size="md"
-              isVisible={true}
-              isAnimating={shouldAnim}
-              animationDelay={index * 100}
-            />
-          );
-        })}
+        {displayCards.map((card, index) => (
+          <PlayingCard
+            key={card.id}
+            card={card}
+            size="md"
+            isVisible={true}
+            animationDelay={
+              index >= prevCount.current ? (index - prevCount.current) * 80 : 0
+            }
+          />
+        ))}
         {Array.from({ length: 5 - displayCards.length }).map((_, index) => (
           <div
             key={`placeholder-${index}`}

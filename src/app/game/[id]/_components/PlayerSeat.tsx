@@ -5,8 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PlayingCard } from "@/components/ui/playing-card";
 import { Player } from "@/db/schema/players";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
-import { useEffect, useRef } from "react";
 import { motion } from "motion/react";
+import { useEffect, useRef } from "react";
 
 type PlayerSeatProps = {
   player: Player;
@@ -66,7 +66,7 @@ export function PlayerSeat({
           }`}
         >
           <CardContent
-            className={`grid grid-cols-[auto_auto] gap-x-4 gap-y-2 ${
+            className={`grid grid-cols-[auto_auto] items-start content-start gap-x-4 gap-y-2 ${
               player.hasFolded ? "text-slate-500" : ""
             }`}
           >
@@ -114,7 +114,7 @@ export function PlayerSeat({
               </div>
             </div>
 
-            <div className="flex justify-center-safe gap-x-1">
+            <div className="flex justify-center-safe gap-x-1 w-[5.75rem] shrink-0">
               {cards.length > 0
                 ? cards.map((card, cardIndex) => (
                     <PlayingCard
@@ -122,7 +122,7 @@ export function PlayerSeat({
                       card={card}
                       size="sm"
                       isVisible={isYou || phase === "showdown"}
-                      isAnimating={!player.hasFolded}
+                      isAnimating={false}
                       animationDelay={cardIndex * 100}
                     />
                   ))

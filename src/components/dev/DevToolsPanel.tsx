@@ -34,7 +34,7 @@ export function DevToolsPanel({
   return (
     <Card
       className={cn(
-        "w-[440px] bg-slate-800 border-slate-700 text-white shadow-xl z-50 overflow-hidden",
+        "w-[440px] bg-slate-800 border-slate-700 text-white shadow-xl z-50 overflow-hidden py-0 pt-2 gap-0",
         floating && "fixed top-20 right-4",
         className
       )}

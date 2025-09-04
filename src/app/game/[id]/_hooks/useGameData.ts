@@ -574,6 +574,8 @@ export function useGameData(id: string) {
       setTimeout(() => clearTimeout(advanceTimer), 3000);
     }, 150); // 150ms debounce delay to wait for related player/card updates
 
+    // Remove debug logs
+
     // Cleanup function
     return () => {
       if (showdownTimeoutRef.current) {
