@@ -65,6 +65,14 @@ export function BoardPanel({ embedded = false }: { embedded?: boolean }) {
         >
           Simulate Full Board
         </Button>
+        <Button
+          size="sm"
+          onClick={() => import("@/lib/dev/replay").then((m) => m.emitReplay())}
+          className="bg-slate-700 border-slate-600"
+          variant="outline"
+        >
+          Replay animations
+        </Button>
       </div>
     </div>
   );

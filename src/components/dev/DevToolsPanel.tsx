@@ -6,11 +6,9 @@ import { Game } from "@/db/schema/games";
 import { Player } from "@/db/schema/players";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MultiPlayerTestPanel } from "./MultiPlayerTestPanel";
 import { SimulatorPanel } from "./SimulatorPanel";
-// Animations panel removed with motion provider refactor
-import { emitReplay } from "@/lib/dev/replay";
 import { BoardPanel } from "./BoardPanel";
 
 type DevToolsPanelProps = {
@@ -31,6 +29,19 @@ export function DevToolsPanel({
   className,
 }: DevToolsPanelProps) {
   const [open, setOpen] = useState(true);
+  const tabStorageKey = `dev.panel.tab`;
+  const [tab, setTab] = useState<string>("multi");
+  useEffect(() => {
+    try {
+      const raw = typeof window !== "undefined" && localStorage.getItem(tabStorageKey);
+      if (raw) setTab(raw);
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") localStorage.setItem(tabStorageKey, tab);
+    } catch {}
+  }, [tab]);
   return (
     <Card
       className={cn(
@@ -43,15 +54,6 @@ export function DevToolsPanel({
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm">Developer Tools</CardTitle>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => emitReplay()}
-              className={cn(
-                "h-7 px-2 inline-flex items-center justify-center rounded bg-slate-700/60 border border-slate-600 text-slate-200 hover:bg-slate-600 transition-colors text-xs"
-              )}
-            >
-              Replay animations
-            </button>
             <button
               type="button"
               aria-expanded={open}
@@ -78,19 +80,19 @@ export function DevToolsPanel({
         aria-hidden={!open}
       >
         <CardContent className={cn(open ? "p-3" : "p-0")}>
-          <Tabs defaultValue="sim" className="w-full">
+          <Tabs value={tab} onValueChange={setTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 bg-slate-900 border border-slate-700">
-              <TabsTrigger
-                value="sim"
-                className="data-[state=active]:bg-slate-700"
-              >
-                Simulator
-              </TabsTrigger>
               <TabsTrigger
                 value="multi"
                 className="data-[state=active]:bg-slate-700"
               >
                 Multi-player
+              </TabsTrigger>
+              <TabsTrigger
+                value="sim"
+                className="data-[state=active]:bg-slate-700"
+              >
+                Simulator
               </TabsTrigger>
               <TabsTrigger
                 value="board"
@@ -99,6 +101,16 @@ export function DevToolsPanel({
                 Board
               </TabsTrigger>
             </TabsList>
+            <TabsContent value="multi" className="pt-3">
+              <MultiPlayerTestPanel
+                gameId={tableId}
+                game={game}
+                players={players}
+                currentPlayerId={currentPlayerId}
+                floating={false}
+                embedded
+              />
+            </TabsContent>
             <TabsContent value="sim" className="pt-3">
               <SimulatorPanel
                 tableId={tableId}
@@ -106,16 +118,6 @@ export function DevToolsPanel({
                   id: p.id,
                   displayName: p.displayName,
                 }))}
-                floating={false}
-                embedded
-              />
-            </TabsContent>
-            <TabsContent value="multi" className="pt-3">
-              <MultiPlayerTestPanel
-                gameId={tableId}
-                game={game}
-                players={players}
-                currentPlayerId={currentPlayerId}
                 floating={false}
                 embedded
               />

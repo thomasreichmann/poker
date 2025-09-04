@@ -22,7 +22,7 @@ import { makeStrategy } from "@/lib/simulator/strategies";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMutation } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, Pause, Play, Settings } from "lucide-react";
+import { ChevronDown, ChevronUp, Settings } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const STRATEGIES = [
@@ -59,7 +59,7 @@ export function SimulatorPanel({
 
   const [enabled, setEnabled] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const [paused, setPaused] = useState(false);
+  // pause removed from UI; simulator runs when enabled
   const [seed, setSeed] = useState("");
   const [minDelay, setMinDelay] = useState(200);
   const [maxDelay, setMaxDelay] = useState(800);
@@ -87,13 +87,30 @@ export function SimulatorPanel({
     setEnabled((v) => !v);
   };
 
-  const onApply = async () => {
-    // no-op in client-orchestrated mode; settings are already in local state
-  };
+  // persistence key for per-seat overrides (per table)
+  const perSeatStorageKey = `dev.simulator.perSeat.${tableId}`;
 
-  const onPauseResume = async () => {
-    setPaused((v) => !v);
-  };
+  // hydrate per-seat overrides from storage
+  useEffect(() => {
+    try {
+      const raw = typeof window !== "undefined" && localStorage.getItem(perSeatStorageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<string, StrategyId | "">;
+        if (parsed && typeof parsed === "object") {
+          setPerSeat(parsed);
+        }
+      }
+    } catch {}
+  }, [perSeatStorageKey]);
+
+  // persist per-seat overrides whenever they change
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(perSeatStorageKey, JSON.stringify(perSeat));
+      }
+    } catch {}
+  }, [perSeat, perSeatStorageKey]);
 
   // Build a minimal pure game state for strategy evaluation
   const pureState: PureGameState | null = useMemo(() => {
@@ -150,7 +167,7 @@ export function SimulatorPanel({
 
   useEffect(() => {
     if (!canShowDevFeatures) return;
-    if (!enabled || paused) return;
+    if (!enabled) return;
     if (!pureState || !pureState.currentPlayerTurn) return;
 
     const currentTurn = pureState.currentPlayerTurn;
@@ -201,7 +218,6 @@ export function SimulatorPanel({
   }, [
     canShowDevFeatures,
     enabled,
-    paused,
     pureState?.id,
     pureState?.currentPlayerTurn,
     pureState?.currentHighestBet,
@@ -280,7 +296,7 @@ export function SimulatorPanel({
               </div>
               <div className="flex-none">
                 <Select
-                  value={perSeat[p.id] || ""}
+                  value={perSeat[p.id] || "inherit"}
                   onValueChange={(v) =>
                     setPerSeat((prev) => ({
                       ...prev,
@@ -289,7 +305,7 @@ export function SimulatorPanel({
                   }
                 >
                   <SelectTrigger className="bg-slate-700 border-slate-600 h-8 text-xs">
-                    <SelectValue placeholder="inherit" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="inherit">inherit</SelectItem>
@@ -308,55 +324,23 @@ export function SimulatorPanel({
 
       <div className="flex gap-2">
         <Button
+          variant={enabled ? "default" : "outline"}
           size="sm"
-          onClick={onApply}
-          className="flex-1 bg-blue-600 hover:bg-blue-700"
+          onClick={onToggleEnable}
+          className={
+            enabled
+              ? "flex-1 bg-emerald-600 border-emerald-600"
+              : "flex-1 bg-slate-700 border-slate-600 text-white"
+          }
         >
-          Apply
-        </Button>
-        <Button
-          size="sm"
-          onClick={onPauseResume}
-          variant="outline"
-          className="flex-1 bg-slate-700 border-slate-600"
-        >
-          {paused ? (
-            <>
-              <Play className="h-3 w-3 mr-1" /> Resume
-            </>
-          ) : (
-            <>
-              <Pause className="h-3 w-3 mr-1" /> Pause
-            </>
-          )}
+          {enabled ? "Disable" : "Enable"}
         </Button>
       </div>
     </>
   );
 
   if (embedded) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-medium">Simulator</div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={enabled ? "default" : "outline"}
-              size="sm"
-              onClick={onToggleEnable}
-              className={
-                enabled
-                  ? "bg-emerald-600 border-emerald-600"
-                  : "bg-slate-700 border-slate-600 text-white"
-              }
-            >
-              {enabled ? "Disable" : "Enable"}
-            </Button>
-          </div>
-        </div>
-        {body}
-      </div>
-    );
+    return <div className="space-y-3">{body}</div>;
   }
 
   return (
@@ -384,18 +368,6 @@ export function SimulatorPanel({
               ) : (
                 <ChevronUp className="h-4 w-4" />
               )}
-            </Button>
-            <Button
-              variant={enabled ? "default" : "outline"}
-              size="sm"
-              onClick={onToggleEnable}
-              className={
-                enabled
-                  ? "bg-emerald-600 border-emerald-600"
-                  : "bg-slate-700 border-slate-600 text-white"
-              }
-            >
-              {enabled ? "Disable" : "Enable"}
             </Button>
           </div>
         </div>
