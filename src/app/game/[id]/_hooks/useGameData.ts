@@ -292,25 +292,16 @@ export function useGameData(id: string) {
     if (!id) return;
 
     const supabase = getSupabaseBrowserClient();
-
-    // Ensure Realtime Authorization token is set for private channels
-    const unsubscribeAuth = () => {
-      authListener?.subscription.unsubscribe();
-    };
-    void supabase.auth.getSession().then(({ data }) => {
-      const token = data.session?.access_token;
-      if (token) {
-        supabase.realtime.setAuth(token);
-      }
-    });
+    // Keep Realtime token in sync
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         const token = session?.access_token;
-        if (token) {
-          supabase.realtime.setAuth(token);
-        }
+        if (token) supabase.realtime.setAuth(token);
       }
     );
+    const unsubscribeAuth = () => {
+      authListener?.subscription.unsubscribe();
+    };
 
     // Utilities to update the TRPC cache directly from broadcast payloads
     const queryKey = trpc.game.getById.queryKey({ id });
@@ -450,15 +441,33 @@ export function useGameData(id: string) {
       applyBroadcast(payload.event, p.table, p.record, p.old_record);
     }
 
-    const channel = supabase
-      .channel(`topic:${id}`, { config: { private: true } })
-      .on("broadcast", { event: "INSERT" }, onBroadcast)
-      .on("broadcast", { event: "UPDATE" }, onBroadcast)
-      .on("broadcast", { event: "DELETE" }, onBroadcast)
-      .subscribe();
+    // Ensure token is set before subscribing to a private channel; fallback to public if needed
+    let channel = null as ReturnType<typeof supabase.channel> | null;
+    void supabase.auth.getSession().then(({ data }) => {
+      const token = data.session?.access_token;
+      const tryPrivate = !!token;
+      if (token) supabase.realtime.setAuth(token);
+
+      const build = (isPrivate: boolean) =>
+        supabase
+          .channel(`topic:${id}`, { config: { private: isPrivate } })
+          .on("broadcast", { event: "INSERT" }, onBroadcast)
+          .on("broadcast", { event: "UPDATE" }, onBroadcast)
+          .on("broadcast", { event: "DELETE" }, onBroadcast)
+          .subscribe((status) => {
+            if (status === "SUBSCRIBED") return;
+            if (status === "CHANNEL_ERROR" && isPrivate) {
+              // Fallback to non-private channel if private subscription fails
+              if (channel) void supabase.removeChannel(channel);
+              channel = build(false);
+            }
+          });
+
+      channel = build(tryPrivate);
+    });
 
     return () => {
-      void supabase.removeChannel(channel);
+      if (channel) void supabase.removeChannel(channel);
       unsubscribeAuth?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
