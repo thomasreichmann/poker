@@ -9,7 +9,9 @@ import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { MultiPlayerTestPanel } from "./MultiPlayerTestPanel";
 import { SimulatorPanel } from "./SimulatorPanel";
-import { AnimationsPanel } from "./AnimationsPanel";
+// Animations panel removed with motion provider refactor
+import { emitReplay } from "@/lib/dev/replay";
+import { BoardPanel } from "./BoardPanel";
 
 type DevToolsPanelProps = {
   tableId: string;
@@ -40,27 +42,38 @@ export function DevToolsPanel({
       <CardHeader className={cn(open ? "px-3 py-2" : "px-3 py-1")}>
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm">Developer Tools</CardTitle>
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
-            className={cn(
-              "h-7 w-7 inline-flex items-center justify-center rounded bg-slate-700/60 border border-slate-600 text-slate-200 hover:bg-slate-600 transition-colors"
-            )}
-          >
-            <ChevronDown
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => emitReplay()}
               className={cn(
-                "h-4 w-4 transition-transform duration-300",
-                open ? "rotate-0" : "-rotate-90"
+                "h-7 px-2 inline-flex items-center justify-center rounded bg-slate-700/60 border border-slate-600 text-slate-200 hover:bg-slate-600 transition-colors text-xs"
               )}
-            />
-          </button>
+            >
+              Replay animations
+            </button>
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}
+              className={cn(
+                "h-7 w-7 inline-flex items-center justify-center rounded bg-slate-700/60 border border-slate-600 text-slate-200 hover:bg-slate-600 transition-colors"
+              )}
+            >
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform duration-300",
+                  open ? "rotate-0" : "-rotate-90"
+                )}
+              />
+            </button>
+          </div>
         </div>
       </CardHeader>
       <div
         className={cn(
-          "transition-all duration-300 overflow-hidden",
-          open ? "max-h-[80vh] opacity-100" : "max-h-0 opacity-0 p-0 m-0"
+          "transition-all duration-300 overflow-auto",
+          open ? "max-h-[60vh] opacity-100" : "max-h-0 opacity-0 p-0 m-0"
         )}
         aria-hidden={!open}
       >
@@ -80,10 +93,10 @@ export function DevToolsPanel({
                 Multi-player
               </TabsTrigger>
               <TabsTrigger
-                value="anim"
+                value="board"
                 className="data-[state=active]:bg-slate-700"
               >
-                Animations
+                Board
               </TabsTrigger>
             </TabsList>
             <TabsContent value="sim" className="pt-3">
@@ -107,8 +120,8 @@ export function DevToolsPanel({
                 embedded
               />
             </TabsContent>
-            <TabsContent value="anim" className="pt-3">
-              <AnimationsPanel embedded />
+            <TabsContent value="board" className="pt-3">
+              <BoardPanel embedded />
             </TabsContent>
           </Tabs>
         </CardContent>

@@ -226,7 +226,7 @@ export function SimulatorPanel({
             type="number"
             value={minDelay}
             onChange={(e) => setMinDelay(Number(e.target.value) || 0)}
-            className="bg-slate-700 border-slate-600 text-xs"
+            className="bg-slate-700 border-slate-600 text-xs h-8"
           />
         </div>
         <div>
@@ -235,80 +235,87 @@ export function SimulatorPanel({
             type="number"
             value={maxDelay}
             onChange={(e) => setMaxDelay(Number(e.target.value) || 0)}
-            className="bg-slate-700 border-slate-600 text-xs"
+            className="bg-slate-700 border-slate-600 text-xs h-8"
           />
         </div>
       </div>
 
-      <div>
-        <label className="text-xs">Seed</label>
-        <Input
-          value={seed}
-          onChange={(e) => setSeed(e.target.value)}
-          placeholder="optional"
-          className="bg-slate-700 border-slate-600 text-xs"
-        />
-      </div>
-
-      <div>
-        <label className="text-xs">Default strategy</label>
-        <Select
-          value={defaultStrategy}
-          onValueChange={(v: StrategyId) => setDefaultStrategy(v)}
-        >
-          <SelectTrigger className="bg-slate-700 border-slate-600">
-            <SelectValue placeholder="Strategy" />
-          </SelectTrigger>
-          <SelectContent>
-            {STRATEGIES.map((s) => (
-              <SelectItem key={s.id} value={s.id}>
-                {s.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs">Seed</label>
+          <Input
+            value={seed}
+            onChange={(e) => setSeed(e.target.value)}
+            placeholder="optional"
+            className="bg-slate-700 border-slate-600 text-xs h-8"
+          />
+        </div>
+        <div>
+          <label className="text-xs">Default strategy</label>
+          <Select
+            value={defaultStrategy}
+            onValueChange={(v: StrategyId) => setDefaultStrategy(v)}
+          >
+            <SelectTrigger className="bg-slate-700 border-slate-600 h-8 text-xs">
+              <SelectValue placeholder="Strategy" />
+            </SelectTrigger>
+            <SelectContent>
+              {STRATEGIES.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="space-y-2">
         <div className="text-xs">Per-seat overrides</div>
-        {players.map((p) => (
-          <div key={p.id} className="grid grid-cols-2 gap-2 items-center">
-            <div className="truncate text-[10px] text-slate-400">
-              {p.displayName || p.id}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {players.map((p) => (
+            <div key={p.id} className="flex items-center gap-2 min-w-0">
+              <div className="truncate text-[10px] text-slate-400 min-w-0 flex-1">
+                {p.displayName || p.id}
+              </div>
+              <div className="flex-none">
+                <Select
+                  value={perSeat[p.id] || ""}
+                  onValueChange={(v) =>
+                    setPerSeat((prev) => ({
+                      ...prev,
+                      [p.id]: v === "inherit" ? "" : (v as StrategyId),
+                    }))
+                  }
+                >
+                  <SelectTrigger className="bg-slate-700 border-slate-600 h-8 text-xs">
+                    <SelectValue placeholder="inherit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="inherit">inherit</SelectItem>
+                    {STRATEGIES.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <Select
-              value={perSeat[p.id] || ""}
-              onValueChange={(v) =>
-                setPerSeat((prev) => ({
-                  ...prev,
-                  [p.id]: v === "inherit" ? "" : (v as StrategyId),
-                }))
-              }
-            >
-              <SelectTrigger className="bg-slate-700 border-slate-600">
-                <SelectValue placeholder="inherit" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="inherit">inherit</SelectItem>
-                {STRATEGIES.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       <div className="flex gap-2">
         <Button
+          size="sm"
           onClick={onApply}
           className="flex-1 bg-blue-600 hover:bg-blue-700"
         >
           Apply
         </Button>
         <Button
+          size="sm"
           onClick={onPauseResume}
           variant="outline"
           className="flex-1 bg-slate-700 border-slate-600"
