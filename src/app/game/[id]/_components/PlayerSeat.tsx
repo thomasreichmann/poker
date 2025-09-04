@@ -6,7 +6,7 @@ import { PlayingCard } from "@/components/ui/playing-card";
 import { Player } from "@/db/schema/players";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
 import { useEffect, useRef } from "react";
-import { useMotion } from "@/lib/motion/provider";
+import { motion } from "motion/react";
 
 type PlayerSeatProps = {
   player: Player;
@@ -31,34 +31,30 @@ export function PlayerSeat({
   isSmallBlind = false,
   isBigBlind = false,
 }: PlayerSeatProps) {
-  const { getAnimAttrs, emit } = useMotion();
   const prevIsCurrent = useRef<boolean>(false);
   const prevHasFolded = useRef<boolean>(player.hasFolded);
 
   useEffect(() => {
     if (!prevIsCurrent.current && isCurrent) {
-      emit("seat:turn", { playerId: player.id });
+      // previously triggered effect animation; now handled by CSS tweak below
     }
     prevIsCurrent.current = isCurrent;
-  }, [isCurrent, player.id, emit]);
+  }, [isCurrent, player.id]);
 
   useEffect(() => {
     if (!prevHasFolded.current && player.hasFolded) {
-      emit("seat:fold", { playerId: player.id });
+      // previously triggered fold animation; simplified below
     }
     prevHasFolded.current = player.hasFolded;
-  }, [player.hasFolded, player.id, emit]);
+  }, [player.hasFolded, player.id]);
 
   return (
-    <div
-      {...getAnimAttrs("seat", { id: player.id })}
-      className="absolute"
-      style={positionStyle}
-    >
-      <div
-        className={`relative transition-all duration-300 ${
-          isCurrent ? "scale-110" : "scale-100"
-        }`}
+    <div className="absolute" style={positionStyle}>
+      <motion.div
+        className={`relative`}
+        animate={{ scale: isCurrent ? 1.1 : 1 }}
+        transition={{ duration: 0.3 }}
+        layout
       >
         <Card
           className={`bg-slate-800 border-2 transition-all duration-300 relative overflow-hidden ${
@@ -126,7 +122,7 @@ export function PlayerSeat({
                       card={card}
                       size="sm"
                       isVisible={isYou || phase === "showdown"}
-                      isAnimating={false}
+                      isAnimating={!player.hasFolded}
                       animationDelay={cardIndex * 100}
                     />
                   ))
@@ -156,7 +152,7 @@ export function PlayerSeat({
             )}
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
     </div>
   );
 }

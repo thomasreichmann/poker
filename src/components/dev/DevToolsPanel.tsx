@@ -9,7 +9,7 @@ import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { MultiPlayerTestPanel } from "./MultiPlayerTestPanel";
 import { SimulatorPanel } from "./SimulatorPanel";
-import { AnimationsPanel } from "./AnimationsPanel";
+// Animations panel removed with motion provider refactor
 
 type DevToolsPanelProps = {
   tableId: string;
@@ -79,12 +79,7 @@ export function DevToolsPanel({
               >
                 Multi-player
               </TabsTrigger>
-              <TabsTrigger
-                value="anim"
-                className="data-[state=active]:bg-slate-700"
-              >
-                Animations
-              </TabsTrigger>
+              {/* Animations tab removed */}
             </TabsList>
             <TabsContent value="sim" className="pt-3">
               <SimulatorPanel
@@ -107,9 +102,7 @@ export function DevToolsPanel({
                 embedded
               />
             </TabsContent>
-            <TabsContent value="anim" className="pt-3">
-              <AnimationsPanel embedded />
-            </TabsContent>
+            {/* Animations content removed */}
           </Tabs>
         </CardContent>
       </div>

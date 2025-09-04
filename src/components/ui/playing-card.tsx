@@ -2,8 +2,8 @@
 
 import { PlayingCard as PlayingCardType } from "@/lib/gameTypes";
 import { getCardColor, getCardSymbol } from "@/lib/gameUtils";
-import { useMotion } from "@/lib/motion/provider";
 import { cn } from "@/lib/utils";
+import { motion } from "motion/react";
 
 interface PlayingCardProps {
   card: PlayingCardType;
@@ -22,10 +22,6 @@ export function PlayingCard({
   animationDelay = 0,
   className,
 }: PlayingCardProps) {
-  const { settings, getAnimAttrs } = useMotion();
-  const useMotionFlip =
-    settings.enabled && settings.preset !== "none" && isAnimating;
-
   const sizeClasses = {
     sm: "w-10 h-14 text-xs",
     md: "w-14 h-20 text-sm",
@@ -33,28 +29,19 @@ export function PlayingCard({
   };
 
   const baseClasses = cn(
-    "rounded border flex flex-col items-center justify-center font-bold shadow-lg transform transition-all duration-500",
+    "rounded border flex flex-col items-center justify-center font-bold shadow-lg",
     sizeClasses[size],
-    useMotionFlip
-      ? "scale-100"
-      : isAnimating
-      ? "scale-0 rotate-180"
-      : "scale-100 rotate-0",
     isVisible ? "bg-white border-gray-300" : "bg-blue-900 border-blue-700",
     className
   );
 
   return (
-    <div
-      {...getAnimAttrs("card", { id: card.id })}
+    <motion.div
       className={baseClasses}
-      style={
-        animationDelay
-          ? {
-              animationDelay: `${animationDelay}ms`,
-            }
-          : undefined
-      }
+      initial={isAnimating ? { opacity: 0, y: 10, rotate: -3, scale: 0.98 } : undefined}
+      animate={isAnimating ? { opacity: 1, y: 0, rotate: 0, scale: 1 } : undefined}
+      transition={{ duration: 0.4, ease: "easeInOut", delay: Math.max(0, animationDelay) / 1000 }}
+      layout
     >
       {isVisible ? (
         <>
@@ -68,6 +55,6 @@ export function PlayingCard({
       ) : (
         <div className="text-blue-300">?</div>
       )}
-    </div>
+    </motion.div>
   );
 }
