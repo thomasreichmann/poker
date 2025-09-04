@@ -274,12 +274,16 @@ export function useGameData(id: string) {
   useEffect(() => {
     // Update the player hole cards in the getById query
     if (!getHoleCards.data) {
-      console.log("holeCards is undefined");
       return;
     }
     queryClient.setQueryData(trpc.game.getById.queryKey({ id }), (prev) => {
       if (!prev) return prev;
-      return { ...prev, cards: getHoleCards.data };
+      // Merge and de-duplicate cards by id
+      const mergedCards = [...prev.cards, ...getHoleCards.data];
+      const dedupedCards = Array.from(
+        new Map(mergedCards.map((card) => [card.id, card])).values()
+      );
+      return { ...prev, cards: dedupedCards };
     });
   }, [getHoleCards.data, id, queryClient, trpc.game.getById]);
 

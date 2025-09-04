@@ -3,11 +3,17 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useMotion } from "@/lib/motion/provider";
+import type { MotionPreset } from "@/lib/motion/types";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp, Eye, Play, RefreshCw } from "lucide-react";
-import type { MotionPreset } from "@/lib/motion/types";
 import { useState } from "react";
 
 type AnimationsPanelProps = {
@@ -15,8 +21,20 @@ type AnimationsPanelProps = {
   embedded?: boolean;
 };
 
-export function AnimationsPanel({ floating = true, embedded = false }: AnimationsPanelProps) {
-  const { settings, toggleEnabled, setDebugOutlines, setSpeedMultiplier, setPreset, events, clearEvents, emit } = useMotion();
+export function AnimationsPanel({
+  floating = true,
+  embedded = false,
+}: AnimationsPanelProps) {
+  const {
+    settings,
+    toggleEnabled,
+    setDebugOutlines,
+    setSpeedMultiplier,
+    setPreset,
+    events,
+    clearEvents,
+    emit,
+  } = useMotion();
   const [isCollapsed, setIsCollapsed] = useState(true);
 
   const body = (
@@ -26,7 +44,12 @@ export function AnimationsPanel({ floating = true, embedded = false }: Animation
           <label className="text-xs">Enabled</label>
           <Button
             onClick={toggleEnabled}
-            className={cn("w-full", settings.enabled ? "bg-emerald-600" : "bg-slate-700 border-slate-600")}
+            className={cn(
+              "w-full",
+              settings.enabled
+                ? "bg-emerald-600"
+                : "bg-slate-700 border-slate-600"
+            )}
             variant={settings.enabled ? "default" : "outline"}
           >
             {settings.enabled ? "On" : "Off"}
@@ -36,7 +59,12 @@ export function AnimationsPanel({ floating = true, embedded = false }: Animation
           <label className="text-xs">Debug outlines</label>
           <Button
             onClick={() => setDebugOutlines(!settings.debugOutlines)}
-            className={cn("w-full", settings.debugOutlines ? "bg-yellow-600" : "bg-slate-700 border-slate-600")}
+            className={cn(
+              "w-full",
+              settings.debugOutlines
+                ? "bg-yellow-600"
+                : "bg-slate-700 border-slate-600"
+            )}
             variant={settings.debugOutlines ? "default" : "outline"}
           >
             {settings.debugOutlines ? "Shown" : "Hidden"}
@@ -58,24 +86,56 @@ export function AnimationsPanel({ floating = true, embedded = false }: Animation
 
       <div>
         <label className="text-xs">Preset</label>
-        <Select value={settings.preset} onValueChange={(v: MotionPreset) => setPreset(v)}>
+        <Select
+          value={settings.preset}
+          onValueChange={(v: MotionPreset) => setPreset(v)}
+        >
           <SelectTrigger className="bg-slate-700 border-slate-600">
             <SelectValue placeholder="preset" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="dev-stub">dev-stub</SelectItem>
+            <SelectItem value="default">default</SelectItem>
             <SelectItem value="none">none</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      <div className="flex gap-2 pt-1">
-        <Button onClick={() => emit("demo:flip") } className="flex-1 bg-blue-600 hover:bg-blue-700">
-          <Play className="h-3 w-3 mr-1" /> Trigger demo
-        </Button>
-        <Button onClick={clearEvents} variant="outline" className="flex-1 bg-slate-700 border-slate-600">
-          <RefreshCw className="h-3 w-3 mr-1" /> Clear log
-        </Button>
+      <div className="space-y-2 pt-1">
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            onClick={() => emit("demo:flip")}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Play className="h-3 w-3 mr-1" /> Demo flip
+          </Button>
+          <Button
+            onClick={() => emit("community:reveal")}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            Reveal community
+          </Button>
+          <Button
+            onClick={() => emit("seat:turn", { playerId: "you" })}
+            className="bg-yellow-600 hover:bg-yellow-700"
+          >
+            Seat turn (you)
+          </Button>
+          <Button
+            onClick={() => emit("seat:fold", { playerId: "you" })}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            Seat fold (you)
+          </Button>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={clearEvents}
+            variant="outline"
+            className="flex-1 bg-slate-700 border-slate-600"
+          >
+            <RefreshCw className="h-3 w-3 mr-1" /> Clear log
+          </Button>
+        </div>
       </div>
 
       <div className="max-h-40 overflow-auto border border-slate-700 rounded p-2 text-[10px] text-slate-300 bg-slate-900/40">
@@ -85,7 +145,9 @@ export function AnimationsPanel({ floating = true, embedded = false }: Animation
           events.map((e) => (
             <div key={e.id} className="flex items-center justify-between">
               <div className="truncate max-w-[70%]">{e.name}</div>
-              <div className="text-slate-500">{new Date(e.at).toLocaleTimeString()}</div>
+              <div className="text-slate-500">
+                {new Date(e.at).toLocaleTimeString()}
+              </div>
             </div>
           ))
         )}
@@ -103,7 +165,11 @@ export function AnimationsPanel({ floating = true, embedded = false }: Animation
               variant={settings.enabled ? "default" : "outline"}
               size="sm"
               onClick={toggleEnabled}
-              className={settings.enabled ? "bg-emerald-600 border-emerald-600" : "bg-slate-700 border-slate-600 text-white"}
+              className={
+                settings.enabled
+                  ? "bg-emerald-600 border-emerald-600"
+                  : "bg-slate-700 border-slate-600 text-white"
+              }
             >
               {settings.enabled ? "Disable" : "Enable"}
             </Button>
@@ -115,7 +181,12 @@ export function AnimationsPanel({ floating = true, embedded = false }: Animation
   }
 
   return (
-    <Card className={cn("w-96 bg-slate-800 border-slate-700 text-white shadow-xl z-50", floating && "fixed top-20 right-4") }>
+    <Card
+      className={cn(
+        "w-96 bg-slate-800 border-slate-700 text-white shadow-xl z-50",
+        floating && "fixed top-20 right-4"
+      )}
+    >
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -123,10 +194,28 @@ export function AnimationsPanel({ floating = true, embedded = false }: Animation
             <CardTitle className="text-sm">Animations</CardTitle>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setIsCollapsed(!isCollapsed)} className="h-6 w-6 p-0">
-              {isCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="h-6 w-6 p-0"
+            >
+              {isCollapsed ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
             </Button>
-            <Button variant={settings.enabled ? "default" : "outline"} size="sm" onClick={toggleEnabled} className={settings.enabled ? "bg-emerald-600 border-emerald-600" : "bg-slate-700 border-slate-600 text-white"}>
+            <Button
+              variant={settings.enabled ? "default" : "outline"}
+              size="sm"
+              onClick={toggleEnabled}
+              className={
+                settings.enabled
+                  ? "bg-emerald-600 border-emerald-600"
+                  : "bg-slate-700 border-slate-600 text-white"
+              }
+            >
               {settings.enabled ? "Disable" : "Enable"}
             </Button>
           </div>
@@ -136,5 +225,3 @@ export function AnimationsPanel({ floating = true, embedded = false }: Animation
     </Card>
   );
 }
-
-
