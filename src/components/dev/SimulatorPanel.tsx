@@ -240,7 +240,8 @@ export function SimulatorPanel({
     // Resolve strategy for the current seat
     const overrideStrategy = perSeat[currentTurn];
     const seatStrategy: StrategyId | undefined =
-      (overrideStrategy !== "" ? overrideStrategy : defaultStrategy) || undefined;
+      (overrideStrategy !== "" ? overrideStrategy : defaultStrategy) ||
+      undefined;
 
     if (!seatStrategy || seatStrategy === "human") return;
 
@@ -262,7 +263,10 @@ export function SimulatorPanel({
       // Bail if turn changed since scheduling
       if (latestTurnRef.current !== currentTurn) return;
       // Also bail if the master is now up (no auto-acting for master)
-      if (yourDbPlayer && latestTurnRef.current === String(yourDbPlayer.id)) return;
+      if (yourDbPlayer && latestTurnRef.current === String(yourDbPlayer.id))
+        return;
+      // Bail if the game is over
+      if (pureState.status !== "active") return;
       await actAsPlayerMutation.mutateAsync({
         gameId: tableId,
         targetPlayerId: currentTurn,
