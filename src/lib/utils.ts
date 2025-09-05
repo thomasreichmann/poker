@@ -5,6 +5,27 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Global per-turn timeout registry to dedupe timers across multiple hook instances
+type TurnKey = string;
+type TurnTimerEntry = { ownerId: string; timer: ReturnType<typeof setTimeout> };
+
+export function getTurnTimeoutRegistry(): Map<TurnKey, TurnTimerEntry> | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    __pokerTurnTimeouts?: Map<TurnKey, TurnTimerEntry>;
+  };
+  if (!w.__pokerTurnTimeouts) w.__pokerTurnTimeouts = new Map();
+  return w.__pokerTurnTimeouts;
+}
+
+export function makeTurnKey(
+  gameId: string,
+  handId: string | number,
+  playerId: string
+) {
+  return `${gameId}:${String(handId)}:${playerId}`;
+}
+
 // Generic change detection helpers
 export function shallowEqualByKeys<T extends object>(
   a: T,

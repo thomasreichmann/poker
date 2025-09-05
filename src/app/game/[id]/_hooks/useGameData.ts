@@ -2,6 +2,7 @@
 
 import { useToast } from "@/components/ui/toast";
 import { evaluateHand } from "@/lib/poker/cards";
+import { useTurnTimeout } from "@/lib/useTurnTimeout";
 import { getSupabaseBrowserClient } from "@/supabase/client";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -178,6 +179,7 @@ export function useGameData(id: string) {
   const advanceMutation = useMutation(trpc.game.advance.mutationOptions());
   const resetMutation = useMutation(trpc.game.reset.mutationOptions());
   const leaveMutation = useMutation(trpc.game.leave.mutationOptions());
+  const timeoutMutation = useMutation(trpc.game.timeout.mutationOptions());
 
   const showError = (message: string) => {
     toast({ variant: "destructive", description: message });
@@ -466,6 +468,23 @@ export function useGameData(id: string) {
   // Show showdown feedback and auto-advance to next hand
   const showdownHandledRef = useRef<string | null>(null);
   const showdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Turn timeout: schedule once per game/hand/player; auto-clears on change
+  useTurnTimeout({
+    gameId: dbGame?.id ?? null,
+    handId: dbGame?.handId ?? null,
+    playerId: dbGame?.currentPlayerTurn ?? null,
+    round: dbGame?.currentRound ?? null,
+    enabled: Boolean(me && dbGame?.status === "active"),
+    durationMs: 30_000,
+    onTimeoutAction: async () => {
+      if (!dbGame?.id || !dbGame.currentPlayerTurn) return;
+      await timeoutMutation.mutateAsync({
+        gameId: dbGame.id,
+        playerId: String(dbGame.currentPlayerTurn),
+      });
+    },
+  });
 
   useEffect(() => {
     if (!dbGame) return;

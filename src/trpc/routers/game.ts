@@ -8,8 +8,8 @@ import {
   advanceGameStatePure,
   handleActionPure,
   handleJoinGamePure,
-  resetGamePure,
   leaveGamePure,
+  resetGamePure,
 } from "@/lib/poker/engineAdapter";
 import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -210,5 +210,11 @@ export const gameRouter = createTRPCRouter({
         );
 
       return holeCards;
+    }),
+  // Ask the server to timeout a player
+  timeout: protectedProcedure
+    .input(z.object({ gameId: z.uuid(), playerId: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      return "ok";
     }),
 });
