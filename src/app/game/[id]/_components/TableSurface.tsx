@@ -6,19 +6,21 @@ type TableSurfaceProps = {
   pot: number;
   currentHighestBet: number;
   phaseLabel: string;
+  vertical?: boolean;
 };
 
 export function TableSurface({
   pot,
   currentHighestBet,
   phaseLabel,
+  vertical = false,
 }: TableSurfaceProps) {
   return (
     <div className="relative">
-      <div className="w-[92vw] max-w-[800px] aspect-[8/5] bg-gradient-to-br from-emerald-800 to-emerald-900 rounded-full border-8 border-amber-950 shadow-2xl relative">
-        <div className="absolute inset-3 md:inset-4 bg-emerald-700 rounded-full opacity-30" />
+      <div className={`${vertical ? "w-[92vw] max-w-[520px] aspect-[3/4]" : "w-[92vw] max-w-[800px] aspect-[8/5]"} bg-gradient-to-br from-emerald-800 to-emerald-900 rounded-full border-8 border-amber-950 shadow-2xl relative`}>
+        <div className="absolute inset-2 md:inset-4 bg-emerald-700 rounded-full opacity-30" />
 
-        <div className="absolute top-[40%] md:top-[150px] left-1/2 -translate-x-1/2 -translate-y-1/2">
+        <div className={`absolute ${vertical ? "top-[46%]" : "top-[40%] md:top-[150px]"} left-1/2 -translate-x-1/2 -translate-y-1/2`}>
           <div className="relative">
             <div className="absolute inset-0 rounded-full blur-xl bg-yellow-500/10" />
             <div className="relative flex items-center gap-3 bg-slate-900/70 backdrop-blur-sm border border-amber-400/40 rounded-full px-5 py-3 shadow-[0_0_30px_rgba(234,179,8,0.12)]">
@@ -44,7 +46,7 @@ export function TableSurface({
           </div>
         </div>
 
-        <div className="absolute top-6 md:top-14 left-1/2 transform -translate-x-1/2">
+        <div className={`absolute ${vertical ? "top-3" : "top-6 md:top-14"} left-1/2 transform -translate-x-1/2`}>
           <Badge className="bg-emerald-600 text-white px-3 md:px-4 py-0.5 md:py-1 text-xs md:text-sm font-semibold">
             {phaseLabel}
           </Badge>

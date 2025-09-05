@@ -19,6 +19,7 @@ type PlayerSeatProps = {
   isSmallBlind?: boolean;
   isBigBlind?: boolean;
   compact?: boolean;
+  floating?: boolean;
 };
 
 export function PlayerSeat({
@@ -32,6 +33,7 @@ export function PlayerSeat({
   isSmallBlind = false,
   isBigBlind = false,
   compact = false,
+  floating = true,
 }: PlayerSeatProps) {
   const prevIsCurrent = useRef<boolean>(false);
   const prevHasFolded = useRef<boolean>(player.hasFolded);
@@ -51,7 +53,7 @@ export function PlayerSeat({
   }, [player.hasFolded, player.id]);
 
   return (
-    <div className="absolute" style={positionStyle}>
+    <div className={floating ? "absolute" : "relative"} style={floating ? positionStyle : undefined}>
       <motion.div
         className={`relative`}
         animate={{ scale: isCurrent ? 1.1 : 1 }}

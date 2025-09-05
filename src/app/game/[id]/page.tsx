@@ -143,119 +143,116 @@ export default function PokerGamePage() {
       {/* Poker Table */}
       <div className="relative w-full h-screen pt-14 md:pt-16 flex">
         {/* Main Table Area */}
-        <div className="flex-1 flex items-center justify-center mb-40 md:mb-56">
+        <div className="flex-1 flex items-center justify-center mb-36 md:mb-56">
           <div className="relative">
             <TableSurface
               pot={dbGame?.pot ?? 0}
               currentHighestBet={dbGame?.currentHighestBet ?? 0}
               phaseLabel={phaseLabel}
+              vertical={isMobile}
             />
             <CommunityCards cards={communityCards} isAnimating={false} compact={isMobile} />
 
-            {/* Players */}
-            {playersByView.map((player, index) => {
-              const positionsDesktop = [
-                {
-                  // Bottom center (You)
-                  bottom: "-70px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                },
-                {
-                  // Left lower side
-                  top: "60%",
-                  left: "-200px",
-                },
-                {
-                  // Left upper side
-                  top: "20%",
-                  left: "-200px",
-                },
-                {
-                  // Top center
-                  top: "-60px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                },
-                {
-                  // Right upper side
-                  top: "20%",
-                  right: "-200px",
-                },
-                {
-                  // Right lower side
-                  top: "60%",
-                  right: "-200px",
-                },
-              ];
+            {/* Desktop: absolute seats around the table */}
+            {!isMobile && (
+              <>
+                {playersByView.map((player, index) => {
+                  const positionsDesktop = [
+                    {
+                      // Bottom center (You)
+                      bottom: "-70px",
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                    },
+                    { top: "60%", left: "-200px" },
+                    { top: "20%", left: "-200px" },
+                    { top: "-60px", left: "50%", transform: "translateX(-50%)" },
+                    { top: "20%", right: "-200px" },
+                    { top: "60%", right: "-200px" },
+                  ];
 
-              const positionsMobile = [
-                {
-                  // Bottom center (You)
-                  bottom: "-40px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                },
-                {
-                  // Bottom left
-                  bottom: "-10px",
-                  left: "18%",
-                  transform: "translateX(-50%)",
-                },
-                {
-                  // Bottom right
-                  bottom: "-10px",
-                  left: "82%",
-                  transform: "translateX(-50%)",
-                },
-                {
-                  // Top center
-                  top: "-40px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                },
-                {
-                  // Top left
-                  top: "-10px",
-                  left: "18%",
-                  transform: "translateX(-50%)",
-                },
-                {
-                  // Top right
-                  top: "-10px",
-                  left: "82%",
-                  transform: "translateX(-50%)",
-                },
-              ];
+                  const position = positionsDesktop[index] || positionsDesktop[0];
 
-              const positions = isMobile ? positionsMobile : positionsDesktop;
-              const position = positions[index] || positions[0];
+                  const isCurrentPlayer = activePlayerIndexByView === index;
+                  const isYou = player.id === yourDbPlayer?.id;
+                  const playerCards = playerIdToCards.get(player.id) ?? [];
+                  const seatIndex = playersBySeat.findIndex((p) => p.id === player.id);
 
-              const isCurrentPlayer = activePlayerIndexByView === index;
-              const isYou = player.id === yourDbPlayer?.id;
-              const playerCards = playerIdToCards.get(player.id) ?? [];
-
-              const seatIndex = playersBySeat.findIndex(
-                (p) => p.id === player.id
-              );
-              return (
-                <PlayerSeat
-                  key={player.id}
-                  player={player}
-                  isCurrent={isCurrentPlayer}
-                  isYou={isYou}
-                  phase={phase}
-                  cards={playerCards}
-                  positionStyle={position}
-                  activeKey={`${dbGame?.id}-${activePlayerIndex}-${phase}`}
-                  isSmallBlind={getIsSB(seatIndex)}
-                  isBigBlind={getIsBB(seatIndex)}
-                  compact={isMobile}
-                />
-              );
-            })}
+                  return (
+                    <PlayerSeat
+                      key={player.id}
+                      player={player}
+                      isCurrent={isCurrentPlayer}
+                      isYou={isYou}
+                      phase={phase}
+                      cards={playerCards}
+                      positionStyle={position}
+                      activeKey={`${dbGame?.id}-${activePlayerIndex}-${phase}`}
+                      isSmallBlind={getIsSB(seatIndex)}
+                      isBigBlind={getIsBB(seatIndex)}
+                      compact={false}
+                      floating
+                    />
+                  );
+                })}
+              </>
+            )}
           </div>
         </div>
+
+        {/* Mobile: static players list above and below table */}
+        {isMobile && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-between pt-16 pb-40">
+            <div className="pointer-events-auto grid grid-cols-3 gap-2 px-3 w-full max-w-md">
+              {playersByView.slice(3).map((player, index) => {
+                const isCurrentPlayer = activePlayerIndexByView === (index + 3);
+                const isYou = player.id === yourDbPlayer?.id;
+                const playerCards = playerIdToCards.get(player.id) ?? [];
+                const seatIndex = playersBySeat.findIndex((p) => p.id === player.id);
+                return (
+                  <PlayerSeat
+                    key={player.id}
+                    player={player}
+                    isCurrent={isCurrentPlayer}
+                    isYou={isYou}
+                    phase={phase}
+                    cards={playerCards}
+                    positionStyle={{}}
+                    activeKey={`${dbGame?.id}-${activePlayerIndex}-${phase}`}
+                    isSmallBlind={getIsSB(seatIndex)}
+                    isBigBlind={getIsBB(seatIndex)}
+                    compact
+                    floating={false}
+                  />
+                );
+              })}
+            </div>
+            <div className="pointer-events-auto grid grid-cols-3 gap-2 px-3 w-full max-w-md">
+              {playersByView.slice(0, 3).map((player, index) => {
+                const isCurrentPlayer = activePlayerIndexByView === index;
+                const isYou = player.id === yourDbPlayer?.id;
+                const playerCards = playerIdToCards.get(player.id) ?? [];
+                const seatIndex = playersBySeat.findIndex((p) => p.id === player.id);
+                return (
+                  <PlayerSeat
+                    key={player.id}
+                    player={player}
+                    isCurrent={isCurrentPlayer}
+                    isYou={isYou}
+                    phase={phase}
+                    cards={playerCards}
+                    positionStyle={{}}
+                    activeKey={`${dbGame?.id}-${activePlayerIndex}-${phase}`}
+                    isSmallBlind={getIsSB(seatIndex)}
+                    isBigBlind={getIsBB(seatIndex)}
+                    compact
+                    floating={false}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <ActionPanel
           visible={showActionPanel}
