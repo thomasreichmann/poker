@@ -443,7 +443,6 @@ export function useGameData(id: string) {
     }
 
     function onBroadcast(payload: BroadcastPayload) {
-      console.log("onBroadcast", payload.event, payload.payload.table, payload);
       const p = payload.payload;
       if (p.schema !== "public") return;
       if (!p.table) return;
@@ -553,7 +552,7 @@ export function useGameData(id: string) {
 
       // Fallback if we still don't have winners for some reason
       const finalWinnerNames = winnerNames || "Unknown Player";
-
+      console.log("triggering winner toast");
       const description = handName
         ? `Winner: ${finalWinnerNames} — ${handName}`
         : `Winner: ${finalWinnerNames}`;
