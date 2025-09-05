@@ -58,7 +58,7 @@ export function ActionPanel({
                 className="border-slate-600 text-slate-300 hover:bg-slate-700 bg-transparent px-2 py-1 text-xs flex-grow"
                 onClick={() => onChangeAmountAction(String(sliderMin))}
               >
-                Min
+                Mín
               </Button>
               <Button
                 variant="outline"
@@ -75,7 +75,7 @@ export function ActionPanel({
                   )
                 }
               >
-                1/2 Pot
+                1/2 Pote
               </Button>
               <Button
                 variant="outline"
@@ -92,7 +92,7 @@ export function ActionPanel({
                   )
                 }
               >
-                Pot
+                Pote
               </Button>
               <Button
                 variant="outline"
@@ -109,7 +109,7 @@ export function ActionPanel({
                   )
                 }
               >
-                Max
+                Máx
               </Button>
             </div>
 
@@ -156,7 +156,7 @@ export function ActionPanel({
                 disabled={maxRaiseTotal <= sliderMin}
               />
               <span className="text-xs text-slate-400 whitespace-nowrap">
-                Max R$ {maxRaiseTotal}
+                Máx R$ {maxRaiseTotal}
               </span>
             </div>
 
@@ -195,7 +195,7 @@ export function ActionPanel({
                       sliderValue < minRaiseTotal || sliderValue > maxRaiseTotal
                     }
                   >
-                    Raise to R${" "}
+                    Aumentar para R${" "}
                     {Math.max(
                       minRaiseTotal,
                       Math.min(maxRaiseTotal, sliderValue)
@@ -206,7 +206,7 @@ export function ActionPanel({
                     onClick={onCallAction}
                     className="bg-blue-600 hover:bg-blue-700 h-20 w-full text-base md:text-lg font-semibold"
                   >
-                    Call R$ {callAmount}
+                    Pagar R$ {callAmount}
                   </Button>
                 )
               ) : (
@@ -224,7 +224,7 @@ export function ActionPanel({
                     sliderValue < minRaiseTotal || sliderValue > maxRaiseTotal
                   }
                 >
-                  {currentHighestBet === 0 ? "Bet" : "Raise to"} R${" "}
+                  {currentHighestBet === 0 ? "Apostar" : "Aumentar para"} R${" "}
                   {Math.max(
                     minRaiseTotal,
                     Math.min(maxRaiseTotal, sliderValue)

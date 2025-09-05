@@ -65,7 +65,7 @@ export function Header({
             className="text-slate-300 hover:text-white flex items-center space-x-2"
             onClick={() => router.push("/dashboard")}
           >
-            <span>Dashboard</span>
+            <span>Início</span>
           </Button>
           {canLeave ? (
             <Button

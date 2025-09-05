@@ -99,16 +99,14 @@ export function PlayerSeat({
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-white truncate">
-                  {player.displayName
-                    ? player.displayName
-                    : `Player ${player.seat}`}
+                  {player.displayName ? player.displayName : `Jogador ${player.seat}`}
                 </div>
                 <div className="text-xs text-emerald-400">
                   R$ {player.stack}
                 </div>
                 {(player.currentBet ?? 0) > 0 && (
                   <div className="text-xs text-yellow-400">
-                    Bet: R$ {player.currentBet}
+                    Aposta: R$ {player.currentBet}
                   </div>
                 )}
               </div>
