@@ -67,6 +67,7 @@ export function SimulatorPanel({
     useState<StrategyId>("call_any");
   const [perSeat, setPerSeat] = useState<Record<string, StrategyId | "">>({});
   const [perSeatHydrated, setPerSeatHydrated] = useState(false);
+  const [defaultStrategyHydrated, setDefaultStrategyHydrated] = useState(false);
 
   useEffect(() => {
     // Preserve selections, add new players, prune removed
@@ -160,11 +161,13 @@ export function SimulatorPanel({
         }
       }
     } catch {}
+    setDefaultStrategyHydrated(true);
   }, [defaultStrategyStorageKey]);
 
   // persist default strategy when it changes
   useEffect(() => {
     try {
+      if (!defaultStrategyHydrated) return;
       if (typeof window !== "undefined") {
         localStorage.setItem(
           defaultStrategyStorageKey,
@@ -172,7 +175,7 @@ export function SimulatorPanel({
         );
       }
     } catch {}
-  }, [defaultStrategy, defaultStrategyStorageKey]);
+  }, [defaultStrategy, defaultStrategyStorageKey, defaultStrategyHydrated]);
 
   // Build a minimal pure game state for strategy evaluation
   const pureState: PureGameState | null = useMemo(() => {
