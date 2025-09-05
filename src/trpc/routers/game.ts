@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { actions, ActionTypeSchema } from "@/db/schema/actions";
 import { cards } from "@/db/schema/cards";
-import { games, type Game } from "@/db/schema/games";
+import { games } from "@/db/schema/games";
 import { players } from "@/db/schema/players";
 import { users } from "@/db/schema/users";
 import {
@@ -54,10 +54,6 @@ export const gameRouter = createTRPCRouter({
         .limit(1);
 
       if (!game) return null;
-
-      // Provide a safe fallback for turnMs until DB is migrated
-      (game as unknown as { turnMs?: number }).turnMs =
-        (game as unknown as { turnMs?: number }).turnMs ?? 30_000;
 
       const gamePlayersJoined = await db
         .select({
