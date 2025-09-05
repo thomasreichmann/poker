@@ -47,9 +47,9 @@ export function ActionPanel({
   if (!visible) return null;
 
   return (
-    <div className="fixed right-4 bottom-4 z-40 w-full max-w-md md:max-w-lg">
+    <div className="fixed left-2 right-2 bottom-2 md:left-auto md:right-4 md:bottom-4 z-50 w-auto md:w-full md:max-w-lg">
       <Card className="bg-slate-800 border-slate-600 shadow-2xl py-0">
-        <CardContent className="p-3">
+        <CardContent className="p-2 md:p-3">
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2">
               <Button

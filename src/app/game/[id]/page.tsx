@@ -9,11 +9,13 @@ import { Header } from "./_components/Header";
 import { PlayerSeat } from "./_components/PlayerSeat";
 import { TableSurface } from "./_components/TableSurface";
 import { useGameData } from "./_hooks/useGameData";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 export default function PokerGamePage() {
   const { id } = useParams() as { id: string };
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [raiseAmount, setRaiseAmount] = useState<number>(0);
+  const isMobile = useIsMobile();
 
   const {
     dbGame,
@@ -139,20 +141,20 @@ export default function PokerGamePage() {
       />
 
       {/* Poker Table */}
-      <div className="relative w-full h-screen pt-16 flex">
+      <div className="relative w-full h-screen pt-14 md:pt-16 flex">
         {/* Main Table Area */}
-        <div className="flex-1 flex items-center justify-center mb-56">
+        <div className="flex-1 flex items-center justify-center mb-40 md:mb-56">
           <div className="relative">
             <TableSurface
               pot={dbGame?.pot ?? 0}
               currentHighestBet={dbGame?.currentHighestBet ?? 0}
               phaseLabel={phaseLabel}
             />
-            <CommunityCards cards={communityCards} isAnimating={false} />
+            <CommunityCards cards={communityCards} isAnimating={false} compact={isMobile} />
 
             {/* Players */}
             {playersByView.map((player, index) => {
-              const positions = [
+              const positionsDesktop = [
                 {
                   // Bottom center (You)
                   bottom: "-70px",
@@ -186,6 +188,47 @@ export default function PokerGamePage() {
                   right: "-200px",
                 },
               ];
+
+              const positionsMobile = [
+                {
+                  // Bottom center (You)
+                  bottom: "-40px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                },
+                {
+                  // Bottom left
+                  bottom: "-10px",
+                  left: "18%",
+                  transform: "translateX(-50%)",
+                },
+                {
+                  // Bottom right
+                  bottom: "-10px",
+                  left: "82%",
+                  transform: "translateX(-50%)",
+                },
+                {
+                  // Top center
+                  top: "-40px",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                },
+                {
+                  // Top left
+                  top: "-10px",
+                  left: "18%",
+                  transform: "translateX(-50%)",
+                },
+                {
+                  // Top right
+                  top: "-10px",
+                  left: "82%",
+                  transform: "translateX(-50%)",
+                },
+              ];
+
+              const positions = isMobile ? positionsMobile : positionsDesktop;
               const position = positions[index] || positions[0];
 
               const isCurrentPlayer = activePlayerIndexByView === index;
@@ -207,6 +250,7 @@ export default function PokerGamePage() {
                   activeKey={`${dbGame?.id}-${activePlayerIndex}-${phase}`}
                   isSmallBlind={getIsSB(seatIndex)}
                   isBigBlind={getIsBB(seatIndex)}
+                  compact={isMobile}
                 />
               );
             })}

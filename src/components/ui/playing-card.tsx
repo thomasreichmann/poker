@@ -8,7 +8,7 @@ import { motion } from "motion/react";
 
 interface PlayingCardProps {
   card: PlayingCardType;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   isVisible?: boolean;
   isAnimating?: boolean;
   animationDelay?: number;
@@ -25,6 +25,7 @@ export function PlayingCard({
   className,
 }: PlayingCardProps) {
   const sizeClasses = {
+    xs: "w-8 h-12 text-[10px]",
     sm: "w-10 h-14 text-xs",
     md: "w-14 h-20 text-sm",
     lg: "w-16 h-24 text-base",
