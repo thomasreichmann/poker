@@ -470,13 +470,23 @@ export function useGameData(id: string) {
   const showdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Turn timeout: schedule once per game/hand/player; auto-clears on change
+  // Stagger timeout requests by seat distance from the active player (500ms per seat)
+  const TURN_TIMEOUT_BASE_MS = 30_000;
+  const STAGGER_MS = 500;
+  const seatCount = playersBySeat.length;
+  const seatDistanceFromActive =
+    yourDbPlayer && seatCount > 0
+      ? (selfSeatIndex - activePlayerIndex + seatCount) % seatCount
+      : 0;
+  const timeoutDurationMs = TURN_TIMEOUT_BASE_MS + seatDistanceFromActive * STAGGER_MS;
+
   useTurnTimeout({
     gameId: dbGame?.id ?? null,
     handId: dbGame?.handId ?? null,
     playerId: dbGame?.currentPlayerTurn ?? null,
     round: dbGame?.currentRound ?? null,
-    enabled: Boolean(me && dbGame?.status === "active"),
-    durationMs: 30_000,
+    enabled: Boolean(me && yourDbPlayer && dbGame?.status === "active"),
+    durationMs: timeoutDurationMs,
     onTimeoutAction: async () => {
       if (!dbGame?.id || !dbGame.currentPlayerTurn) return;
       await timeoutMutation.mutateAsync({
