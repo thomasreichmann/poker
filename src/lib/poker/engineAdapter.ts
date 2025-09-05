@@ -634,5 +634,5 @@ export async function leaveGamePure(
     .where(eq(games.id, gameId))
     .limit(1);
   if (!game) throw new Error("Game not found");
-  return game;
+  return game as Game;
 }
