@@ -93,13 +93,23 @@ describe("Pure Poker Engine", () => {
     });
 
     test("validates valid bet", () => {
+      // Make a post-flop scenario with no existing bet
+      const postFlop = { ...gameState } as GameState;
+      postFlop.currentRound = "flop";
+      postFlop.currentHighestBet = 0;
+      postFlop.communityCards = [
+        { rank: "A", suit: "hearts" },
+        { rank: "K", suit: "spades" },
+        { rank: "Q", suit: "diamonds" },
+      ];
+
       const action: GameAction = {
-        playerId: gameState.currentPlayerTurn!,
+        playerId: postFlop.currentPlayerTurn!,
         action: "bet",
         amount: 50,
       };
 
-      const validation = validateAction(gameState, action);
+      const validation = validateAction(postFlop, action);
       expect(validation.isValid).toBe(true);
     });
 
@@ -155,27 +165,35 @@ describe("Pure Poker Engine", () => {
     });
 
     test("processes bet correctly", () => {
-      const currentPlayer = gameState.players.find(
-        (p) => p.id === gameState.currentPlayerTurn
+      // Switch to a post-flop state with no existing bet
+      const postFlop = { ...gameState } as GameState;
+      postFlop.currentRound = "flop";
+      postFlop.currentHighestBet = 0;
+      postFlop.communityCards = [
+        { rank: "A", suit: "hearts" },
+        { rank: "K", suit: "spades" },
+        { rank: "Q", suit: "diamonds" },
+      ];
+
+      const currentPlayer = postFlop.players.find(
+        (p) => p.id === postFlop.currentPlayerTurn
       )!;
       const initialStack = currentPlayer.stack;
-      const initialCurrentBet = currentPlayer.currentBet; // Player might have blind posted
+      const initialCurrentBet = currentPlayer.currentBet;
 
-      // With automatic blinds: pot=30 (10+20), currentHighestBet=20 (big blind)
-      // Current player might already have a bet from blinds
       const action: GameAction = {
-        playerId: gameState.currentPlayerTurn!,
+        playerId: postFlop.currentPlayerTurn!,
         action: "bet",
-        amount: 50, // Add 50 to their existing bet
+        amount: 50,
       };
 
-      const result = processAction(gameState, action);
+      const result = processAction(postFlop, action);
 
       expect(result.success).toBe(true);
-      expect(result.newGameState.pot).toBe(gameState.pot + 50); // Initial pot + 50 bet
+      expect(result.newGameState.pot).toBe(postFlop.pot + 50);
       expect(result.newGameState.currentHighestBet).toBe(
         initialCurrentBet + 50
-      ); // Player's total bet
+      );
 
       const updatedPlayer = result.newGameState.players.find(
         (p) => p.id === currentPlayer.id
@@ -283,6 +301,42 @@ describe("Pure Poker Engine", () => {
       expect(result.status).toBe("completed");
       expect(getActivePlayers(result)).toHaveLength(1);
     });
+
+    test("round advances after raise and all calls when action returns to aggressor", () => {
+      // Start a 3-player game by constructing players first, then starting
+      let gs = createInitialGameState("raise-call-test");
+      gs = {
+        ...gs,
+        players: [
+          { id: "P1", seat: 0, stack: 1000, currentBet: 0, hasFolded: false, isButton: false, hasWon: false, showCards: false, holeCards: [] },
+          { id: "P2", seat: 1, stack: 1000, currentBet: 0, hasFolded: false, isButton: false, hasWon: false, showCards: false, holeCards: [] },
+          { id: "P3", seat: 2, stack: 1000, currentBet: 0, hasFolded: false, isButton: false, hasWon: false, showCards: false, holeCards: [] },
+        ],
+      } as GameState;
+      gs = startNewGame(gs);
+
+      // Preflop initial state: blinds posted automatically, UTG first to act
+      // UTG raises the minimum (to 2x currentHighestBet)
+      const utg = gs.currentPlayerTurn!;
+      const utgPlayer = gs.players.find((p) => p.id === utg)!;
+      const minTargetTotal = Math.max(gs.bigBlind, gs.currentHighestBet * 2);
+      const utgRaiseDelta = Math.max(1, minTargetTotal - utgPlayer.currentBet);
+      gs = executeGameAction(gs, { playerId: utg, action: "raise", amount: utgRaiseDelta });
+
+      // Next player calls
+      const caller1 = gs.currentPlayerTurn!;
+      gs = executeGameAction(gs, { playerId: caller1, action: "call" });
+
+      // Next player calls
+      const caller2 = gs.currentPlayerTurn!;
+      gs = executeGameAction(gs, { playerId: caller2, action: "call" });
+
+      // After the last call, action should return to the aggressor, which should complete the round
+      // Verify we advanced to flop
+      expect(gs.currentRound).toBe("flop");
+      expect(gs.communityCards).toHaveLength(3);
+      expect(gs.currentHighestBet).toBe(0);
+    });
   });
 
   describe("Winner Determination", () => {
@@ -380,10 +434,11 @@ describe("Pure Poker Engine", () => {
       const currentStack = currentPlayer.stack; // Stack after potential blind posting
       const initialCurrentBet = currentPlayer.currentBet; // Any existing bet (like blinds)
 
-      // Player goes all-in with their remaining stack
+      // If there's already a bet (blinds), use raise; otherwise use bet
+      const actionType = gameState.currentHighestBet > 0 ? "raise" : "bet";
       const result = executeGameAction(gameState, {
         playerId: currentPlayerId,
-        action: "bet",
+        action: actionType,
         amount: currentStack, // Use their current stack after blind posting
       });
 

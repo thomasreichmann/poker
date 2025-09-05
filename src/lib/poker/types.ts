@@ -59,6 +59,7 @@ export interface GameState {
   currentRound: RoundType;
   currentHighestBet: number;
   currentPlayerTurn?: string;
+  lastAggressorId?: string;
   pot: number;
   bigBlind: number;
   smallBlind: number;
