@@ -66,9 +66,11 @@ export function SimulatorPanel({
   const [defaultStrategy, setDefaultStrategy] =
     useState<StrategyId>("call_any");
   const [perSeat, setPerSeat] = useState<Record<string, StrategyId | "">>({});
+  const [perSeatHydrated, setPerSeatHydrated] = useState(false);
 
   useEffect(() => {
     // Preserve selections, add new players, prune removed
+    if (!players || players.length === 0) return;
     setPerSeat((prev) => {
       const next: Record<string, StrategyId | ""> = { ...prev };
       for (const p of players) {
@@ -89,11 +91,36 @@ export function SimulatorPanel({
 
   // persistence key for per-seat overrides (per table)
   const perSeatStorageKey = `dev.simulator.perSeat.${tableId}`;
+  const defaultStrategyStorageKey = `dev.simulator.defaultStrategy.${tableId}`;
+  const enabledStorageKey = `dev.simulator.enabled.${tableId}`;
+
+  // hydrate enabled from storage
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const raw = localStorage.getItem(enabledStorageKey);
+      if (raw != null) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed === "boolean") setEnabled(parsed);
+      }
+    } catch {}
+  }, [enabledStorageKey]);
+
+  // persist enabled when it changes
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(enabledStorageKey, JSON.stringify(enabled));
+      }
+    } catch {}
+  }, [enabled, enabledStorageKey]);
 
   // hydrate per-seat overrides from storage
   useEffect(() => {
     try {
-      const raw = typeof window !== "undefined" && localStorage.getItem(perSeatStorageKey);
+      const raw =
+        typeof window !== "undefined" &&
+        localStorage.getItem(perSeatStorageKey);
       if (raw) {
         const parsed = JSON.parse(raw) as Record<string, StrategyId | "">;
         if (parsed && typeof parsed === "object") {
@@ -101,16 +128,51 @@ export function SimulatorPanel({
         }
       }
     } catch {}
+    setPerSeatHydrated(true);
   }, [perSeatStorageKey]);
 
   // persist per-seat overrides whenever they change
   useEffect(() => {
     try {
+      if (!perSeatHydrated) return;
       if (typeof window !== "undefined") {
         localStorage.setItem(perSeatStorageKey, JSON.stringify(perSeat));
       }
     } catch {}
-  }, [perSeat, perSeatStorageKey]);
+  }, [perSeat, perSeatStorageKey, perSeatHydrated]);
+
+  // hydrate default strategy from storage
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      const raw = localStorage.getItem(defaultStrategyStorageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed === "human" ||
+          parsed === "always_fold" ||
+          parsed === "call_any" ||
+          parsed === "tight_aggro" ||
+          parsed === "loose_passive" ||
+          parsed === "scripted"
+        ) {
+          setDefaultStrategy(parsed);
+        }
+      }
+    } catch {}
+  }, [defaultStrategyStorageKey]);
+
+  // persist default strategy when it changes
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          defaultStrategyStorageKey,
+          JSON.stringify(defaultStrategy)
+        );
+      }
+    } catch {}
+  }, [defaultStrategy, defaultStrategyStorageKey]);
 
   // Build a minimal pure game state for strategy evaluation
   const pureState: PureGameState | null = useMemo(() => {
