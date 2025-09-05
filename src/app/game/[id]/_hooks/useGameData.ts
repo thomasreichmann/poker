@@ -133,13 +133,13 @@ export function useGameData(id: string) {
 
   const phaseLabel = useMemo(() => {
     const map: Record<string, string> = {
-      "pre-flop": "Preflop",
+      "pre-flop": "Pré-flop",
       flop: "Flop",
       turn: "Turn",
       river: "River",
       showdown: "Showdown",
     };
-    return dbGame ? map[dbGame.currentRound ?? "pre-flop"] ?? "Preflop" : "";
+    return dbGame ? map[dbGame.currentRound ?? "pre-flop"] ?? "Pré-flop" : "";
   }, [dbGame]);
 
   const callAmount = useMemo(() => {

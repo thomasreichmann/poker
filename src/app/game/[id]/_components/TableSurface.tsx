@@ -29,7 +29,7 @@ export function TableSurface({
               </div>
               <div className="text-center min-w-[140px]">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-amber-200/80">
-                  Pot
+                  Pote
                 </div>
                 <div className="text-2xl font-extrabold text-amber-300 tabular-nums">
                   R$ {pot}
@@ -37,7 +37,7 @@ export function TableSurface({
               </div>
               {currentHighestBet > 0 && (
                 <div className="ml-1 text-xs text-amber-200/90 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-400/30 whitespace-nowrap">
-                  Current Bet: R$ {currentHighestBet}
+                  Aposta Atual: R$ {currentHighestBet}
                 </div>
               )}
             </div>
