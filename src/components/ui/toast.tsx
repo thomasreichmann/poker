@@ -12,6 +12,8 @@ type Toast = {
   variant?: ToastVariant;
   duration?: number; // ms
   action?: { label: string; onClick: () => void };
+  // Optional: when provided, prevents showing another toast with the same groupId simultaneously
+  groupId?: string;
 };
 
 type ToastContextType = {
@@ -47,6 +49,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         ...t,
       };
       setToasts((prev) => {
+        if (
+          toastObj.groupId &&
+          prev.some((p) => p.groupId === toastObj.groupId)
+        ) {
+          return prev;
+        }
         const next = [...prev, toastObj];
         return next.slice(-MAX_TOASTS);
       });

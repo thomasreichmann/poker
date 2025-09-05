@@ -480,7 +480,7 @@ export function useGameData(id: string) {
       return;
     }
 
-    const key = `${dbGame.id}-${String(dbGame.updatedAt ?? "")}`;
+    const key = `${dbGame.id}-${String(dbGame.handId ?? "")}`;
     if (showdownHandledRef.current === key) return;
 
     // Clear any existing timeout to restart the debounce period
@@ -552,7 +552,7 @@ export function useGameData(id: string) {
 
       // Fallback if we still don't have winners for some reason
       const finalWinnerNames = winnerNames || "Unknown Player";
-      console.log("triggering winner toast");
+
       const description = handName
         ? `Winner: ${finalWinnerNames} — ${handName}`
         : `Winner: ${finalWinnerNames}`;
@@ -561,6 +561,7 @@ export function useGameData(id: string) {
         title: "Showdown",
         description,
         duration: 5000,
+        groupId: `showdown-${dbGame.id}-${String(dbGame.handId ?? "")}`,
       });
 
       // Schedule immediate advance when the client receives showdown state
@@ -583,7 +584,7 @@ export function useGameData(id: string) {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dbGame?.id, dbGame?.currentRound, dbGame?.updatedAt, dbPlayers, dbCards]);
+  }, [dbGame?.id, dbGame?.currentRound, dbGame?.handId, dbPlayers, dbCards]);
 
   return {
     me,
