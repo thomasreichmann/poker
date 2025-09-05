@@ -178,8 +178,7 @@ export function SimulatorPanel({
     // Resolve strategy for the current seat
     const overrideStrategy = perSeat[currentTurn];
     const seatStrategy: StrategyId | undefined =
-      (overrideStrategy && overrideStrategy !== "" ? overrideStrategy : defaultStrategy) ||
-      undefined;
+      (overrideStrategy !== "" ? overrideStrategy : defaultStrategy) || undefined;
 
     if (!seatStrategy || seatStrategy === "human") return;
 
