@@ -211,7 +211,7 @@ export function SimulatorPanel({
   }, [dbGame, dbPlayers]);
 
   // Orchestrator: the client who enabled acts as the master scheduler
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestTurnRef = useRef<string | null>(null);
   const rngRef = useRef<() => number>(() => Math.random());
 
@@ -235,11 +235,12 @@ export function SimulatorPanel({
     const currentTurn = pureState.currentPlayerTurn;
 
     // Skip if it's our own turn (master remains manual)
-    if (yourDbPlayer && currentTurn === yourDbPlayer.id) return;
+    if (yourDbPlayer && currentTurn === String(yourDbPlayer.id)) return;
 
     // Resolve strategy for the current seat
+    const overrideStrategy = perSeat[currentTurn];
     const seatStrategy: StrategyId | undefined =
-      (perSeat[currentTurn] as StrategyId | "") || undefined || defaultStrategy;
+      (overrideStrategy !== "" ? overrideStrategy : defaultStrategy) || undefined;
 
     if (!seatStrategy || seatStrategy === "human") return;
 
@@ -250,18 +251,18 @@ export function SimulatorPanel({
     // Capture the latest observed turn for race-free validation later
     latestTurnRef.current = currentTurn;
 
+    const floorMin = Math.max(0, Math.min(minDelay, maxDelay));
+    const ceilMax = Math.max(0, Math.max(minDelay, maxDelay));
     const jitter =
-      minDelay +
-      Math.floor(
-        rngRef.current() * Math.max(0, (maxDelay ?? minDelay) - minDelay + 1)
-      );
+      floorMin +
+      Math.floor(rngRef.current() * Math.max(0, ceilMax - floorMin + 1));
 
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       // Bail if turn changed since scheduling
       if (latestTurnRef.current !== currentTurn) return;
       // Also bail if the master is now up (no auto-acting for master)
-      if (yourDbPlayer && latestTurnRef.current === yourDbPlayer.id) return;
+      if (yourDbPlayer && latestTurnRef.current === String(yourDbPlayer.id)) return;
       await actAsPlayerMutation.mutateAsync({
         gameId: tableId,
         targetPlayerId: currentTurn,
