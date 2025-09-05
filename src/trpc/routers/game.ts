@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { actions, ActionTypeSchema } from "@/db/schema/actions";
 import { cards } from "@/db/schema/cards";
-import { games } from "@/db/schema/games";
+import { games, type Game } from "@/db/schema/games";
 import { players } from "@/db/schema/players";
 import { users } from "@/db/schema/users";
 import {
@@ -47,13 +47,32 @@ export const gameRouter = createTRPCRouter({
   getById: baseProcedure
     .input(z.object({ id: z.uuid() }))
     .query(async ({ input }) => {
-      const [game] = await db
-        .select()
+      const [gameRow] = await db
+        .select({
+          id: games.id,
+          handId: games.handId,
+          status: games.status,
+          currentRound: games.currentRound,
+          currentHighestBet: games.currentHighestBet,
+          currentPlayerTurn: games.currentPlayerTurn,
+          lastAggressorId: games.lastAggressorId,
+          pot: games.pot,
+          bigBlind: games.bigBlind,
+          smallBlind: games.smallBlind,
+          updatedAt: games.updatedAt,
+          lastAction: games.lastAction,
+          lastBetAmount: games.lastBetAmount,
+          simulatorConfig: games.simulatorConfig,
+          // Intentionally omit games.turnMs until DB migration is applied
+        })
         .from(games)
         .where(eq(games.id, input.id))
         .limit(1);
 
-      if (!game) return null;
+      if (!gameRow) return null;
+
+      // Provide a stable shape matching Game with a safe fallback for turnMs
+      const game: Game = { ...gameRow, turnMs: 30_000 } as Game;
 
       const gamePlayersJoined = await db
         .select({

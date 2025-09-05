@@ -476,7 +476,7 @@ export function useGameData(id: string) {
     playerId: dbGame?.currentPlayerTurn ?? null,
     round: dbGame?.currentRound ?? null,
     enabled: Boolean(me && dbGame?.status === "active"),
-    durationMs: 30_000,
+    durationMs: Math.max(1_000, Number(dbGame?.turnMs ?? 30_000)),
     onTimeoutAction: async () => {
       if (!dbGame?.id || !dbGame.currentPlayerTurn) return;
       await timeoutMutation.mutateAsync({

@@ -44,7 +44,20 @@ type ActionInput = {
 
 export async function dbGameToPureGame(gameId: string): Promise<GameState> {
   const [game] = await db
-    .select()
+    .select({
+      id: games.id,
+      handId: games.handId,
+      status: games.status,
+      currentRound: games.currentRound,
+      currentHighestBet: games.currentHighestBet,
+      currentPlayerTurn: games.currentPlayerTurn,
+      lastAggressorId: games.lastAggressorId,
+      pot: games.pot,
+      bigBlind: games.bigBlind,
+      smallBlind: games.smallBlind,
+      lastAction: games.lastAction,
+      lastBetAmount: games.lastBetAmount,
+    })
     .from(games)
     .where(eq(games.id, gameId))
     .limit(1);
@@ -171,7 +184,21 @@ export async function persistPureGameState(
       if (!gameChanged && !playersChanged && !cardsChanged) {
         // Nothing to persist
         const [unchanged] = await tx
-          .select()
+          .select({
+            id: games.id,
+            handId: games.handId,
+            status: games.status,
+            currentRound: games.currentRound,
+            currentHighestBet: games.currentHighestBet,
+            currentPlayerTurn: games.currentPlayerTurn,
+            lastAggressorId: games.lastAggressorId,
+            pot: games.pot,
+            bigBlind: games.bigBlind,
+            smallBlind: games.smallBlind,
+            lastAction: games.lastAction,
+            lastBetAmount: games.lastBetAmount,
+            updatedAt: games.updatedAt,
+          })
           .from(games)
           .where(eq(games.id, pureGameState.id))
           .limit(1);
@@ -196,7 +223,21 @@ export async function persistPureGameState(
         updatedAt: new Date(),
       })
       .where(eq(games.id, pureGameState.id))
-      .returning();
+      .returning({
+        id: games.id,
+        handId: games.handId,
+        status: games.status,
+        currentRound: games.currentRound,
+        currentHighestBet: games.currentHighestBet,
+        currentPlayerTurn: games.currentPlayerTurn,
+        lastAggressorId: games.lastAggressorId,
+        pot: games.pot,
+        bigBlind: games.bigBlind,
+        smallBlind: games.smallBlind,
+        lastAction: games.lastAction,
+        lastBetAmount: games.lastBetAmount,
+        updatedAt: games.updatedAt,
+      }) as unknown as [Game];
 
     // Update only changed players when previous state is available
     const previousPlayersById = new Map(
@@ -629,10 +670,24 @@ export async function leaveGamePure(
   }
 
   const [game] = await db
-    .select()
+    .select({
+      id: games.id,
+      handId: games.handId,
+      status: games.status,
+      currentRound: games.currentRound,
+      currentHighestBet: games.currentHighestBet,
+      currentPlayerTurn: games.currentPlayerTurn,
+      lastAggressorId: games.lastAggressorId,
+      pot: games.pot,
+      bigBlind: games.bigBlind,
+      smallBlind: games.smallBlind,
+      lastAction: games.lastAction,
+      lastBetAmount: games.lastBetAmount,
+      updatedAt: games.updatedAt,
+    })
     .from(games)
     .where(eq(games.id, gameId))
     .limit(1);
   if (!game) throw new Error("Game not found");
-  return game;
+  return game as unknown as Game;
 }

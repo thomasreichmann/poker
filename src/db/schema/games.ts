@@ -31,6 +31,8 @@ export const games = pgTable("poker_games", {
   pot: integer("pot").default(0).notNull(),
   bigBlind: integer("big_blind").default(20).notNull(),
   smallBlind: integer("small_blind").default(10).notNull(),
+  // Per-turn time limit in milliseconds
+  turnMs: integer("turn_ms").default(30_000),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   lastAction: PgEnumAction("last_action").default("check"),
   lastBetAmount: integer("last_bet_amount").default(0),
