@@ -18,6 +18,7 @@ type PlayerSeatProps = {
   activeKey: string;
   isSmallBlind?: boolean;
   isBigBlind?: boolean;
+  turnDurationMs: number;
 };
 
 export function PlayerSeat({
@@ -30,6 +31,7 @@ export function PlayerSeat({
   activeKey,
   isSmallBlind = false,
   isBigBlind = false,
+  turnDurationMs,
 }: PlayerSeatProps) {
   const prevIsCurrent = useRef<boolean>(false);
   const prevHasFolded = useRef<boolean>(player.hasFolded);
@@ -47,6 +49,11 @@ export function PlayerSeat({
     }
     prevHasFolded.current = player.hasFolded;
   }, [player.hasFolded, player.id]);
+
+  const durationSec = `${Math.max(
+    1,
+    Math.floor((turnDurationMs ?? 30000) / 10) / 100
+  )}s`;
 
   return (
     <div className="absolute" style={positionStyle}>
@@ -99,7 +106,9 @@ export function PlayerSeat({
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-white truncate">
-                  {player.displayName ? player.displayName : `Jogador ${player.seat}`}
+                  {player.displayName
+                    ? player.displayName
+                    : `Jogador ${player.seat}`}
                 </div>
                 <div className="text-xs text-emerald-400">
                   R$ {player.stack}
@@ -143,7 +152,7 @@ export function PlayerSeat({
                   className="turn-timer-fill h-full bg-yellow-500/80"
                   style={{
                     // @ts-expect-error custom property
-                    "--turn-timer-duration": "30s",
+                    "--turn-timer-duration": durationSec,
                   }}
                 />
               </div>

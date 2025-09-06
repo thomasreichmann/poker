@@ -119,6 +119,8 @@ export default function PokerGamePage() {
     );
   };
 
+  const turnDurationMs = Math.max(1000, Number(dbGame?.turnMs ?? 30000));
+
   return (
     <div className="min-h-screen bg-slate-900 text-white relative overflow-hidden">
       <Header
@@ -207,6 +209,7 @@ export default function PokerGamePage() {
                   activeKey={`${dbGame?.id}-${activePlayerIndex}-${phase}`}
                   isSmallBlind={getIsSB(seatIndex)}
                   isBigBlind={getIsBB(seatIndex)}
+                  turnDurationMs={turnDurationMs}
                 />
               );
             })}
