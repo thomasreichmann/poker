@@ -53,17 +53,14 @@ export default function PokerGamePage() {
 
   const handleRaiseAmountChange = (delta: number) => {
     setRaiseAmount((prev) => {
-      const next = Math.max(
-        minRaiseTotal,
-        Math.min(maxRaiseTotal, prev + delta)
-      );
+      const next = Math.max(sliderMin, Math.min(maxRaiseTotal, prev + delta));
       return next;
     });
   };
 
   const handleRaiseInputChange = (value: string) => {
     const num = Number.parseInt(value) || 0;
-    setRaiseAmount(Math.max(minRaiseTotal, Math.min(maxRaiseTotal, num)));
+    setRaiseAmount(Math.max(sliderMin, Math.min(maxRaiseTotal, num)));
   };
 
   const handlePlayerAction = async (
