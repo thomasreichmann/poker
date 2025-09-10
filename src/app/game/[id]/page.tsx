@@ -33,6 +33,7 @@ export default function PokerGamePage() {
     connectedCount,
     playerIdToCards,
     actions,
+    me,
   } = useGameData(id);
 
   useEffect(() => {
@@ -237,7 +238,8 @@ export default function PokerGamePage() {
       {/* Winner dialog removed in server-driven version */}
 
       {/* Dev panels container */}
-      {process.env.NODE_ENV !== "production" && (
+      {(process.env.NODE_ENV !== "production" ||
+        me?.user_metadata?.elevatedPrivileges) && (
         <div className="fixed top-20 right-4 z-50">
           <DevToolsPanel
             tableId={id}

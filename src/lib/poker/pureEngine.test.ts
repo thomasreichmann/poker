@@ -308,9 +308,39 @@ describe("Pure Poker Engine", () => {
       gs = {
         ...gs,
         players: [
-          { id: "P1", seat: 0, stack: 1000, currentBet: 0, hasFolded: false, isButton: false, hasWon: false, showCards: false, holeCards: [] },
-          { id: "P2", seat: 1, stack: 1000, currentBet: 0, hasFolded: false, isButton: false, hasWon: false, showCards: false, holeCards: [] },
-          { id: "P3", seat: 2, stack: 1000, currentBet: 0, hasFolded: false, isButton: false, hasWon: false, showCards: false, holeCards: [] },
+          {
+            id: "P1",
+            seat: 0,
+            stack: 1000,
+            currentBet: 0,
+            hasFolded: false,
+            isButton: false,
+            hasWon: false,
+            showCards: false,
+            holeCards: [],
+          },
+          {
+            id: "P2",
+            seat: 1,
+            stack: 1000,
+            currentBet: 0,
+            hasFolded: false,
+            isButton: false,
+            hasWon: false,
+            showCards: false,
+            holeCards: [],
+          },
+          {
+            id: "P3",
+            seat: 2,
+            stack: 1000,
+            currentBet: 0,
+            hasFolded: false,
+            isButton: false,
+            hasWon: false,
+            showCards: false,
+            holeCards: [],
+          },
         ],
       } as GameState;
       gs = startNewGame(gs);
@@ -321,7 +351,11 @@ describe("Pure Poker Engine", () => {
       const utgPlayer = gs.players.find((p) => p.id === utg)!;
       const minTargetTotal = Math.max(gs.bigBlind, gs.currentHighestBet * 2);
       const utgRaiseDelta = Math.max(1, minTargetTotal - utgPlayer.currentBet);
-      gs = executeGameAction(gs, { playerId: utg, action: "raise", amount: utgRaiseDelta });
+      gs = executeGameAction(gs, {
+        playerId: utg,
+        action: "raise",
+        amount: utgRaiseDelta,
+      });
 
       // Next player calls
       const caller1 = gs.currentPlayerTurn!;
@@ -418,6 +452,108 @@ describe("Pure Poker Engine", () => {
       const updatedWinner = result.players.find((p) => p.id === "player1")!;
       expect(updatedWinner.stack).toBe(1000);
       expect(updatedWinner.hasWon).toBe(true);
+    });
+
+    test("pair on board with higher kicker should not tie", () => {
+      const base = createInitialGameState("kicker-test");
+
+      const playerHigh: Player = {
+        id: "highKicker",
+        seat: 0,
+        stack: 1000,
+        currentBet: 0,
+        hasFolded: false,
+        isButton: false,
+        hasWon: false,
+        showCards: false,
+        holeCards: [
+          { rank: "K" as const, suit: "hearts" as const },
+          { rank: "Q" as const, suit: "clubs" as const },
+        ],
+      };
+
+      const playerLow: Player = {
+        id: "lowKicker",
+        seat: 1,
+        stack: 1000,
+        currentBet: 0,
+        hasFolded: false,
+        isButton: false,
+        hasWon: false,
+        showCards: false,
+        holeCards: [
+          { rank: "J" as const, suit: "diamonds" as const },
+          { rank: "10" as const, suit: "spades" as const },
+        ],
+      };
+
+      // Board pairs nines; top board kicker is Ace; remaining kicker differentiates players
+      const gs = {
+        ...base,
+        players: [playerHigh, playerLow],
+        communityCards: [
+          { rank: "9" as const, suit: "hearts" as const },
+          { rank: "9" as const, suit: "clubs" as const },
+          { rank: "A" as const, suit: "spades" as const },
+          { rank: "5" as const, suit: "diamonds" as const },
+          { rank: "2" as const, suit: "clubs" as const },
+        ],
+      } as GameState;
+
+      const { winners } = findWinners(gs);
+      expect(winners).toHaveLength(1);
+      expect(winners[0]?.id).toBe("highKicker");
+    });
+
+    test("two pair uses board pairs and highest hole-card kicker", () => {
+      const base = createInitialGameState("two-pair-kicker-test");
+
+      const p1: Player = {
+        id: "p1",
+        seat: 0,
+        stack: 1000,
+        currentBet: 0,
+        hasFolded: false,
+        isButton: false,
+        hasWon: false,
+        showCards: false,
+        holeCards: [
+          { rank: "A" as const, suit: "hearts" as const },
+          { rank: "3" as const, suit: "clubs" as const },
+        ],
+      };
+
+      const p2: Player = {
+        id: "p2",
+        seat: 1,
+        stack: 1000,
+        currentBet: 0,
+        hasFolded: false,
+        isButton: false,
+        hasWon: false,
+        showCards: false,
+        holeCards: [
+          { rank: "K" as const, suit: "spades" as const },
+          { rank: "4" as const, suit: "diamonds" as const },
+        ],
+      };
+
+      // Board provides two pairs; kicker should be compared (A kicker vs K kicker)
+      const gs = {
+        ...base,
+        players: [p1, p2],
+        communityCards: [
+          { rank: "9" as const, suit: "hearts" as const },
+          { rank: "9" as const, suit: "clubs" as const },
+          { rank: "5" as const, suit: "spades" as const },
+          { rank: "5" as const, suit: "diamonds" as const },
+          { rank: "2" as const, suit: "clubs" as const },
+        ],
+      } as GameState;
+
+      const { winners } = findWinners(gs);
+      expect(winners).toHaveLength(1);
+      expect(winners[0]?.id).toBe("p1");
     });
   });
 

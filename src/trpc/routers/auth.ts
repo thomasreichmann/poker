@@ -8,7 +8,10 @@ export const authRouter = createTRPCRouter({
     return {
       id: ctx.user.id,
       email: ctx.user.email,
-      user_metadata: ctx.user.user_metadata,
+      user_metadata: {
+        ...ctx.user.user_metadata,
+        elevatedPrivileges: ctx.user.email === "new@thomasar.dev",
+      },
     };
   }),
   // Get current user profile

@@ -108,138 +108,153 @@ export function evaluateHand(cards: Card[]): HandRank {
     rankCounts.set(value, (rankCounts.get(value) ?? 0) + 1);
   });
 
+  // Helper: pack a vector of tie-break values into a single comparable number.
+  // Use base-100 to avoid collisions (card ranks are <= 14).
+  const pack = (nums: number[]) => nums.reduce((acc, v) => acc * 100 + v, 0);
+
+  // Helper: get distinct rank values sorted high to low
+  const distinctValuesDesc = [...new Set(values)].sort((a, b) => b - a);
+
+  // Helper: determine highest straight high-card value in a list of cards
+  const straightHigh = (vals: number[]): number | null => {
+    const uniq = [...new Set(vals)].sort((a, b) => b - a);
+    // Wheel straight (A-2-3-4-5)
+    if (uniq.includes(14) && [5, 4, 3, 2].every((v) => uniq.includes(v))) {
+      return 5;
+    }
+    for (let i = 0; i <= uniq.length - 5; i++) {
+      const start = uniq[i]!;
+      let ok = true;
+      for (let d = 1; d < 5; d++) {
+        if (!uniq.includes(start - d)) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) return start;
+    }
+    return null;
+  };
+
   // Check for straight flush
   if (isStraightFlush(cards)) {
-    // For Ace-low straight flush, use 5 as the value
-    if (
-      values.includes(14) &&
-      [2, 3, 4, 5].every((val) => values.includes(val))
-    ) {
-      return {
-        rank: 8,
-        value: 5,
-        name: "Straight Flush",
-      };
+    // Identify suit having the straight flush and compute its high card
+    for (const suit of Suit.enumValues) {
+      const suitCards = cards.filter((c) => getSuit(c) === suit);
+      if (suitCards.length >= 5) {
+        const high = straightHigh(suitCards.map(getRankValue));
+        if (high) {
+          return { rank: 8, value: high, name: "Straight Flush" };
+        }
+        // Handle wheel straight flush (A-2-3-4-5)
+        const vals = suitCards.map(getRankValue);
+        if (vals.includes(14) && [2, 3, 4, 5].every((v) => vals.includes(v))) {
+          return { rank: 8, value: 5, name: "Straight Flush" };
+        }
+      }
     }
-    return {
-      rank: 8,
-      value: Math.max(...values),
-      name: "Straight Flush",
-    };
   }
 
   // Check for four of a kind
-  for (const [value, count] of rankCounts) {
-    if (count === 4) {
-      return {
-        rank: 7,
-        value: value,
-        name: "Four of a Kind",
-      };
+  {
+    const quads = [...rankCounts.entries()]
+      .filter(([, c]) => c === 4)
+      .map(([v]) => v)
+      .sort((a, b) => b - a);
+    if (quads.length > 0) {
+      const quad = quads[0]!;
+      const kicker = distinctValuesDesc.find((v) => v !== quad) ?? 0;
+      return { rank: 7, value: pack([quad, kicker]), name: "Four of a Kind" };
     }
   }
 
-  // Check for full house
-  let hasThree = false;
-  let hasPair = false;
-  let threeValue = 0;
-  let pairValue = 0;
-  for (const [value, count] of rankCounts) {
-    if (count === 3) {
-      hasThree = true;
-      threeValue = value;
-    } else if (count >= 2) {
-      hasPair = true;
-      pairValue = Math.max(pairValue, value);
-    }
-  }
-  if (hasThree && hasPair) {
-    return {
-      rank: 6,
-      value: threeValue * 100 + pairValue,
-      name: "Full House",
-    };
-  }
-
-  // Check for flush: pick the actual suit with >=5 cards
-  if (isFlush(cards)) {
-    let flushSuit: string | null = null;
-    for (const s of Suit.enumValues) {
-      const count = cards.filter((c) => getSuit(c) === s).length;
-      if (count >= 5) {
-        flushSuit = s;
-        break;
-      }
-    }
-    if (flushSuit) {
-      const flushCards = sortedCards.filter(
-        (card) => getSuit(card) === flushSuit
-      );
-      if (flushCards.length > 0) {
+  // Check for full house (prefer highest triple, then highest remaining pair or second triple)
+  {
+    const triples = [...rankCounts.entries()]
+      .filter(([, c]) => c >= 3)
+      .map(([v]) => v)
+      .sort((a, b) => b - a);
+    if (triples.length > 0) {
+      const primaryTriple = triples[0]!;
+      // Build pair candidates from remaining ranks (including other triples counted as pair)
+      const pairCandidates = [...rankCounts.entries()]
+        .filter(([v, c]) => v !== primaryTriple && c >= 2)
+        .map(([v]) => v)
+        .sort((a, b) => b - a);
+      if (pairCandidates.length > 0) {
+        const pair = pairCandidates[0]!;
         return {
-          rank: 5,
-          value: getRankValue(flushCards[0]!),
-          name: "Flush",
+          rank: 6,
+          value: pack([primaryTriple, pair]),
+          name: "Full House",
+        };
+      }
+      // Special case: two triples -> use second triple as pair
+      if (triples.length >= 2) {
+        const pairFromTriple = triples[1]!;
+        return {
+          rank: 6,
+          value: pack([primaryTriple, pairFromTriple]),
+          name: "Full House",
         };
       }
     }
   }
 
-  // Check for straight
-  if (isStraight(cards)) {
-    // For Ace-low straight, use 5 as the value
-    if (
-      values.includes(14) &&
-      [2, 3, 4, 5].every((val) => values.includes(val))
-    ) {
-      return {
-        rank: 4,
-        value: 5,
-        name: "Straight",
-      };
+  // Check for flush: pick suit and encode top 5 flush kickers
+  if (isFlush(cards)) {
+    for (const s of Suit.enumValues) {
+      const flushCards = sortedCards.filter((card) => getSuit(card) === s);
+      if (flushCards.length >= 5) {
+        const top5 = flushCards.slice(0, 5).map(getRankValue);
+        return { rank: 5, value: pack(top5), name: "Flush" };
+      }
     }
-    return {
-      rank: 4,
-      value: Math.max(...values),
-      name: "Straight",
-    };
   }
 
-  // Check for three of a kind
-  if (hasThree) {
-    return {
-      rank: 3,
-      value: threeValue,
-      name: "Three of a Kind",
-    };
+  // Check for straight
+  {
+    const high = straightHigh(values);
+    if (high) {
+      return { rank: 4, value: high, name: "Straight" };
+    }
   }
 
-  // Check for two pair
+  // Check for three of a kind (top triple, then two highest kickers)
+  {
+    const triples = [...rankCounts.entries()]
+      .filter(([, c]) => c === 3)
+      .map(([v]) => v)
+      .sort((a, b) => b - a);
+    if (triples.length > 0) {
+      const t = triples[0]!;
+      const kickers = distinctValuesDesc.filter((v) => v !== t).slice(0, 2);
+      return { rank: 3, value: pack([t, ...kickers]), name: "Three of a Kind" };
+    }
+  }
+
+  // Check for two pair (two highest pairs + highest kicker)
   const pairs = Array.from(rankCounts.entries())
     .filter(([, count]) => count >= 2)
     .map(([value]) => value)
     .sort((a, b) => b - a);
   if (pairs.length >= 2) {
-    return {
-      rank: 2,
-      value: (pairs[0] ?? 0) * 100 + (pairs[1] ?? 0),
-      name: "Two Pair",
-    };
+    const [p1, p2] = [pairs[0]!, pairs[1]!];
+    const kicker = distinctValuesDesc.find((v) => v !== p1 && v !== p2) ?? 0;
+    return { rank: 2, value: pack([p1, p2, kicker]), name: "Two Pair" };
   }
 
-  // Check for one pair
+  // Check for one pair (highest pair + 3 kickers)
   if (pairs.length === 1) {
-    return {
-      rank: 1,
-      value: pairs[0] ?? 0,
-      name: "One Pair",
-    };
+    const pair = pairs[0]!;
+    const kickers = distinctValuesDesc.filter((v) => v !== pair).slice(0, 3);
+    return { rank: 1, value: pack([pair, ...kickers]), name: "One Pair" };
   }
 
-  // High card
+  // High card (top 5)
   return {
     rank: 0,
-    value: values[0] ?? 0,
+    value: pack(distinctValuesDesc.slice(0, 5)),
     name: "High Card",
   };
 }
