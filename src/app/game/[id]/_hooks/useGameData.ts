@@ -6,7 +6,7 @@ import { useTurnTimeout } from "@/lib/useTurnTimeout";
 import { getSupabaseBrowserClient } from "@/supabase/client";
 import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { Action } from "@/db/schema/actions";
 import { PokerAction } from "@/db/schema/actionTypes";
@@ -469,21 +469,30 @@ export function useGameData(id: string) {
   const showdownHandledRef = useRef<string | null>(null);
   const showdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Stable timeout handler to avoid effect churn in the hook
+  const onTurnTimeout = useCallback(async () => {
+    if (!dbGame?.id || !dbGame.currentPlayerTurn) return;
+    const timeoutResult = await timeoutMutation.mutateAsync({
+      gameId: dbGame.id,
+      playerId: String(dbGame.currentPlayerTurn),
+    });
+    console.log(
+      `Timeout results made against player ${dbGame.currentPlayerTurn}\n`,
+      timeoutResult.isValid,
+      timeoutResult.error
+    );
+  }, [dbGame?.id, dbGame?.currentPlayerTurn, timeoutMutation]);
+
   // Turn timeout: schedule once per game/hand/player; auto-clears on change
   useTurnTimeout({
-    gameId: dbGame?.id ?? null,
-    handId: dbGame?.handId ?? null,
-    playerId: dbGame?.currentPlayerTurn ?? null,
-    round: dbGame?.currentRound ?? null,
+    gameId: dbGame?.id,
+    handId: dbGame?.handId,
+    playerId: dbGame?.currentPlayerTurn,
+    round: dbGame?.currentRound,
     enabled: Boolean(me && dbGame?.status === "active"),
     durationMs: Math.max(1_000, Number(dbGame?.turnMs ?? 30_000)),
-    onTimeoutAction: async () => {
-      if (!dbGame?.id || !dbGame.currentPlayerTurn) return;
-      await timeoutMutation.mutateAsync({
-        gameId: dbGame.id,
-        playerId: String(dbGame.currentPlayerTurn),
-      });
-    },
+    deadlineAt: dbGame?.turnTimeoutAt ?? null,
+    onTimeoutAction: onTurnTimeout,
   });
 
   useEffect(() => {

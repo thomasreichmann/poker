@@ -17,6 +17,7 @@ import {
   handleShowdown,
   handleSinglePlayerWin,
   startNewGame,
+  timeoutPlayer,
   validateAction,
   type GameAction,
   type GameState,
@@ -108,6 +109,10 @@ export async function dbGameToPureGame(gameId: string): Promise<GameState> {
     players,
     communityCards,
     deck: deck.map((c) => ({ rank: c.rank, suit: c.suit })),
+    // Default to updatedAt + turnMs if turnTimeoutAt is not set
+    turnTimeoutAt:
+      game.turnTimeoutAt ?? new Date(game.updatedAt.getTime() + game.turnMs),
+    turnMs: game.turnMs,
   };
 
   return pureState;
@@ -136,6 +141,7 @@ export async function persistPureGameState(
         "smallBlind",
         "lastAction",
         "lastBetAmount",
+        "turnTimeoutAt",
       ]);
 
       const playersChanged = hasArrayChanges(
@@ -193,6 +199,8 @@ export async function persistPureGameState(
         smallBlind: pureGameState.smallBlind,
         lastAction: pureGameState.lastAction ?? null,
         lastBetAmount: pureGameState.lastBetAmount,
+        turnTimeoutAt: pureGameState.turnTimeoutAt,
+        turnMs: pureGameState.turnMs,
         updatedAt: new Date(),
       })
       .where(eq(games.id, pureGameState.id))
@@ -489,6 +497,9 @@ export async function resetGamePure(gameId: string): Promise<Game> {
       currentGameState.bigBlind,
       currentGameState.smallBlind
     ),
+    // Set the first turn timeout and persist turnMs
+    turnTimeoutAt: new Date(Date.now() + currentGameState.turnMs),
+    turnMs: currentGameState.turnMs,
     // Preserve stacks, clear round-specific state, set next button and increment handId
     handId: (currentGameState.handId ?? 0) + 1,
     players: sortedPlayers.map((player, index) => ({
@@ -635,4 +646,14 @@ export async function leaveGamePure(
     .limit(1);
   if (!game) throw new Error("Game not found");
   return game as Game;
+}
+
+export async function timeoutPlayerPure(gameId: string, playerId: string) {
+  const previousState = await dbGameToPureGame(gameId);
+  const timeoutResult = timeoutPlayer(previousState, playerId);
+  if (timeoutResult.isValid) {
+    await persistPureGameState(timeoutResult.newGameState, previousState);
+  }
+
+  return timeoutResult;
 }

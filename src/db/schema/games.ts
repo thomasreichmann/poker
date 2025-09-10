@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { integer, jsonb, pgEnum, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
 import { PgEnumAction } from "./actionTypes";
 import { actions } from "./actions";
 import { type Card, cards } from "./cards";
@@ -32,12 +32,11 @@ export const games = pgTable("poker_games", {
   bigBlind: integer("big_blind").default(20).notNull(),
   smallBlind: integer("small_blind").default(10).notNull(),
   // Per-turn time limit in milliseconds
-  turnMs: integer("turn_ms").default(30_000),
+  turnMs: integer("turn_ms").notNull().default(30_000),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   lastAction: PgEnumAction("last_action").default("check"),
   lastBetAmount: integer("last_bet_amount").default(0),
-  // New: simulator configuration stored per table (dev/staging only consumers)
-  simulatorConfig: jsonb("simulator_config"),
+  turnTimeoutAt: timestamp("turn_timeout_at"),
 });
 
 export type Game = typeof games.$inferSelect;

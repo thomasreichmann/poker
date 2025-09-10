@@ -69,6 +69,8 @@ export interface GameState {
   communityCards: Card[];
   deck: Card[];
   handId: number;
+  turnTimeoutAt: Date;
+  turnMs: number;
 }
 
 export interface ActionResult {

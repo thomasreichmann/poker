@@ -10,6 +10,7 @@ import {
 } from "./cards";
 import type {
   ActionResult,
+  ActionType,
   Card,
   GameAction,
   GameState,
@@ -62,6 +63,8 @@ export function createInitialGameState(
     communityCards: [],
     deck: generateDeck(),
     handId: 0,
+    turnTimeoutAt: new Date(Date.now() + 30_000),
+    turnMs: 30_000,
   };
 }
 
@@ -202,9 +205,10 @@ export function setFirstPlayerToAct(gameState: GameState): GameState {
     if (activePlayers.length === 2) {
       // Heads-up preflop: button (SB) acts first
       const buttonPlayerAll = gameState.players[buttonIndexAll]!;
-      firstToAct = buttonPlayerAll.hasFolded || buttonPlayerAll.stack === 0
-        ? findNthEligibleAfter(buttonIndexAll, 1)
-        : buttonPlayerAll;
+      firstToAct =
+        buttonPlayerAll.hasFolded || buttonPlayerAll.stack === 0
+          ? findNthEligibleAfter(buttonIndexAll, 1)
+          : buttonPlayerAll;
     } else {
       // Multi-way preflop: UTG is first eligible player after big blind (third after button)
       firstToAct = findNthEligibleAfter(buttonIndexAll, 3);
@@ -217,6 +221,10 @@ export function setFirstPlayerToAct(gameState: GameState): GameState {
   return {
     ...gameState,
     currentPlayerTurn: firstToAct.id,
+    turnTimeoutAt:
+      gameState.status === "active" && gameState.currentRound !== "showdown"
+        ? new Date(Date.now() + gameState.turnMs)
+        : gameState.turnTimeoutAt,
   };
 }
 
@@ -248,7 +256,14 @@ export function setNextPlayer(gameState: GameState): GameState {
     const nextIndex = (currentIndexInAll + offset) % playerCount;
     const candidate = allPlayers[nextIndex]!;
     if (!candidate.hasFolded && candidate.stack > 0) {
-      return { ...gameState, currentPlayerTurn: candidate.id };
+      return {
+        ...gameState,
+        currentPlayerTurn: candidate.id,
+        turnTimeoutAt:
+          gameState.status === "active" && gameState.currentRound !== "showdown"
+            ? new Date(Date.now() + gameState.turnMs)
+            : gameState.turnTimeoutAt,
+      };
     }
   }
 
@@ -432,7 +447,10 @@ function validateBetOrRaise(
 
   // Cannot place a new bet when a bet already exists; must raise instead
   if (action.action === "bet" && gameState.currentHighestBet > 0) {
-    return { isValid: false, error: "Cannot bet; there is already a bet. Use raise." };
+    return {
+      isValid: false,
+      error: "Cannot bet; there is already a bet. Use raise.",
+    };
   }
 
   const totalBetNeeded = gameState.currentHighestBet - player.currentBet;
@@ -462,10 +480,8 @@ function validateBetOrRaise(
     action.action === "raise" &&
     // Require the new total to be at least 2x currentHighestBet (UI contract) or all-in
     // This approximates NLHE min-raise without tracking last raise size
-    (player.currentBet + action.amount) < Math.max(
-      gameState.bigBlind,
-      gameState.currentHighestBet * 2
-    ) &&
+    player.currentBet + action.amount <
+      Math.max(gameState.bigBlind, gameState.currentHighestBet * 2) &&
     action.amount !== player.stack
   ) {
     const minTargetTotal = Math.max(
@@ -666,7 +682,9 @@ function determineNextAction(
         const candidate = gameState.players[idx]!;
         if (!candidate.hasFolded && candidate.stack > 0) {
           if (candidate.id === gameState.lastAggressorId) {
-            return gameState.currentRound === "river" ? "showdown" : "advance_round";
+            return gameState.currentRound === "river"
+              ? "showdown"
+              : "advance_round";
           }
           break;
         }
@@ -711,7 +729,8 @@ function determineNextAction(
   const currentIndexAll = gameState.players.findIndex(
     (p) => p.id === gameState.currentPlayerTurn
   );
-  let nextActiveId = activePlayers.find((p) => p.stack > 0)?.id ?? activePlayers[0]!.id;
+  let nextActiveId =
+    activePlayers.find((p) => p.stack > 0)?.id ?? activePlayers[0]!.id;
   if (currentIndexAll !== -1) {
     const total = gameState.players.length;
     for (let offset = 1; offset <= total * 2; offset++) {
@@ -905,7 +924,10 @@ export function handleSinglePlayerWin(gameState: GameState): GameState {
  * Force-fold a player regardless of turn. Does not advance the turn automatically.
  * Use when a player disconnects or leaves out of turn. Caller may decide to advance.
  */
-export function forceFoldPlayer(gameState: GameState, playerId: string): GameState {
+export function forceFoldPlayer(
+  gameState: GameState,
+  playerId: string
+): GameState {
   const player = getPlayerById(gameState, playerId);
   if (!player || player.hasFolded) return gameState;
   const newGameState = updatePlayer(gameState, playerId, { hasFolded: true });
@@ -949,4 +971,49 @@ export function executeGameAction(
   }
 
   return newGameState;
+}
+
+export function validateTimeout(
+  gameState: GameState,
+  player?: Player
+): { isValid: boolean; error?: string; canCheck?: boolean } {
+  if (!player) return { isValid: false, error: "Player not found" };
+  if (player.hasFolded)
+    return { isValid: false, error: "Player has already folded" };
+  if (gameState.currentPlayerTurn !== player.id)
+    return { isValid: false, error: "Not player's turn" };
+  if (gameState.status !== "active")
+    return { isValid: false, error: "Game is not active" };
+  if (gameState.currentRound === "showdown")
+    return { isValid: false, error: "Cannot timeout during showdown" };
+
+  // Check if the player has run out of time to act
+  if (gameState.turnTimeoutAt > new Date())
+    return { isValid: false, error: "Player still has time to act" };
+
+  const canCheck = validateCheck(gameState, player);
+
+  return { isValid: true, canCheck: canCheck.isValid };
+}
+
+export function timeoutPlayer(
+  gameState: GameState,
+  playerId: string
+): { isValid: boolean; error?: string; newGameState: GameState } {
+  const player = getPlayerById(gameState, playerId);
+  const validation = validateTimeout(gameState, player);
+  if (!validation.isValid)
+    return { isValid: false, error: validation.error, newGameState: gameState };
+
+  const action: ActionType = validation.canCheck ? "check" : "fold";
+
+  const newGameState = executeGameAction(gameState, {
+    playerId,
+    action,
+  });
+
+  return {
+    isValid: true,
+    newGameState,
+  };
 }
