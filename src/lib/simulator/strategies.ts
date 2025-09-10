@@ -85,9 +85,11 @@ export function loosePassive(): BotStrategy {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function scripted(_cfg?: StrategyConfig): BotStrategy {
   return {
     id: "scripted",
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     decide: (_ctx) => {
       // Placeholder: not implemented yet
       return null;

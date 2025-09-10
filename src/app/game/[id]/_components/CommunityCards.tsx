@@ -11,10 +11,7 @@ type CommunityCardsProps = {
   isAnimating?: boolean;
 };
 
-export function CommunityCards({
-  cards,
-  isAnimating = false,
-}: CommunityCardsProps) {
+export function CommunityCards({ cards }: CommunityCardsProps) {
   const prevCount = useRef(0);
   const prevIdsRef = useRef<string[]>([]);
   const board = useBoardState();

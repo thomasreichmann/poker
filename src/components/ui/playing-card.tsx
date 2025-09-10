@@ -20,7 +20,6 @@ export function PlayingCard({
   card,
   size = "md",
   isVisible = true,
-  isAnimating = false,
   animationDelay = 0,
   className,
 }: PlayingCardProps) {

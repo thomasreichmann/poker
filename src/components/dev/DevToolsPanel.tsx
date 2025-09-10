@@ -6,10 +6,10 @@ import { Game } from "@/db/schema/games";
 import { Player } from "@/db/schema/players";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { BoardPanel } from "./BoardPanel";
 import { MultiPlayerTestPanel } from "./MultiPlayerTestPanel";
 import { SimulatorPanel } from "./SimulatorPanel";
-import { BoardPanel } from "./BoardPanel";
 
 type DevToolsPanelProps = {
   tableId: string;
@@ -33,15 +33,17 @@ export function DevToolsPanel({
   const [tab, setTab] = useState<string>("multi");
   useEffect(() => {
     try {
-      const raw = typeof window !== "undefined" && localStorage.getItem(tabStorageKey);
+      const raw =
+        typeof window !== "undefined" && localStorage.getItem(tabStorageKey);
       if (raw) setTab(raw);
     } catch {}
-  }, []);
+  }, [tabStorageKey]);
   useEffect(() => {
     try {
-      if (typeof window !== "undefined") localStorage.setItem(tabStorageKey, tab);
+      if (typeof window !== "undefined")
+        localStorage.setItem(tabStorageKey, tab);
     } catch {}
-  }, [tab]);
+  }, [tab, tabStorageKey]);
   return (
     <Card
       className={cn(

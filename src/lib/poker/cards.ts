@@ -101,7 +101,6 @@ export function evaluateHand(cards: Card[]): HandRank {
 
   const sortedCards = sortCards(cards);
   const values = sortedCards.map(getRankValue);
-  const suits = sortedCards.map(getSuit);
 
   // Count occurrences of each rank
   const rankCounts = new Map<number, number>();
@@ -173,7 +172,9 @@ export function evaluateHand(cards: Card[]): HandRank {
       }
     }
     if (flushSuit) {
-      const flushCards = sortedCards.filter((card) => getSuit(card) === flushSuit);
+      const flushCards = sortedCards.filter(
+        (card) => getSuit(card) === flushSuit
+      );
       if (flushCards.length > 0) {
         return {
           rank: 5,

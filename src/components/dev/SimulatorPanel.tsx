@@ -209,6 +209,9 @@ export function SimulatorPanel({
       communityCards: [],
       deck: [],
       handId: dbGame.handId ?? 0,
+      turnMs: dbGame.turnMs ?? 30_000,
+      turnTimeoutAt:
+        dbGame.turnTimeoutAt ?? new Date(Date.now() + dbGame.turnMs),
     };
     return state;
   }, [dbGame, dbPlayers]);
