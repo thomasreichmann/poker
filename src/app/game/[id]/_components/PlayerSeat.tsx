@@ -19,6 +19,7 @@ type PlayerSeatProps = {
   isSmallBlind?: boolean;
   isBigBlind?: boolean;
   turnDurationMs: number;
+  isWinner?: boolean;
 };
 
 export function PlayerSeat({
@@ -32,6 +33,7 @@ export function PlayerSeat({
   isSmallBlind = false,
   isBigBlind = false,
   turnDurationMs,
+  isWinner = false,
 }: PlayerSeatProps) {
   const prevIsCurrent = useRef<boolean>(false);
   const prevHasFolded = useRef<boolean>(player.hasFolded);
@@ -77,6 +79,17 @@ export function PlayerSeat({
               player.hasFolded ? "text-slate-500" : ""
             }`}
           >
+            {isWinner && (
+              <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -inset-1 rounded-xl bg-amber-400/10 blur-md" />
+                <div className="absolute inset-0 rounded-xl ring-2 ring-amber-400/70 animate-pulse" />
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-amber-500 text-black rounded-full shadow">
+                    Winner
+                  </span>
+                </div>
+              </div>
+            )}
             <div className="flex items-center space-x-3">
               <div className="relative">
                 <Avatar className="w-12 h-12">

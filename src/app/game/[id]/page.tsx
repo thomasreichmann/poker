@@ -202,6 +202,9 @@ export default function PokerGamePage() {
               const seatIndex = playersBySeat.findIndex(
                 (p) => p.id === player.id
               );
+              const isShowdownOrCompleted =
+                (dbGame?.currentRound ?? "pre-flop") === "showdown" ||
+                dbGame?.status === "completed";
               return (
                 <PlayerSeat
                   key={player.id}
@@ -215,6 +218,7 @@ export default function PokerGamePage() {
                   isSmallBlind={getIsSB(seatIndex)}
                   isBigBlind={getIsBB(seatIndex)}
                   turnDurationMs={turnDurationMs}
+                  isWinner={Boolean(isShowdownOrCompleted && player.hasWon)}
                 />
               );
             })}
