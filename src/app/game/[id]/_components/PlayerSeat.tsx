@@ -161,18 +161,64 @@ export function PlayerSeat({
             )}
           </CardContent>
           {isWinner && (
-            <div className="pointer-events-none absolute inset-0 rounded-xl animate-[winner-pop_300ms_ease-out]">
-              <div className="absolute inset-0 bg-amber-400/10 blur-lg" />
-              <div className="absolute inset-0 rounded-xl ring-2 ring-amber-400/70 animate-pulse" />
-              <div className="winner-shimmer-bar" />
-              <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+            <motion.div
+              className="pointer-events-none absolute inset-0 rounded-xl"
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 20, mass: 0.6 }}
+            >
+              <motion.div
+                className="absolute inset-0"
+                style={{ backgroundColor: "rgba(251, 191, 36, 0.10)", filter: "blur(10px)", borderRadius: "inherit" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: 0.05 }}
+              />
+              <motion.div
+                className="absolute inset-0 rounded-xl"
+                style={{ boxShadow: "inset 0 0 0 2px rgba(251, 191, 36, 0.7)" }}
+                initial={{ opacity: 0.6 }}
+                animate={{ opacity: [0.6, 1, 0.6] }}
+                transition={{ duration: 1.2, repeat: 2, ease: "easeInOut" }}
+              />
+              <motion.div
+                className="absolute rounded-xl"
+                style={{
+                  top: "-12%",
+                  bottom: "-12%",
+                  left: "-8%",
+                  right: "-8%",
+                  background:
+                    "linear-gradient(90deg, rgba(255,255,255,0), rgba(251,191,36,0.18), rgba(255,255,255,0))",
+                  filter: "blur(6px)",
+                }}
+                initial={{ x: "-120%", rotate: 10, opacity: 0 }}
+                animate={{ x: "120%", opacity: [0, 1, 0] }}
+                transition={{ duration: 1.4, delay: 0.15, ease: "easeOut" }}
+              />
+              <motion.div
+                className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5"
+                initial={{ y: -4, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.24, delay: 0.1 }}
+              >
                 <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-amber-500 text-black rounded-full shadow">
                   Winner
                 </span>
-                <span className="winner-sparkle inline-block w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.8)] [animation-delay:80ms]" />
-                <span className="winner-sparkle inline-block w-1.5 h-1.5 rounded-full bg-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.6)] [animation-delay:220ms]" />
-              </div>
-            </div>
+                <motion.span
+                  className="inline-block w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.8)]"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: [0, 1, 0.4, 0], opacity: [0, 1, 0.8, 0] }}
+                  transition={{ duration: 1.1, delay: 0.08, times: [0, 0.3, 0.6, 1] }}
+                />
+                <motion.span
+                  className="inline-block w-1.5 h-1.5 rounded-full bg-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.6)]"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: [0, 1, 0.4, 0], opacity: [0, 1, 0.8, 0] }}
+                  transition={{ duration: 1.1, delay: 0.22, times: [0, 0.3, 0.6, 1] }}
+                />
+              </motion.div>
+            </motion.div>
           )}
         </Card>
       </motion.div>
