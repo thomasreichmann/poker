@@ -19,6 +19,7 @@ type PlayerSeatProps = {
   isSmallBlind?: boolean;
   isBigBlind?: boolean;
   turnDurationMs: number;
+  isWinner?: boolean;
 };
 
 export function PlayerSeat({
@@ -32,6 +33,7 @@ export function PlayerSeat({
   isSmallBlind = false,
   isBigBlind = false,
   turnDurationMs,
+  isWinner = false,
 }: PlayerSeatProps) {
   const prevIsCurrent = useRef<boolean>(false);
   const prevHasFolded = useRef<boolean>(player.hasFolded);
@@ -158,6 +160,20 @@ export function PlayerSeat({
               </div>
             )}
           </CardContent>
+          {isWinner && (
+            <div className="pointer-events-none absolute inset-0 rounded-xl animate-[winner-pop_300ms_ease-out]">
+              <div className="absolute inset-0 bg-amber-400/10 blur-lg" />
+              <div className="absolute inset-0 rounded-xl ring-2 ring-amber-400/70 animate-pulse" />
+              <div className="winner-shimmer-bar" />
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+                <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-amber-500 text-black rounded-full shadow">
+                  Winner
+                </span>
+                <span className="winner-sparkle inline-block w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.8)] [animation-delay:80ms]" />
+                <span className="winner-sparkle inline-block w-1.5 h-1.5 rounded-full bg-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.6)] [animation-delay:220ms]" />
+              </div>
+            </div>
+          )}
         </Card>
       </motion.div>
     </div>
