@@ -44,6 +44,7 @@ export function MultiPlayerTestPanel({
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
   const [quickRaiseAmount, setQuickRaiseAmount] = useState<number>(0);
   const [autoFollowTurn, setAutoFollowTurn] = useState(true);
+  const [timeoutFanout, setTimeoutFanout] = useState<number>(1);
   const [loadingAction, setLoadingAction] = useState<
     | "fold"
     | "check"
@@ -89,6 +90,30 @@ export function MultiPlayerTestPanel({
       setQuickRaiseAmount(game.bigBlind * 3);
     }
   }, [game]);
+
+  // Load and persist timeout fan-out (sessionStorage) for parallel timeout requests
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const raw = window.sessionStorage.getItem("dev_timeout_fanout");
+        if (raw) {
+          const n = Number(raw);
+          if (Number.isFinite(n))
+            setTimeoutFanout(Math.max(1, Math.min(25, n)));
+        }
+      }
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(
+          "dev_timeout_fanout",
+          String(timeoutFanout)
+        );
+      }
+    } catch {}
+  }, [timeoutFanout]);
 
   const selectedPlayer = useMemo(
     () => players.find((p) => p.id === selectedPlayerId) || null,
@@ -433,6 +458,38 @@ export function MultiPlayerTestPanel({
           </div>
         </div>
       )}
+      {/* Timeout Fan-out (parallel): controls how many timeout requests will be sent when the local timer fires */}
+      <div className="space-y-2 pt-2 border-t border-slate-700">
+        <label className="text-sm font-medium">
+          Timeout fan-out (parallel)
+        </label>
+        <div className="flex items-center gap-2">
+          <Input
+            type="number"
+            min={1}
+            max={25}
+            value={timeoutFanout}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setTimeoutFanout(
+                Number.isFinite(n) ? Math.max(1, Math.min(25, n)) : 1
+              );
+            }}
+            className="bg-slate-700 border-slate-600 text-xs w-24"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs bg-slate-600 hover:bg-slate-500 text-white border-slate-500"
+            onClick={() => setTimeoutFanout(1)}
+          >
+            Reset
+          </Button>
+          <span className="text-xs text-slate-400">
+            Sends N timeout requests when the turn timer elapses
+          </span>
+        </div>
+      </div>
       {/* Game Controls */}
       <div className="flex gap-2 pt-2 border-t border-slate-700">
         <Button

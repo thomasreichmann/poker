@@ -479,14 +479,47 @@ export function useGameData(id: string) {
   // Stable timeout handler to avoid effect churn in the hook
   const onTurnTimeout = useCallback(async () => {
     if (!dbGame?.id || !dbGame.currentPlayerTurn) return;
-    const timeoutResult = await timeoutMutation.mutateAsync({
+
+    // Read fan-out count from sessionStorage (dev/testing aid)
+    let fanout = 1;
+    try {
+      if (typeof window !== "undefined") {
+        const raw = window.sessionStorage.getItem("dev_timeout_fanout") ?? "1";
+        const parsed = Number(raw);
+        fanout = Number.isFinite(parsed)
+          ? Math.max(1, Math.min(25, parsed))
+          : 1;
+      }
+    } catch {}
+
+    const payload = {
       gameId: dbGame.id,
       playerId: String(dbGame.currentPlayerTurn),
-    });
+    } as const;
+
+    if (fanout <= 1) {
+      try {
+        const res = await timeoutMutation.mutateAsync(payload);
+        console.log(
+          `Timeout result for player ${dbGame.currentPlayerTurn}`,
+          res?.isValid,
+          res?.error
+        );
+      } catch (err) {
+        console.error("Timeout request failed", err);
+      }
+      return;
+    }
+
+    // Launch N parallel timeout requests for analysis
+    const requests = Array.from({ length: fanout }, () =>
+      timeoutMutation.mutateAsync(payload)
+    );
+    const results = await Promise.allSettled(requests);
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.length - succeeded;
     console.log(
-      `Timeout results made against player ${dbGame.currentPlayerTurn}\n`,
-      timeoutResult.isValid,
-      timeoutResult.error
+      `Timeout fan-out x${fanout} for player ${dbGame.currentPlayerTurn} -> ok=${succeeded} fail=${failed}`
     );
   }, [dbGame?.id, dbGame?.currentPlayerTurn, timeoutMutation]);
 

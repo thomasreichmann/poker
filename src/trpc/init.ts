@@ -61,8 +61,8 @@ const devDelayMiddleware = t.middleware(async ({ next }) => {
   if (process.env.NODE_ENV === "production") {
     return next();
   }
-  const min = Number(500);
-  const max = Number(1000);
+  const min = Number(100);
+  const max = Number(350);
   const delayMs = Math.max(
     0,
     Math.floor(Math.random() * (max - min + 1)) + min
