@@ -181,6 +181,13 @@ export function useGameData(id: string) {
   const leaveMutation = useMutation(trpc.game.leave.mutationOptions());
   const timeoutMutation = useMutation(trpc.game.timeout.mutationOptions());
 
+  const isJoining = joinMutation.isPending;
+  const isActing = actMutation.isPending;
+  const isAdvancing = advanceMutation.isPending;
+  const isResetting = resetMutation.isPending;
+  const isLeaving = leaveMutation.isPending;
+  const isTimingOut = timeoutMutation.isPending;
+
   const showError = (message: string) => {
     toast({ variant: "destructive", description: message });
   };
@@ -635,5 +642,11 @@ export function useGameData(id: string) {
     connectedCount,
     playerIdToCards,
     actions,
+    isJoining,
+    isActing,
+    isAdvancing,
+    isResetting,
+    isLeaving,
+    isTimingOut,
   } as const;
 }

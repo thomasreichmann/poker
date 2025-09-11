@@ -20,15 +20,7 @@ import { useDevAccess } from "@/hooks/useDevAccess";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
 import { useMutation } from "@tanstack/react-query";
-import {
-  ChevronDown,
-  ChevronUp,
-  Gamepad2,
-  Play,
-  RotateCcw,
-  Users,
-  Zap,
-} from "lucide-react";
+import { ChevronDown, ChevronUp, Gamepad2, Users, Zap } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 type MultiPlayerTestPanelProps = {
@@ -52,6 +44,17 @@ export function MultiPlayerTestPanel({
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
   const [quickRaiseAmount, setQuickRaiseAmount] = useState<number>(0);
   const [autoFollowTurn, setAutoFollowTurn] = useState(true);
+  const [loadingAction, setLoadingAction] = useState<
+    | "fold"
+    | "check"
+    | "call"
+    | "raise"
+    | "bet"
+    | "timeout"
+    | "advance"
+    | "reset"
+    | null
+  >(null);
 
   const trpc = useTRPC();
   const { toast } = useToast();
@@ -134,6 +137,7 @@ export function MultiPlayerTestPanel({
     if (!game || !selectedPlayer) return;
 
     try {
+      setLoadingAction(action);
       const payload: {
         gameId: string;
         targetPlayerId: string;
@@ -179,6 +183,8 @@ export function MultiPlayerTestPanel({
         title: "Action failed",
         description: error instanceof Error ? error.message : "Unknown error",
       });
+    } finally {
+      setLoadingAction(null);
     }
   };
 
@@ -200,6 +206,7 @@ export function MultiPlayerTestPanel({
 
   const handleAdvanceGame = async () => {
     try {
+      setLoadingAction("advance");
       await advanceMutation.mutateAsync({ gameId });
       toast({ title: "Game advanced" });
     } catch (error) {
@@ -208,11 +215,14 @@ export function MultiPlayerTestPanel({
         title: "Failed to advance game",
         description: error instanceof Error ? error.message : "Unknown error",
       });
+    } finally {
+      setLoadingAction(null);
     }
   };
 
   const handleResetGame = async () => {
     try {
+      setLoadingAction("reset");
       await resetMutation.mutateAsync({ gameId });
       toast({ title: "Game reset" });
     } catch (error) {
@@ -221,6 +231,8 @@ export function MultiPlayerTestPanel({
         title: "Failed to reset game",
         description: error instanceof Error ? error.message : "Unknown error",
       });
+    } finally {
+      setLoadingAction(null);
     }
   };
 
@@ -324,8 +336,12 @@ export function MultiPlayerTestPanel({
               variant="destructive"
               size="sm"
               onClick={() => executeAction("fold")}
-              disabled={selectedPlayer.id !== currentPlayerId}
+              disabled={
+                selectedPlayer.id !== currentPlayerId || actMutation.isPending
+              }
               className="text-xs bg-red-600 hover:bg-red-700 text-white border-0"
+              isLoading={loadingAction === "fold"}
+              loadingText="Fold"
             >
               Fold
             </Button>
@@ -334,8 +350,12 @@ export function MultiPlayerTestPanel({
                 variant="outline"
                 size="sm"
                 onClick={() => executeAction("check")}
-                disabled={selectedPlayer.id !== currentPlayerId}
+                disabled={
+                  selectedPlayer.id !== currentPlayerId || actMutation.isPending
+                }
                 className="text-xs bg-slate-700 hover:bg-slate-600 text-white border-slate-600"
+                isLoading={loadingAction === "check"}
+                loadingText="Check"
               >
                 Check
               </Button>
@@ -344,8 +364,14 @@ export function MultiPlayerTestPanel({
                 variant="secondary"
                 size="sm"
                 onClick={() => executeAction("call")}
-                disabled={selectedPlayer.id !== currentPlayerId || !canCall}
+                disabled={
+                  selectedPlayer.id !== currentPlayerId ||
+                  !canCall ||
+                  actMutation.isPending
+                }
                 className="text-xs bg-blue-600 hover:bg-blue-700 text-white border-0"
+                isLoading={loadingAction === "call"}
+                loadingText={`Call $${callAmount}`}
               >
                 Call ${callAmount}
               </Button>
@@ -368,10 +394,13 @@ export function MultiPlayerTestPanel({
                 size="sm"
                 onClick={() => executeAction("raise", quickRaiseAmount)}
                 disabled={
+                  actMutation.isPending ||
                   selectedPlayer.id !== currentPlayerId ||
                   quickRaiseAmount < minRaiseTotal
                 }
                 className="text-xs bg-green-600 hover:bg-green-700 text-white border-0"
+                isLoading={loadingAction === "raise"}
+                loadingText="Raise"
               >
                 Raise
               </Button>
@@ -411,8 +440,10 @@ export function MultiPlayerTestPanel({
           size="sm"
           onClick={handleAdvanceGame}
           className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500"
+          disabled={advanceMutation.isPending}
+          isLoading={loadingAction === "advance"}
+          loadingText="Advancing..."
         >
-          <Play className="h-3 w-3 mr-1" />
           Advance
         </Button>
         <Button
@@ -420,8 +451,10 @@ export function MultiPlayerTestPanel({
           size="sm"
           onClick={handleResetGame}
           className="flex-1 text-xs bg-orange-600 hover:bg-orange-700 text-white border-orange-500"
+          disabled={resetMutation.isPending}
+          isLoading={loadingAction === "reset"}
+          loadingText="Resetting..."
         >
-          <RotateCcw className="h-3 w-3 mr-1" />
           Reset
         </Button>
       </div>

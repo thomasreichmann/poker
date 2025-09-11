@@ -233,7 +233,7 @@ export default function RegisterPage() {
             <Image
               src="/all-in.svg"
               alt="ALL IN"
-              width={114}
+              width={228}
               height={32}
               priority
             />

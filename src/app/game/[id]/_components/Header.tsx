@@ -36,6 +36,9 @@ type HeaderProps = {
   onLeaveAction?: () => Promise<void> | void;
   canReset?: boolean;
   onResetAction?: () => Promise<void> | void;
+  isJoining?: boolean;
+  isLeaving?: boolean;
+  isResetting?: boolean;
 };
 
 export function Header({
@@ -53,6 +56,9 @@ export function Header({
   onLeaveAction,
   canReset = false,
   onResetAction,
+  isJoining = false,
+  isLeaving = false,
+  isResetting = false,
 }: HeaderProps) {
   const router = useRouter();
   return (
@@ -72,6 +78,8 @@ export function Header({
               variant="ghost"
               size="sm"
               className="text-slate-300 hover:text-white flex items-center space-x-2"
+              isLoading={isLeaving}
+              loadingText="Saindo..."
               onClick={async () => {
                 try {
                   await onLeaveAction?.();
@@ -80,8 +88,7 @@ export function Header({
                 }
               }}
             >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Sair da Mesa</span>
+              Sair da Mesa
             </Button>
           ) : (
             <Link
@@ -143,11 +150,22 @@ export function Header({
                   <>
                     <DropdownMenuLabel>Developer</DropdownMenuLabel>
                     <DropdownMenuItem
-                      onClick={() => onResetAction?.()}
+                      onClick={() => {
+                        if (isResetting) return;
+                        onResetAction?.();
+                      }}
                       className="text-amber-300 focus:text-amber-200"
                     >
-                      <RotateCcw className="h-4 w-4" />
-                      Reset game
+                      {isResetting ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="animate-spin inline-block size-3 rounded-full border-2 border-amber-200 border-t-transparent" />{" "}
+                          Resetando...
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-2">
+                          <RotateCcw className="h-4 w-4" /> Reset game
+                        </span>
+                      )}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -159,6 +177,8 @@ export function Header({
               size="sm"
               className="bg-emerald-600 hover:bg-emerald-700"
               onClick={onJoinAction}
+              isLoading={isJoining}
+              loadingText="Entrando..."
             >
               Entrar
             </Button>

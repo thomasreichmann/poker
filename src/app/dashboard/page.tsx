@@ -192,8 +192,8 @@ export default function DashboardPage() {
               <Image
                 src="/all-in.svg"
                 alt="ALL IN"
-                width={114}
-                height={32}
+                width={228}
+                height={64}
                 priority
               />
             </Link>

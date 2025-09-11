@@ -34,6 +34,10 @@ export default function PokerGamePage() {
     playerIdToCards,
     actions,
     me,
+    isActing,
+    isJoining,
+    isLeaving,
+    isResetting,
   } = useGameData(id);
 
   useEffect(() => {
@@ -136,6 +140,9 @@ export default function PokerGamePage() {
         onLeaveAction={handleLeave}
         canReset={!!dbGame}
         onResetAction={handleReset}
+        isJoining={isJoining}
+        isLeaving={isLeaving}
+        isResetting={isResetting}
       />
 
       {/* Poker Table */}
@@ -226,6 +233,7 @@ export default function PokerGamePage() {
           canCheck={canCheck}
           canCall={canCall}
           currentHighestBet={dbGame?.currentHighestBet ?? 0}
+          isActing={isActing}
           onChangeAmountAction={(v) => handleRaiseInputChange(v)}
           onDeltaAction={(d) => handleRaiseAmountChange(d)}
           onCheckAction={() => handlePlayerAction("check")}

@@ -31,8 +31,8 @@ export default function PokerLandingPage() {
             <Image
               src="/all-in.svg"
               alt="ALL IN"
-              width={114}
-              height={32}
+              width={228}
+              height={64}
               priority
             />
           </div>
@@ -358,7 +358,7 @@ export default function PokerLandingPage() {
           <div className="grid md:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <Image src="/all-in.svg" alt="ALL IN" width={114} height={32} />
+                <Image src="/all-in.svg" alt="ALL IN" width={228} height={64} />
               </div>
               <p className="text-slate-400 text-sm">
                 A plataforma de poker online mais confiável do Brasil para

@@ -56,13 +56,31 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
 });
 
+// Dev-only delay middleware to simulate network latency in tRPC calls
+const devDelayMiddleware = t.middleware(async ({ next }) => {
+  if (process.env.NODE_ENV === "production") {
+    return next();
+  }
+  const min = Number(500);
+  const max = Number(1000);
+  const delayMs = Math.max(
+    0,
+    Math.floor(Math.random() * (max - min + 1)) + min
+  );
+  if (delayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return next();
+});
+
 // Base router and procedure helpers
 export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
-export const baseProcedure = t.procedure;
+
+export const baseProcedure = t.procedure.use(devDelayMiddleware);
 
 // Protected procedure that requires authentication
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+export const protectedProcedure = baseProcedure.use(({ ctx, next }) => {
   if (!ctx.user) {
     throw new Error("Unauthorized");
   }
@@ -75,7 +93,7 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
 });
 
 // Non-production only procedure
-export const nonProdProcedure = t.procedure.use(({ next }) => {
+export const nonProdProcedure = baseProcedure.use(({ next }) => {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Operation not allowed in production");
   }
