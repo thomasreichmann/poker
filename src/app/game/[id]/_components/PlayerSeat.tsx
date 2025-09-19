@@ -1,10 +1,22 @@
 "use client";
 
+import { DevOnly } from "@/components/dev/DevOnly";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { PlayingCard } from "@/components/ui/playing-card";
+import { useToast } from "@/components/ui/toast";
 import { Player } from "@/db/schema/players";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
+import { useTRPC } from "@/trpc/client";
+import { useMutation } from "@tanstack/react-query";
+import { Info } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef } from "react";
 
@@ -19,6 +31,7 @@ type PlayerSeatProps = {
   isSmallBlind?: boolean;
   isBigBlind?: boolean;
   turnDurationMs: number;
+  gameId: string;
 };
 
 export function PlayerSeat({
@@ -32,9 +45,16 @@ export function PlayerSeat({
   isSmallBlind = false,
   isBigBlind = false,
   turnDurationMs,
+  gameId,
 }: PlayerSeatProps) {
   const prevIsCurrent = useRef<boolean>(false);
   const prevHasFolded = useRef<boolean>(player.hasFolded);
+  const trpc = useTRPC();
+  const { toast } = useToast();
+
+  const forceLeaveMutation = useMutation(
+    trpc.dev.forceLeavePlayer.mutationOptions()
+  );
 
   useEffect(() => {
     if (!prevIsCurrent.current && isCurrent) {
@@ -121,7 +141,7 @@ export function PlayerSeat({
               </div>
             </div>
 
-            <div className="flex justify-center-safe gap-x-1 w-[5.75rem] shrink-0">
+            <div className="relative flex justify-center-safe gap-x-1 w-[5.75rem] shrink-0">
               {cards.length > 0
                 ? cards.map((card, cardIndex) => (
                     <PlayingCard
@@ -159,6 +179,70 @@ export function PlayerSeat({
             )}
           </CardContent>
         </Card>
+        {!isYou && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Player options"
+                aria-disabled={Boolean(player.hasFolded)}
+                className={`absolute top-1 right-1 p-1 rounded-full text-slate-200 z-20 pointer-events-auto ${
+                  player.hasFolded
+                    ? "bg-slate-700/50 hover:bg-slate-700/50 opacity-60 grayscale"
+                    : "bg-slate-700/80 hover:bg-slate-600/80"
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <Info className="w-3 h-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={6}>
+              <DropdownMenuItem disabled onClick={(e) => e.stopPropagation()}>
+                Ver Perfil
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled
+                variant="destructive"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Reportar Jogador
+              </DropdownMenuItem>
+              <DevOnly>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      await forceLeaveMutation.mutateAsync({
+                        gameId,
+                        targetUserId: player.userId,
+                      });
+                      toast({
+                        title: "Player forced to leave",
+                        description:
+                          "They will be folded now and removed after the hand.",
+                      });
+                    } catch (err) {
+                      const message =
+                        err instanceof Error ? err.message : "Unknown error";
+                      toast({
+                        title: "Failed to force leave",
+                        description: message,
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                >
+                  Force quit game
+                </DropdownMenuItem>
+              </DevOnly>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </motion.div>
     </div>
   );

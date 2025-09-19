@@ -1,5 +1,6 @@
 "use client";
 
+import { DevOnly } from "@/components/dev/DevOnly";
 import { DevToolsPanel } from "@/components/dev/DevToolsPanel";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -33,7 +34,6 @@ export default function PokerGamePage() {
     connectedCount,
     playerIdToCards,
     actions,
-    me,
     isActing,
     isJoining,
     isLeaving,
@@ -215,6 +215,7 @@ export default function PokerGamePage() {
                   isSmallBlind={getIsSB(seatIndex)}
                   isBigBlind={getIsBB(seatIndex)}
                   turnDurationMs={turnDurationMs}
+                  gameId={String(id)}
                 />
               );
             })}
@@ -245,9 +246,8 @@ export default function PokerGamePage() {
 
       {/* Winner dialog removed in server-driven version */}
 
-      {/* Dev panels container */}
-      {(process.env.NODE_ENV !== "production" ||
-        me?.user_metadata?.elevatedPrivileges) && (
+      {/* Dev panels container (UI-only gating from backend role) */}
+      <DevOnly>
         <div className="fixed top-20 right-4 z-50">
           <DevToolsPanel
             tableId={id}
@@ -257,7 +257,7 @@ export default function PokerGamePage() {
             floating={false}
           />
         </div>
-      )}
+      </DevOnly>
     </div>
   );
 }
