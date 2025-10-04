@@ -33,8 +33,8 @@ export const devRouter = createTRPCRouter({
   actAsPlayer: protectedProcedure
     .input(
       z.object({
-        gameId: z.string().uuid(),
-        targetPlayerId: z.string().uuid(),
+        gameId: z.uuid(),
+        targetPlayerId: z.uuid(),
         action: ZodActionSchema,
         amount: z.number().int().positive().optional(),
         actorSource: z.enum(["human", "bot"]).optional(),
@@ -55,7 +55,7 @@ export const devRouter = createTRPCRouter({
       await requireDevAccess(ctx.user.id);
 
       // Verify the target player exists in the game
-      const targetPlayer = await db
+      const [targetPlayer] = await db
         .select()
         .from(players)
         .where(
@@ -66,14 +66,14 @@ export const devRouter = createTRPCRouter({
         )
         .limit(1);
 
-      if (!targetPlayer[0]) {
+      if (!targetPlayer) {
         throw new Error("Target player not found in this game");
       }
 
       // Execute the action as the target player (optionally annotate as bot)
       return await handleActionPure({
         gameId: input.gameId,
-        playerId: input.targetPlayerId,
+        playerId: targetPlayer.id,
         action: input.action,
         amount: input.amount,
         actorSource: input.actorSource ?? "human",
@@ -83,7 +83,7 @@ export const devRouter = createTRPCRouter({
 
   // Advance game state (dev only)
   advanceGame: protectedProcedure
-    .input(z.object({ gameId: z.string().uuid() }))
+    .input(z.object({ gameId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       // Verify dev access
       await requireDevAccess(ctx.user.id);
@@ -93,7 +93,7 @@ export const devRouter = createTRPCRouter({
 
   // Reset game (dev only)
   resetGame: protectedProcedure
-    .input(z.object({ gameId: z.string().uuid() }))
+    .input(z.object({ gameId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       // Verify dev access
       await requireDevAccess(ctx.user.id);
@@ -105,8 +105,8 @@ export const devRouter = createTRPCRouter({
   forceLeavePlayer: protectedProcedure
     .input(
       z.object({
-        gameId: z.string().uuid(),
-        targetUserId: z.string().uuid(),
+        gameId: z.uuid(),
+        targetUserId: z.uuid(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -135,7 +135,7 @@ export const devRouter = createTRPCRouter({
 
   // Get all players in a game (for dev panel player selection)
   getGamePlayers: protectedProcedure
-    .input(z.object({ gameId: z.string().uuid() }))
+    .input(z.object({ gameId: z.uuid() }))
     .query(async ({ ctx, input }) => {
       // Verify dev access
       await requireDevAccess(ctx.user.id);

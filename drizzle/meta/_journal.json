@@ -64,13 +64,6 @@
       "when": 1755374122923,
       "tag": "0008_create-user-roles-table",
       "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1755906602456,
-      "tag": "0009_simulator-config-and-actor-source",
-      "breakpoints": true
     }
   ]
 }

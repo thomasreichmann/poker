@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-const bodySchema = z.object({ userId: z.string().uuid() });
+const bodySchema = z.object({ userId: z.uuid() });
 
 export async function POST(req: Request) {
   if (process.env.NODE_ENV === "production") {

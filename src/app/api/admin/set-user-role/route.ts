@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 const bodySchema = z.object({
-  targetUserId: z.string().uuid(),
+  targetUserId: z.uuid(),
   role: z.enum(["user", "admin", "dev"]),
 });
 

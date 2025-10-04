@@ -97,7 +97,7 @@ export const gameRouter = createTRPCRouter({
   join: protectedProcedure
     .input(
       z.object({
-        gameId: z.string().uuid(),
+        gameId: z.uuid(),
         stack: z.number().int().positive().default(1000),
       })
     )
@@ -147,7 +147,7 @@ export const gameRouter = createTRPCRouter({
   act: protectedProcedure
     .input(
       z.object({
-        gameId: z.string().uuid(),
+        gameId: z.uuid(),
         action: ActionTypeSchema,
         amount: z.number().int().positive().optional(),
       })
@@ -171,21 +171,21 @@ export const gameRouter = createTRPCRouter({
 
   // Advance game state (next player/round/showdown)
   advance: protectedProcedure
-    .input(z.object({ gameId: z.string().uuid() }))
+    .input(z.object({ gameId: z.uuid() }))
     .mutation(async ({ input }) => {
       return await advanceGameStatePure(input.gameId);
     }),
 
   // Reset a game back to initial state and optionally auto-start if >= 2 players
   reset: protectedProcedure
-    .input(z.object({ gameId: z.string().uuid() }))
+    .input(z.object({ gameId: z.uuid() }))
     .mutation(async ({ input }) => {
       return await resetGamePure(input.gameId);
     }),
 
   // Leave a game (fold immediately if active; remove after hand)
   leave: protectedProcedure
-    .input(z.object({ gameId: z.string().uuid() }))
+    .input(z.object({ gameId: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       return await leaveGamePure(ctx.user.id, input.gameId);
     }),
