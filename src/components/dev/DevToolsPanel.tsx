@@ -28,7 +28,7 @@ export function DevToolsPanel({
   floating = false,
   className,
 }: DevToolsPanelProps) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const tabStorageKey = `dev.panel.tab`;
   const [tab, setTab] = useState<string>("multi");
   useEffect(() => {
@@ -111,6 +111,7 @@ export function DevToolsPanel({
                 currentPlayerId={currentPlayerId}
                 floating={false}
                 embedded
+                disableToasts
               />
             </TabsContent>
             <TabsContent value="sim" className="pt-3">

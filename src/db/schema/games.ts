@@ -1,5 +1,12 @@
 import { relations } from "drizzle-orm";
-import { integer, pgEnum, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  AnyPgColumn,
+  integer,
+  pgEnum,
+  pgTable,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { PgEnumAction } from "./actionTypes";
 import { actions } from "./actions";
 import { type Card, cards } from "./cards";
@@ -26,7 +33,10 @@ export const games = pgTable("poker_games", {
   status: gameStatusEnum("status").default("waiting"),
   currentRound: roundTypeEnum("current_round").default("pre-flop"),
   currentHighestBet: integer("current_highest_bet").default(0).notNull(),
-  currentPlayerTurn: uuid("current_player_turn"),
+  currentPlayerTurn: uuid("current_player_turn").references(
+    (): AnyPgColumn => players.id,
+    { onDelete: "set null" }
+  ),
   lastAggressorId: uuid("last_aggressor_id"),
   pot: integer("pot").default(0).notNull(),
   bigBlind: integer("big_blind").default(20).notNull(),

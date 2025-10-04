@@ -9,7 +9,20 @@
       "program": "${workspaceFolder}/node_modules/next/dist/bin/next",
       "sourceMaps": true,
       "runtimeArgs": ["--inspect"],
-      "skipFiles": ["<node_internals>/**"]
+      "skipFiles": ["<node_internals>/**"],
+      "serverReadyAction": {
+        "action": "startDebugging",
+        "name": "Launch Brave",
+        "pattern": "http://localhost:3000"
+      }
+    },
+    {
+      "name": "Launch Brave",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}",
+      "runtimeExecutable": "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
     }
   ]
 }

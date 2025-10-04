@@ -1,55 +1,64 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast";
-import { evaluateHand } from "@/lib/poker/cards";
-import { useTurnTimeout } from "@/lib/useTurnTimeout";
-import { getSupabaseBrowserClient } from "@/supabase/client";
 import { useTRPC } from "@/trpc/client";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo } from "react";
+import { useGameActions } from "./useGameActions";
+import { useGameQuery } from "./useGameQuery";
+import { useGameRealtime } from "./useGameRealtime";
+import { useShowdownEffects } from "./useShowdownEffects";
+import { useTurnManagement } from "./useTurnManagement";
 
-import { Action } from "@/db/schema/actions";
 import { PokerAction } from "@/db/schema/actionTypes";
-import { Card } from "@/db/schema/cards";
-import { Game } from "@/db/schema/games";
-import { Player } from "@/db/schema/players";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
-
-type BroadcastPayload = {
-  event: string;
-  payload: {
-    id: string;
-    old_record: never;
-    operation: string;
-    record: never;
-    schema: string;
-    table: string;
-  };
-  type: string;
-};
+import {
+  normalizeCards,
+  type CachedGameData,
+} from "./realtime/applyBroadcastToCache";
 
 export function useGameData(id: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
-  const { data: me } = useQuery(trpc.auth.me.queryOptions());
-  const gameQueryOptions = trpc.game.getById.queryOptions({ id });
-  const { data: gameData } = useQuery({
-    ...gameQueryOptions,
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: false,
-  });
+  const { me, snapshot, getByIdKey } = useGameQuery(id);
 
   const getHoleCards = useQuery(
     trpc.game.getHoleCards.queryOptions({ gameId: id })
   );
 
-  const dbGame = useMemo(() => gameData?.game ?? null, [gameData?.game]);
-  const dbPlayers = useMemo(() => gameData?.players ?? [], [gameData?.players]);
-  const dbCards = useMemo(() => gameData?.cards ?? [], [gameData?.cards]);
+  // Merge helper: ensure private hole cards are present for the current hand
+  const ensureHoleCardsMerged = useCallback(
+    (prevIn: CachedGameData | null): CachedGameData | null => {
+      if (!prevIn) return prevIn;
+      const prev = prevIn as CachedGameData;
+      const myUserId = me?.id;
+      const myPlayer = myUserId
+        ? prev.players.find((p) => p.userId === myUserId)
+        : undefined;
+      const handId = prev.game?.handId;
+      if (!myPlayer || handId == null) return prev;
+
+      const privateCards = Array.isArray(getHoleCards.data)
+        ? getHoleCards.data.filter(
+            (c) => c.playerId === myPlayer.id && c.handId === handId
+          )
+        : [];
+      if (privateCards.length === 0) return prev;
+
+      const withoutMine = prev.cards.filter((c) => c.playerId !== myPlayer.id);
+      const merged = normalizeCards([
+        ...withoutMine,
+        ...privateCards,
+      ] as unknown as CachedGameData["cards"]);
+      return { ...prev, cards: merged };
+    },
+    [getHoleCards.data, me?.id]
+  );
+
+  const dbGame = useMemo(() => snapshot?.game ?? null, [snapshot?.game]);
+  const dbPlayers = useMemo(() => snapshot?.players ?? [], [snapshot?.players]);
+  const dbCards = useMemo(() => snapshot?.cards ?? [], [snapshot?.cards]);
 
   const yourDbPlayer = useMemo(
     () => dbPlayers.find((p) => p.userId === me?.id) || null,
@@ -174,19 +183,20 @@ export function useGameData(id: string) {
     return tableBet > (yourDbPlayer.currentBet ?? 0) && yourDbPlayer.stack > 0;
   }, [dbGame, yourDbPlayer]);
 
-  const joinMutation = useMutation(trpc.game.join.mutationOptions());
-  const actMutation = useMutation(trpc.game.act.mutationOptions());
-  const advanceMutation = useMutation(trpc.game.advance.mutationOptions());
-  const resetMutation = useMutation(trpc.game.reset.mutationOptions());
-  const leaveMutation = useMutation(trpc.game.leave.mutationOptions());
-  const timeoutMutation = useMutation(trpc.game.timeout.mutationOptions());
+  const { mutations, isPending } = useGameActions();
+  const joinMutation = mutations.joinMutation;
+  const actMutation = mutations.actMutation;
+  const advanceMutation = mutations.advanceMutation;
+  const resetMutation = mutations.resetMutation;
+  const leaveMutation = mutations.leaveMutation;
+  const timeoutMutation = mutations.timeoutMutation;
 
-  const isJoining = joinMutation.isPending;
-  const isActing = actMutation.isPending;
-  const isAdvancing = advanceMutation.isPending;
-  const isResetting = resetMutation.isPending;
-  const isLeaving = leaveMutation.isPending;
-  const isTimingOut = timeoutMutation.isPending;
+  const isJoining = isPending.isJoining;
+  const isActing = isPending.isActing;
+  const isAdvancing = isPending.isAdvancing;
+  const isResetting = isPending.isResetting;
+  const isLeaving = isPending.isLeaving;
+  const isTimingOut = isPending.isTimingOut;
 
   const showError = (message: string) => {
     toast({ variant: "destructive", description: message });
@@ -283,30 +293,34 @@ export function useGameData(id: string) {
   // Robustly refetch your hole cards with retry/backoff until current-hand cards are present
   const refetchHoleCardsWithRetry = useCallback(async () => {
     try {
+      // If we already have current-hand hole cards in the cache, skip refetching
+      const currentHandId = dbGame?.handId;
+      const myId = yourDbPlayer?.id;
+      if (!currentHandId || !myId) return;
+      const haveTwoAlready =
+        dbCards.filter((c) => c.playerId === myId && c.handId === currentHandId)
+          .length >= 2;
+      if (haveTwoAlready) return;
+
       let attempt = 0;
-      const maxAttempts = 8;
-      let delayMs = 100;
-      // Snapshot identifiers to avoid race conditions mid-loop
-      const targetPlayerId = yourDbPlayer?.id;
-      const targetHandId = dbGame?.handId;
-      if (!targetPlayerId || !targetHandId) return;
+      const maxAttempts = 3;
+      let delayMs = 120;
 
       while (attempt < maxAttempts) {
         const res = await getHoleCards.refetch();
-        const hasCurrentHand = Array.isArray(res.data)
-          ? res.data.some(
-              (c) => c.playerId === targetPlayerId && c.handId === targetHandId
-            )
-          : false;
+        const cards = Array.isArray(res.data) ? res.data : [];
+        const hasCurrentHand = cards.some(
+          (c) => c.playerId === myId && c.handId === currentHandId
+        );
         if (hasCurrentHand) return;
         await new Promise((r) => setTimeout(r, delayMs));
-        delayMs = Math.min(1500, Math.floor(delayMs * 1.8));
+        delayMs = Math.min(1000, Math.floor(delayMs * 1.8));
         attempt += 1;
       }
     } catch {
       // swallow; subsequent broadcasts/effects will still populate
     }
-  }, [getHoleCards, yourDbPlayer?.id, dbGame?.handId]);
+  }, [getHoleCards, yourDbPlayer?.id, dbGame?.handId, dbCards]);
 
   // Ensure we fetch your current-hand hole cards after a hand change or initial mount
   useEffect(() => {
@@ -321,216 +335,57 @@ export function useGameData(id: string) {
   }, [dbGame?.handId, yourDbPlayer?.id]);
 
   useEffect(() => {
-    // Update the player hole cards in the getById query
-    if (!getHoleCards.data) {
-      return;
-    }
-    queryClient.setQueryData(trpc.game.getById.queryKey({ id }), (prev) => {
-      if (!prev) return prev;
-      // Merge and de-duplicate cards by id
-      const mergedCards = [...prev.cards, ...getHoleCards.data];
-      const dedupedCards = Array.from(
-        new Map(mergedCards.map((card) => [card.id, card])).values()
-      );
-      return { ...prev, cards: dedupedCards };
+    if (!getHoleCards.data) return;
+    queryClient.setQueryData(getByIdKey, (prev) => {
+      return ensureHoleCardsMerged(prev as CachedGameData | null);
     });
-  }, [getHoleCards.data, id, queryClient, trpc.game.getById]);
+  }, [getHoleCards.data, getByIdKey, queryClient, ensureHoleCardsMerged]);
 
-  // Realtime Broadcast subscription (private channel per game)
-  useEffect(() => {
-    if (!id) return;
-
-    const supabase = getSupabaseBrowserClient();
-
-    // Ensure Realtime Authorization token is set for private channels
-    const unsubscribeAuth = () => {
-      authListener?.subscription.unsubscribe();
-    };
-    void supabase.auth.getSession().then(({ data }) => {
-      const token = data.session?.access_token;
-      if (token) {
-        supabase.realtime.setAuth(token);
-      }
-    });
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        const token = session?.access_token;
-        if (token) {
-          supabase.realtime.setAuth(token);
-        }
-      }
-    );
-
-    // Utilities to update the TRPC cache directly from broadcast payloads
-    const queryKey = trpc.game.getById.queryKey({ id });
-    const toCamel = (s: string) =>
-      s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-    const toCamelObject = (obj: Record<string, unknown>) => {
-      return Object.fromEntries(
-        Object.entries(obj).map(([k, v]) => [toCamel(k), v])
-      );
-    };
-
-    const upsertById = <T extends { id: string | number }>(
-      list: T[],
-      item: T
-    ) => {
-      const idx = list.findIndex((x) => x.id === item.id);
-      if (idx === -1) return [...list, item];
-      const copy = list.slice();
-      copy[idx] = item;
-      return copy;
-    };
-    const removeById = <T extends { id: string | number }>(
-      list: T[],
-      id: string | number
-    ) => list.filter((x) => x.id !== id);
-
-    function applyBroadcast(
-      event: string,
-      table: string,
-      newRow: { id: string },
-      oldRow: { id: string }
-    ) {
-      queryClient.setQueryData(queryKey, (prev) => {
+  // Realtime subscription and cache updates via helper hook
+  useGameRealtime(
+    id,
+    (updater) => {
+      queryClient.setQueryData<CachedGameData | null>(getByIdKey, (prev) => {
         if (!prev) return prev;
-        switch (table) {
-          case "poker_games": {
-            // New and old game FROM DB broadcast
-            const game = newRow ?? oldRow;
-            const mapped = toCamelObject(game) as Game;
-
-            // Next and previous game from TRPC cache
-            const prevGame = prev.game as Game;
-            const nextGame = { ...prevGame, ...mapped };
-            const transitionedToNewHand = prevGame.handId !== nextGame.handId;
-            if (transitionedToNewHand) {
-              // Clear all cards at hand reset; Will need to manually re-fetch hole cards
-              // Also drop players flagged to leaveAfterHand to reflect server removals immediately
-              void refetchHoleCardsWithRetry();
-              const filteredPlayers = prev.players.filter(
-                (p) => !p.leaveAfterHand
-              );
-
-              return {
-                ...prev,
-                game: nextGame,
-                cards: [],
-                players: filteredPlayers,
-              };
-            }
-            return { ...prev, game: nextGame };
-          }
-          case "poker_players": {
-            if (event === "DELETE") {
-              const row = oldRow ?? newRow;
-              const idToRemove = row.id;
-              return { ...prev, players: removeById(prev.players, idToRemove) };
-            }
-            const mapped = toCamelObject(newRow) as Player;
-            return {
-              ...prev,
-              players: upsertById(prev.players, mapped).sort(
-                (a, b) => a.seat - b.seat
-              ),
-            };
-          }
-          case "poker_cards": {
-            const normalize = (cardsList: Card[]) => {
-              const byPlayer = new Map<string, Card[]>();
-              const community: Card[] = [];
-              for (const c of cardsList) {
-                if (c.playerId) {
-                  const pid = String(c.playerId);
-                  const arr = byPlayer.get(pid) ?? [];
-                  arr.push(c);
-                  byPlayer.set(pid, arr);
-                } else {
-                  community.push(c);
-                }
-              }
-              const limited: Card[] = [];
-              for (const [, arr] of byPlayer) {
-                arr.sort((a, b) => Number(a.id) - Number(b.id));
-                const kept = arr.slice(-2);
-                for (const c of kept) limited.push(c);
-              }
-              community.sort((a, b) => Number(a.id) - Number(b.id));
-              for (const c of community.slice(-5)) limited.push(c);
-              return limited;
-            };
-
-            if (event === "DELETE") {
-              const idToRemove = oldRow?.id;
-              const next = removeById(prev.cards, idToRemove);
-              return { ...prev, cards: normalize(next) };
-            }
-            const mapped = toCamelObject(newRow) as Card;
-            const next = upsertById(prev.cards, mapped);
-            return { ...prev, cards: normalize(next) };
-          }
-          case "poker_actions": {
-            const mapped = toCamelObject(newRow) as Action;
-
-            if (event === "INSERT") {
-              const next = [mapped, ...prev.actions].slice(0, 50);
-              return { ...prev, actions: next };
-            }
-            if (event === "UPDATE") {
-              return { ...prev, actions: upsertById(prev.actions, mapped) };
-            }
-            if (event === "DELETE") {
-              const idToRemove = oldRow?.id;
-              return { ...prev, actions: removeById(prev.actions, idToRemove) };
-            }
-            return prev;
-          }
-          default:
-            return prev;
-        }
+        const next = updater(prev);
+        // Re-apply private hole cards after public updates
+        return ensureHoleCardsMerged(next as CachedGameData | null);
       });
+    },
+    undefined,
+    () => {
+      // Force a fast re-fetch of full game snapshot right after hand transition
+      void queryClient.invalidateQueries({ queryKey: getByIdKey });
+      void refetchHoleCardsWithRetry();
     }
+  );
 
-    function onBroadcast(payload: BroadcastPayload) {
-      const p = payload.payload;
-      if (p.schema !== "public") return;
-      if (!p.table) return;
-      applyBroadcast(payload.event, p.table, p.record, p.old_record);
-    }
-
-    const channel = supabase
-      .channel(`topic:${id}`, { config: { private: true } })
-      .on("broadcast", { event: "INSERT" }, onBroadcast)
-      .on("broadcast", { event: "UPDATE" }, onBroadcast)
-      .on("broadcast", { event: "DELETE" }, onBroadcast)
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-      unsubscribeAuth?.();
-    };
+  // Also re-merge any time the snapshot hand changes and we have private cards cached
+  useEffect(() => {
+    queryClient.setQueryData(getByIdKey, (prev) => {
+      if (!prev) return prev;
+      return ensureHoleCardsMerged(prev as CachedGameData);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, refetchHoleCardsWithRetry]);
-
-  // Show showdown feedback and auto-advance to next hand
-  const showdownHandledRef = useRef<string | null>(null);
-  const showdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  }, [snapshot?.game?.handId]);
 
   // Stable timeout handler to avoid effect churn in the hook
   const onTurnTimeout = useCallback(async () => {
     if (!dbGame?.id || !dbGame.currentPlayerTurn) return;
-
-    // Read fan-out count from sessionStorage (dev/testing aid)
+    // Do not pre-filter by local cache; server validation will reject if stale
     let fanout = 1;
-    try {
-      if (typeof window !== "undefined") {
-        const raw = window.sessionStorage.getItem("dev_timeout_fanout") ?? "1";
-        const parsed = Number(raw);
-        fanout = Number.isFinite(parsed)
-          ? Math.max(1, Math.min(25, parsed))
-          : 1;
-      }
-    } catch {}
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        if (typeof window !== "undefined") {
+          const raw =
+            window.sessionStorage.getItem("dev_timeout_fanout") ?? "1";
+          const parsed = Number(raw);
+          fanout = Number.isFinite(parsed)
+            ? Math.max(1, Math.min(25, parsed))
+            : 1;
+        }
+      } catch {}
+    }
 
     const payload = {
       gameId: dbGame.id,
@@ -561,212 +416,32 @@ export function useGameData(id: string) {
     console.log(
       `Timeout fan-out x${fanout} for player ${dbGame.currentPlayerTurn} -> ok=${succeeded} fail=${failed}`
     );
-  }, [dbGame?.id, dbGame?.currentPlayerTurn, timeoutMutation]);
+  }, [
+    dbGame?.id,
+    dbGame?.currentPlayerTurn,
+    timeoutMutation,
+    queryClient,
+    getByIdKey,
+  ]);
 
-  // Shared turn-timeout base options (to avoid duplication)
-  const baseTurnTimeoutOpts = useMemo(
-    () => ({
-      gameId: dbGame?.id,
-      handId: dbGame?.handId,
-      playerId: dbGame?.currentPlayerTurn,
-      round: dbGame?.currentRound,
-      onTimeoutAction: onTurnTimeout,
-    }),
-    [
-      dbGame?.id,
-      dbGame?.handId,
-      dbGame?.currentPlayerTurn,
-      dbGame?.currentRound,
-      onTurnTimeout,
-    ]
+  // Turn timeout management and proactive catch-up
+  useTurnManagement(
+    {
+      meId: me?.id,
+      gameId: dbGame?.id ?? null,
+      handId: dbGame?.handId ?? null,
+      status: dbGame?.status ?? null,
+      currentRound: dbGame?.currentRound ?? null,
+      currentPlayerTurn: dbGame?.currentPlayerTurn ?? null,
+      turnMs: dbGame?.turnMs ?? null,
+      turnTimeoutAt: dbGame?.turnTimeoutAt ?? null,
+    },
+    isYourTurn,
+    onTurnTimeout
   );
 
-  // Turn timeout (PRIMARY): only the current turn holder schedules at the exact deadline
-  useTurnTimeout({
-    ...baseTurnTimeoutOpts,
-    enabled: Boolean(
-      me && dbGame?.status === "active" && isYourTurn && !!dbGame?.turnTimeoutAt
-    ),
-    durationMs: Math.max(1_000, Number(dbGame?.turnMs ?? 30_000)),
-    deadlineAt: dbGame?.turnTimeoutAt ?? null,
-  });
-
-  // Turn timeout (FALLBACK): non-turn holders schedule a grace-delayed backup after the deadline
-  const backupDelayMs = useMemo(() => {
-    if (!dbGame?.turnTimeoutAt) return null;
-    const deadline = new Date(dbGame.turnTimeoutAt).getTime();
-    const now = Date.now();
-    // Fire ~1.25s after the deadline (bounded to at least 1s)
-    return Math.max(1_000, deadline - now + 1_250);
-  }, [dbGame?.turnTimeoutAt]);
-
-  useTurnTimeout({
-    ...baseTurnTimeoutOpts,
-    enabled: Boolean(
-      me && dbGame?.status === "active" && !isYourTurn && !!backupDelayMs
-    ),
-    // Use a relative delay so this backup fires after the primary
-    durationMs:
-      backupDelayMs ??
-      Math.max(1_500, Number(dbGame?.turnMs ?? 30_000) + 1_250),
-    deadlineAt: null,
-  });
-
-  // Proactive catch-up: if we're the turn holder and already past deadline, fire immediately
-  const lastCatchupKeyRef = useRef<string | null>(null);
-  const checkAndTimeoutIfOverdue = useCallback(() => {
-    if (!dbGame || !isYourTurn || !dbGame.turnTimeoutAt) return;
-    const key = `${dbGame.id}:${String(dbGame.handId ?? "")}:${String(
-      dbGame.currentPlayerTurn ?? ""
-    )}`;
-    const now = Date.now();
-    const deadlineMs = new Date(dbGame.turnTimeoutAt).getTime();
-    // Allow slight skew to avoid premature firing
-    if (now >= deadlineMs + 300) {
-      if (lastCatchupKeyRef.current !== key) {
-        lastCatchupKeyRef.current = key;
-        void onTurnTimeout();
-      }
-    }
-  }, [dbGame, isYourTurn, onTurnTimeout]);
-
-  useEffect(() => {
-    checkAndTimeoutIfOverdue();
-  }, [checkAndTimeoutIfOverdue]);
-
-  // Also run catch-up on tab visibility/online events to handle throttled timers
-  useEffect(() => {
-    const handler = () => checkAndTimeoutIfOverdue();
-    if (typeof window !== "undefined") {
-      window.addEventListener("visibilitychange", handler);
-      window.addEventListener("online", handler);
-    }
-    return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("visibilitychange", handler);
-        window.removeEventListener("online", handler);
-      }
-    };
-  }, [checkAndTimeoutIfOverdue]);
-
-  useEffect(() => {
-    if (!dbGame) return;
-    const isShowdown = (dbGame.currentRound ?? "pre-flop") === "showdown";
-    if (!isShowdown) {
-      showdownHandledRef.current = null;
-      // Clear any pending showdown timeout
-      if (showdownTimeoutRef.current) {
-        clearTimeout(showdownTimeoutRef.current);
-        showdownTimeoutRef.current = null;
-      }
-      return;
-    }
-
-    const key = `${dbGame.id}-${String(dbGame.handId ?? "")}`;
-    if (showdownHandledRef.current === key) return;
-
-    // Clear any existing timeout to restart the debounce period
-    if (showdownTimeoutRef.current) {
-      clearTimeout(showdownTimeoutRef.current);
-    }
-
-    // Debounce showdown processing to wait for all related updates
-    showdownTimeoutRef.current = setTimeout(() => {
-      // Double-check we haven't already handled this showdown
-      if (showdownHandledRef.current === key) return;
-      showdownHandledRef.current = key;
-
-      // Determine winners (prefer server flag, fallback to client eval)
-      const community = dbCards.filter((c) => c.playerId === null);
-      const activePlayers = dbPlayers.filter(
-        (p) => p.hasFolded === false || p.hasFolded === null
-      );
-      let winners = dbPlayers.filter((p) => p.hasWon);
-      let handName: string | undefined;
-
-      try {
-        if (winners.length === 0 && activePlayers.length > 0) {
-          // If only one player remains (others folded), they win by default
-          if (activePlayers.length === 1) {
-            winners = [activePlayers[0]!];
-            handName = "Winner by default";
-          } else {
-            // Multiple players remain, evaluate hands
-            const evals = activePlayers.map((p) => {
-              const hole = dbCards.filter((c) => c.playerId === p.id);
-              return {
-                player: p,
-                eval: evaluateHand([...hole, ...community]),
-              };
-            });
-            const bestRank = Math.max(...evals.map((e) => e.eval.rank));
-            const bests = evals.filter((e) => e.eval.rank === bestRank);
-            const bestValue = Math.max(...bests.map((e) => e.eval.value));
-            const finalWinners = bests.filter(
-              (e) => e.eval.value === bestValue
-            );
-            winners = finalWinners.map((e) => e.player);
-            handName = finalWinners[0]?.eval.name;
-          }
-        } else if (winners[0]) {
-          const hole = dbCards.filter((c) => c.playerId === winners[0]!.id);
-          const ev = evaluateHand([...hole, ...community]);
-          handName = ev.name;
-        }
-      } catch {
-        // ignore eval errors - fallback to single non-folded player if we still have none
-        if (winners.length === 0 && activePlayers.length > 0) {
-          if (activePlayers.length === 1) {
-            winners = [activePlayers[0]!];
-            handName = "Winner by default";
-          } else {
-            // Multiple active players but eval failed - pick first non-folded as fallback
-            winners = [activePlayers[0]!];
-            handName = "Winner by default";
-          }
-        }
-      }
-
-      // Show all identified winners for debugging purposes
-      const winnerNames = winners
-        .map((p) => (p.displayName ? p.displayName : `Player ${p.seat}`))
-        .join(", ");
-
-      // Fallback if we still don't have winners for some reason
-      const finalWinnerNames = winnerNames || "Unknown Player";
-
-      const description = handName
-        ? `Winner: ${finalWinnerNames} — ${handName}`
-        : `Winner: ${finalWinnerNames}`;
-      toast({
-        variant: "success",
-        title: "Showdown",
-        description,
-        duration: 5000,
-        groupId: `showdown-${dbGame.id}-${String(dbGame.handId ?? "")}`,
-      });
-
-      // Schedule immediate advance when the client receives showdown state
-      // Use a short delay to let the toast render, but don't wait for it to finish
-      const advanceTimer = setTimeout(() => {
-        void actions.advance();
-      }, 2000);
-
-      // Clear advance timer on cleanup (though this timeout function will complete)
-      setTimeout(() => clearTimeout(advanceTimer), 3000);
-    }, 150); // 150ms debounce delay to wait for related player/card updates
-
-    // Remove debug logs
-
-    // Cleanup function
-    return () => {
-      if (showdownTimeoutRef.current) {
-        clearTimeout(showdownTimeoutRef.current);
-        showdownTimeoutRef.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dbGame?.id, dbGame?.currentRound, dbGame?.handId, dbPlayers, dbCards]);
+  // Showdown effects
+  useShowdownEffects(dbGame, dbPlayers, dbCards, () => actions.advance());
 
   return {
     me,

@@ -41,9 +41,32 @@ export function useTurnTimeout(options: TurnTimeoutOptions) {
   }, [onTimeout]);
 
   useEffect(() => {
-    if (!enabled) return;
-    if (!gameId || !playerId) return;
-    if (round === "showdown") return;
+    if (!enabled) {
+      console.debug("[turn-timeout] skip: disabled", {
+        gameId,
+        handId,
+        playerId,
+        round,
+      });
+      return;
+    }
+    if (!gameId || !playerId) {
+      console.debug("[turn-timeout] skip: missing ids", {
+        gameId,
+        handId,
+        playerId,
+        round,
+      });
+      return;
+    }
+    if (round === "showdown") {
+      console.debug("[turn-timeout] skip: showdown", {
+        gameId,
+        handId,
+        playerId,
+      });
+      return;
+    }
 
     // Clear any previous local timer first
     if (localTimerRef.current) {

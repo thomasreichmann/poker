@@ -30,6 +30,7 @@ type MultiPlayerTestPanelProps = {
   currentPlayerId?: string;
   floating?: boolean;
   embedded?: boolean;
+  disableToasts?: boolean;
 };
 
 export function MultiPlayerTestPanel({
@@ -39,6 +40,7 @@ export function MultiPlayerTestPanel({
   currentPlayerId,
   floating = true,
   embedded = false,
+  disableToasts = false,
 }: MultiPlayerTestPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
@@ -188,12 +190,14 @@ export function MultiPlayerTestPanel({
 
       await actMutation.mutateAsync(payload);
 
-      toast({
-        title: "Action executed",
-        description: `${
-          selectedPlayer.displayName || `Seat ${selectedPlayer.seat}`
-        } ${action}${amount ? ` $${amount}` : ""}`,
-      });
+      if (!disableToasts) {
+        toast({
+          title: "Action executed",
+          description: `${
+            selectedPlayer.displayName || `Seat ${selectedPlayer.seat}`
+          } ${action}${amount ? ` $${amount}` : ""}`,
+        });
+      }
 
       // Auto-advance to next player after action if auto-follow is enabled
       if (autoFollowTurn) {
@@ -203,11 +207,13 @@ export function MultiPlayerTestPanel({
         }
       }
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Action failed",
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
+      if (!disableToasts) {
+        toast({
+          variant: "destructive",
+          title: "Action failed",
+          description: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
     } finally {
       setLoadingAction(null);
     }
@@ -233,13 +239,17 @@ export function MultiPlayerTestPanel({
     try {
       setLoadingAction("advance");
       await advanceMutation.mutateAsync({ gameId });
-      toast({ title: "Game advanced" });
+      if (!disableToasts) {
+        toast({ title: "Game advanced" });
+      }
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Failed to advance game",
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
+      if (!disableToasts) {
+        toast({
+          variant: "destructive",
+          title: "Failed to advance game",
+          description: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
     } finally {
       setLoadingAction(null);
     }
@@ -249,13 +259,17 @@ export function MultiPlayerTestPanel({
     try {
       setLoadingAction("reset");
       await resetMutation.mutateAsync({ gameId });
-      toast({ title: "Game reset" });
+      if (!disableToasts) {
+        toast({ title: "Game reset" });
+      }
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Failed to reset game",
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
+      if (!disableToasts) {
+        toast({
+          variant: "destructive",
+          title: "Failed to reset game",
+          description: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
     } finally {
       setLoadingAction(null);
     }

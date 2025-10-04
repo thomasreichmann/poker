@@ -190,7 +190,7 @@ export const gameRouter = createTRPCRouter({
       return await leaveGamePure(ctx.user.id, input.gameId);
     }),
 
-  // Get player's hole cards
+  // Get player's hole cards (current hand only)
   getHoleCards: protectedProcedure
     .input(z.object({ gameId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -203,11 +203,22 @@ export const gameRouter = createTRPCRouter({
         .limit(1);
       if (!player) throw new Error("Player not found in this game");
 
+      // Scope to the game's current hand to avoid returning stale cards
+      const [game] = await db
+        .select({ handId: games.handId })
+        .from(games)
+        .where(eq(games.id, input.gameId))
+        .limit(1);
+
       const holeCards = await db
         .select()
         .from(cards)
         .where(
-          and(eq(cards.gameId, input.gameId), eq(cards.playerId, player.id))
+          and(
+            eq(cards.gameId, input.gameId),
+            eq(cards.playerId, player.id),
+            eq(cards.handId, game?.handId ?? 0)
+          )
         );
 
       return holeCards;
