@@ -11,7 +11,7 @@ export type TurnTimeoutOptions = {
   enabled?: boolean;
   durationMs?: number; // default 30_000
   // Optional absolute deadline from server; if provided, overrides durationMs
-  deadlineAt?: Date | number | null;
+  deadlineAt?: Date | number | string | null;
   onTimeoutAction: () => void | Promise<void>;
 };
 
@@ -60,12 +60,15 @@ export function useTurnTimeout(options: TurnTimeoutOptions) {
 
     // Compute delay from absolute deadline if provided
     const now = Date.now();
-    const absoluteMs =
-      typeof deadlineAt === "number"
-        ? deadlineAt
-        : deadlineAt instanceof Date
-        ? deadlineAt.getTime()
-        : null;
+    const absoluteMs = ((): number | null => {
+      if (typeof deadlineAt === "number") return deadlineAt;
+      if (deadlineAt instanceof Date) return deadlineAt.getTime();
+      if (typeof deadlineAt === "string") {
+        const parsed = Date.parse(deadlineAt);
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+      return null;
+    })();
     let delayMs = duration;
     if (absoluteMs != null) {
       delayMs = absoluteMs - now;

@@ -280,6 +280,46 @@ export function useGameData(id: string) {
     },
   };
 
+  // Robustly refetch your hole cards with retry/backoff until current-hand cards are present
+  const refetchHoleCardsWithRetry = useCallback(async () => {
+    try {
+      let attempt = 0;
+      const maxAttempts = 8;
+      let delayMs = 100;
+      // Snapshot identifiers to avoid race conditions mid-loop
+      const targetPlayerId = yourDbPlayer?.id;
+      const targetHandId = dbGame?.handId;
+      if (!targetPlayerId || !targetHandId) return;
+
+      while (attempt < maxAttempts) {
+        const res = await getHoleCards.refetch();
+        const hasCurrentHand = Array.isArray(res.data)
+          ? res.data.some(
+              (c) => c.playerId === targetPlayerId && c.handId === targetHandId
+            )
+          : false;
+        if (hasCurrentHand) return;
+        await new Promise((r) => setTimeout(r, delayMs));
+        delayMs = Math.min(1500, Math.floor(delayMs * 1.8));
+        attempt += 1;
+      }
+    } catch {
+      // swallow; subsequent broadcasts/effects will still populate
+    }
+  }, [getHoleCards, yourDbPlayer?.id, dbGame?.handId]);
+
+  // Ensure we fetch your current-hand hole cards after a hand change or initial mount
+  useEffect(() => {
+    if (!dbGame || !yourDbPlayer) return;
+    const myCurrentHandCount = dbCards.filter(
+      (c) => c.playerId === yourDbPlayer.id && c.handId === dbGame.handId
+    ).length;
+    if (myCurrentHandCount < 2) {
+      void refetchHoleCardsWithRetry();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbGame?.handId, yourDbPlayer?.id]);
+
   useEffect(() => {
     // Update the player hole cards in the getById query
     if (!getHoleCards.data) {
@@ -367,7 +407,7 @@ export function useGameData(id: string) {
             if (transitionedToNewHand) {
               // Clear all cards at hand reset; Will need to manually re-fetch hole cards
               // Also drop players flagged to leaveAfterHand to reflect server removals immediately
-              void getHoleCards.refetch();
+              void refetchHoleCardsWithRetry();
               const filteredPlayers = prev.players.filter(
                 (p) => !p.leaveAfterHand
               );
@@ -470,7 +510,7 @@ export function useGameData(id: string) {
       unsubscribeAuth?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, refetchHoleCardsWithRetry]);
 
   // Show showdown feedback and auto-advance to next hand
   const showdownHandledRef = useRef<string | null>(null);
@@ -523,17 +563,91 @@ export function useGameData(id: string) {
     );
   }, [dbGame?.id, dbGame?.currentPlayerTurn, timeoutMutation]);
 
-  // Turn timeout: schedule once per game/hand/player; auto-clears on change
+  // Shared turn-timeout base options (to avoid duplication)
+  const baseTurnTimeoutOpts = useMemo(
+    () => ({
+      gameId: dbGame?.id,
+      handId: dbGame?.handId,
+      playerId: dbGame?.currentPlayerTurn,
+      round: dbGame?.currentRound,
+      onTimeoutAction: onTurnTimeout,
+    }),
+    [
+      dbGame?.id,
+      dbGame?.handId,
+      dbGame?.currentPlayerTurn,
+      dbGame?.currentRound,
+      onTurnTimeout,
+    ]
+  );
+
+  // Turn timeout (PRIMARY): only the current turn holder schedules at the exact deadline
   useTurnTimeout({
-    gameId: dbGame?.id,
-    handId: dbGame?.handId,
-    playerId: dbGame?.currentPlayerTurn,
-    round: dbGame?.currentRound,
-    enabled: Boolean(me && dbGame?.status === "active"),
+    ...baseTurnTimeoutOpts,
+    enabled: Boolean(
+      me && dbGame?.status === "active" && isYourTurn && !!dbGame?.turnTimeoutAt
+    ),
     durationMs: Math.max(1_000, Number(dbGame?.turnMs ?? 30_000)),
     deadlineAt: dbGame?.turnTimeoutAt ?? null,
-    onTimeoutAction: onTurnTimeout,
   });
+
+  // Turn timeout (FALLBACK): non-turn holders schedule a grace-delayed backup after the deadline
+  const backupDelayMs = useMemo(() => {
+    if (!dbGame?.turnTimeoutAt) return null;
+    const deadline = new Date(dbGame.turnTimeoutAt).getTime();
+    const now = Date.now();
+    // Fire ~1.25s after the deadline (bounded to at least 1s)
+    return Math.max(1_000, deadline - now + 1_250);
+  }, [dbGame?.turnTimeoutAt]);
+
+  useTurnTimeout({
+    ...baseTurnTimeoutOpts,
+    enabled: Boolean(
+      me && dbGame?.status === "active" && !isYourTurn && !!backupDelayMs
+    ),
+    // Use a relative delay so this backup fires after the primary
+    durationMs:
+      backupDelayMs ??
+      Math.max(1_500, Number(dbGame?.turnMs ?? 30_000) + 1_250),
+    deadlineAt: null,
+  });
+
+  // Proactive catch-up: if we're the turn holder and already past deadline, fire immediately
+  const lastCatchupKeyRef = useRef<string | null>(null);
+  const checkAndTimeoutIfOverdue = useCallback(() => {
+    if (!dbGame || !isYourTurn || !dbGame.turnTimeoutAt) return;
+    const key = `${dbGame.id}:${String(dbGame.handId ?? "")}:${String(
+      dbGame.currentPlayerTurn ?? ""
+    )}`;
+    const now = Date.now();
+    const deadlineMs = new Date(dbGame.turnTimeoutAt).getTime();
+    // Allow slight skew to avoid premature firing
+    if (now >= deadlineMs + 300) {
+      if (lastCatchupKeyRef.current !== key) {
+        lastCatchupKeyRef.current = key;
+        void onTurnTimeout();
+      }
+    }
+  }, [dbGame, isYourTurn, onTurnTimeout]);
+
+  useEffect(() => {
+    checkAndTimeoutIfOverdue();
+  }, [checkAndTimeoutIfOverdue]);
+
+  // Also run catch-up on tab visibility/online events to handle throttled timers
+  useEffect(() => {
+    const handler = () => checkAndTimeoutIfOverdue();
+    if (typeof window !== "undefined") {
+      window.addEventListener("visibilitychange", handler);
+      window.addEventListener("online", handler);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("visibilitychange", handler);
+        window.removeEventListener("online", handler);
+      }
+    };
+  }, [checkAndTimeoutIfOverdue]);
 
   useEffect(() => {
     if (!dbGame) return;

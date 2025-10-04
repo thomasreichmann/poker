@@ -987,8 +987,11 @@ export function validateTimeout(
   if (gameState.currentRound === "showdown")
     return { isValid: false, error: "Cannot timeout during showdown" };
 
-  // Check if the player has run out of time to act
-  if (gameState.turnTimeoutAt > new Date())
+  // Check if the player has run out of time to act (with small skew tolerance)
+  const nowMs = Date.now();
+  const deadlineMs = gameState.turnTimeoutAt.getTime();
+  const skewAllowanceMs = 250; // tolerate minor client/server clock drift
+  if (nowMs < deadlineMs - skewAllowanceMs)
     return { isValid: false, error: "Player still has time to act" };
 
   const canCheck = validateCheck(gameState, player);
