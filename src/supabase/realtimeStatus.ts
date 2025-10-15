@@ -87,15 +87,24 @@ class RealtimeStatusStore {
     this.listeners.forEach((l) => l());
   }
 
-  private upsertChannel(topic: string, state: RealtimeChannelState) {
-    const existingIndex = this.state.channels.findIndex(
-      (c) => c.topic === topic
-    );
-    if (existingIndex >= 0) {
-      this.state.channels[existingIndex] = { topic, state };
-    } else {
-      this.state.channels = [...this.state.channels, { topic, state }];
+  private setState(next: Partial<RealtimeStatusState>) {
+    // produce a new top-level object to ensure useSyncExternalStore detects change
+    this.state = { ...this.state, ...next };
+    this.emit();
+  }
+
+  private upsertChannelImmutable(
+    channels: RealtimeChannelInfo[],
+    topic: string,
+    state: RealtimeChannelState
+  ): RealtimeChannelInfo[] {
+    const idx = channels.findIndex((c) => c.topic === topic);
+    if (idx >= 0) {
+      const copy = channels.slice();
+      copy[idx] = { topic, state };
+      return copy;
     }
+    return [...channels, { topic, state }];
   }
 
   recordLifecycle(topic: string, status: string) {
@@ -112,7 +121,7 @@ class RealtimeStatusStore {
       // drop duplicate consecutive status for the same topic
       return;
     }
-    this.state.lifecycle = [evt, ...this.state.lifecycle].slice(
+    const nextLifecycle = [evt, ...this.state.lifecycle].slice(
       0,
       MAX_LIFECYCLE
     );
@@ -126,12 +135,18 @@ class RealtimeStatusStore {
       LEAVING: "leaving",
     };
     const state = mapped[status] ?? undefined;
-    if (state) this.upsertChannel(topic, state);
-    this.state.connectionStatus = deriveConnectionStatus(
-      this.state.channels,
+    const nextChannels = state
+      ? this.upsertChannelImmutable(this.state.channels, topic, state)
+      : this.state.channels;
+    const nextConnection = deriveConnectionStatus(
+      nextChannels,
       this.state.lastError
     );
-    this.emit();
+    this.setState({
+      lifecycle: nextLifecycle,
+      channels: nextChannels,
+      connectionStatus: nextConnection,
+    });
   }
 
   setChannelState(topic: string, state: RealtimeChannelState) {
@@ -142,34 +157,23 @@ class RealtimeStatusStore {
   recordBroadcast(event: string, table: string) {
     const at = Date.now();
     const key = (event?.toUpperCase?.() as keyof BroadcastCounters) ?? "OTHER";
+    const counters = { ...this.state.counters };
     if (key === "INSERT" || key === "UPDATE" || key === "DELETE") {
-      this.state.counters = {
-        ...this.state.counters,
-        [key]: this.state.counters[key] + 1,
-      };
+      counters[key] = counters[key] + 1;
     } else {
-      this.state.counters = {
-        ...this.state.counters,
-        OTHER: this.state.counters.OTHER + 1,
-      };
+      counters.OTHER = counters.OTHER + 1;
     }
-    this.state.lastBroadcast = { at, event, table };
-    this.emit();
+    this.setState({ counters, lastBroadcast: { at, event, table } });
   }
 
   recordError(message: string) {
-    this.state.lastError = message;
-    this.state.connectionStatus = deriveConnectionStatus(
-      this.state.channels,
-      this.state.lastError
-    );
+    const nextConnection = deriveConnectionStatus(this.state.channels, message);
+    this.setState({ lastError: message, connectionStatus: nextConnection });
     this.recordLifecycle("-", `error:${message}`);
-    this.emit();
   }
 
   clearLifecycle() {
-    this.state.lifecycle = [];
-    this.emit();
+    this.setState({ lifecycle: [] });
   }
 
   reset() {
