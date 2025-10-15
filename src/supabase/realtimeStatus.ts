@@ -39,6 +39,14 @@ export type LastBroadcast = {
   table: string;
 } | null;
 
+export type BroadcastEventEntry = {
+  id: number;
+  at: number;
+  time: string;
+  event: string;
+  table: string;
+};
+
 export type RealtimeStatusState = {
   channels: RealtimeChannelInfo[];
   connectionStatus: RealtimeConnectionStatus;
@@ -46,9 +54,11 @@ export type RealtimeStatusState = {
   lastBroadcast: LastBroadcast;
   lastError: string | null;
   lifecycle: LifecycleEvent[]; // newest first, capped
+  recentBroadcasts: BroadcastEventEntry[]; // newest first, capped
 };
 
 let MAX_LIFECYCLE = 50;
+let MAX_BROADCASTS = 50;
 
 function deriveConnectionStatus(
   channels: RealtimeChannelInfo[],
@@ -71,8 +81,10 @@ class RealtimeStatusStore {
     lastBroadcast: null,
     lastError: null,
     lifecycle: [],
+    recentBroadcasts: [],
   };
   private nextLifecycleId = 1;
+  private nextBroadcastId = 1;
 
   private listeners: Set<() => void> = new Set();
 
@@ -163,7 +175,22 @@ class RealtimeStatusStore {
     } else {
       counters.OTHER = counters.OTHER + 1;
     }
-    this.setState({ counters, lastBroadcast: { at, event, table } });
+    const entry: BroadcastEventEntry = {
+      id: this.nextBroadcastId++,
+      at,
+      time: new Date(at).toLocaleTimeString(),
+      event,
+      table,
+    };
+    const recentBroadcasts = [entry, ...this.state.recentBroadcasts].slice(
+      0,
+      MAX_BROADCASTS
+    );
+    this.setState({
+      counters,
+      lastBroadcast: { at, event, table },
+      recentBroadcasts,
+    });
   }
 
   recordError(message: string) {
@@ -173,7 +200,7 @@ class RealtimeStatusStore {
   }
 
   clearLifecycle() {
-    this.setState({ lifecycle: [] });
+    this.setState({ lifecycle: [], recentBroadcasts: [], lastBroadcast: null });
   }
 
   reset() {
@@ -184,12 +211,17 @@ class RealtimeStatusStore {
       lastBroadcast: null,
       lastError: null,
       lifecycle: [],
+      recentBroadcasts: [],
     };
     this.emit();
   }
 
   setLifecycleLimit(limit: number) {
     MAX_LIFECYCLE = Math.max(10, Math.min(1000, Math.floor(limit)));
+  }
+
+  setBroadcastsLimit(limit: number) {
+    MAX_BROADCASTS = Math.max(10, Math.min(1000, Math.floor(limit)));
   }
 }
 

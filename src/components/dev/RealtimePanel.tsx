@@ -23,6 +23,9 @@ export function RealtimePanel({ gameId }: RealtimePanelProps) {
   const [limit, setLimit] = useState<number>(50);
   const [showErrorsOnly, setShowErrorsOnly] = useState(false);
   const [topicFilter, setTopicFilter] = useState<string>("");
+  const [eventFilter, setEventFilter] = useState<
+    "ALL" | "INSERT" | "UPDATE" | "DELETE"
+  >("ALL");
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [isFetching, setIsFetching] = useState(false);
@@ -200,6 +203,68 @@ export function RealtimePanel({ gameId }: RealtimePanelProps) {
               <span className="text-slate-400">—</span>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="rounded border border-slate-700 overflow-hidden">
+        <div className="bg-slate-900/80 text-slate-300 px-2 py-1 text-xs">
+          <div className="flex items-center gap-2">
+            <span>Recent broadcasts</span>
+            <select
+              value={eventFilter}
+              onChange={(e) =>
+                setEventFilter(
+                  e.target.value as "ALL" | "INSERT" | "UPDATE" | "DELETE"
+                )
+              }
+              className="ml-2 bg-slate-950 border border-slate-700 rounded px-1 py-0.5"
+            >
+              {(["ALL", "INSERT", "UPDATE", "DELETE"] as const).map((v) => (
+                <option key={v} value={v}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            <input
+              value={topicFilter}
+              onChange={(e) => setTopicFilter(e.target.value)}
+              placeholder="Filter table"
+              className="ml-auto bg-slate-950 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-6 bg-slate-900/60 text-slate-400 px-2 py-1 text-[11px]">
+          <div className="col-span-2">Time</div>
+          <div className="col-span-3">Table</div>
+          <div className="col-span-1 text-right">Event</div>
+        </div>
+        <div className="divide-y divide-slate-800">
+          {(paused
+            ? status.recentBroadcasts
+            : status.recentBroadcasts.slice(0, limit)
+          )
+            .filter((e) =>
+              eventFilter === "ALL" ? true : e.event === eventFilter
+            )
+            .filter((e) =>
+              topicFilter.trim() ? e.table.includes(topicFilter.trim()) : true
+            )
+            .map((e) => (
+              <div key={e.id} className="grid grid-cols-6 px-2 py-1 text-xs">
+                <div className="col-span-2 text-slate-400">{e.time}</div>
+                <div className="col-span-3 truncate text-slate-200">
+                  {e.table}
+                </div>
+                <div className="col-span-1 text-right text-slate-300">
+                  {e.event}
+                </div>
+              </div>
+            ))}
+          {status.recentBroadcasts.length === 0 && (
+            <div className="px-2 py-2 text-slate-400 text-sm">
+              No broadcasts
+            </div>
+          )}
         </div>
       </div>
 
