@@ -5,6 +5,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Persist a piece of state in localStorage without SSR crashes.
+// useLocalStorageState moved to src/hooks/useLocalStorageState
+
 // Global per-turn timeout registry to dedupe timers across multiple hook instances
 type TurnKey = string;
 type TurnTimerEntry = { ownerId: string; timer: ReturnType<typeof setTimeout> };

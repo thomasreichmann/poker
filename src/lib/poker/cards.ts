@@ -6,6 +6,10 @@ export type HandRank = {
   name: string;
 };
 
+export type HandEvaluationDetailed = HandRank & {
+  used: Card[];
+};
+
 // Convert card string to rank value (2-14, where 14 is Ace)
 export function getRankValue(card: Card): number {
   const rank = card.rank;
@@ -256,6 +260,267 @@ export function evaluateHand(cards: Card[]): HandRank {
     rank: 0,
     value: pack(distinctValuesDesc.slice(0, 5)),
     name: "High Card",
+  };
+}
+
+// Detailed best hand evaluation returning which 5 cards are used
+export function evaluateBestHandDetailed(
+  cards: Card[]
+): HandEvaluationDetailed {
+  if (cards.length < 5) {
+    throw new Error("Need at least 5 cards to evaluate a hand");
+  }
+
+  const sorted = sortCards(cards);
+  const values = sorted.map(getRankValue);
+
+  // Count occurrences of each rank
+  const rankCounts = new Map<number, Card[]>();
+  for (const c of sorted) {
+    const v = getRankValue(c);
+    const arr = rankCounts.get(v) ?? [];
+    arr.push(c);
+    rankCounts.set(v, arr);
+  }
+
+  const pack = (nums: number[]) => nums.reduce((acc, v) => acc * 100 + v, 0);
+  const distinctValuesDesc = [...new Set(values)].sort((a, b) => b - a);
+
+  const straightSequence = (vals: number[]): number[] | null => {
+    const uniq = [...new Set(vals)].sort((a, b) => b - a);
+    // Wheel straight (A-2-3-4-5)
+    if (uniq.includes(14) && [5, 4, 3, 2].every((v) => uniq.includes(v))) {
+      return [5, 4, 3, 2, 14];
+    }
+    for (let i = 0; i <= uniq.length - 5; i++) {
+      const start = uniq[i]!;
+      let ok = true;
+      for (let d = 1; d < 5; d++) {
+        if (!uniq.includes(start - d)) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) return [start, start - 1, start - 2, start - 3, start - 4];
+    }
+    return null;
+  };
+
+  // Straight Flush
+  if (isStraightFlush(cards)) {
+    for (const suit of Suit.enumValues) {
+      const suitCards = sorted.filter((c) => getSuit(c) === suit);
+      if (suitCards.length >= 5) {
+        const seq = straightSequence(suitCards.map(getRankValue));
+        if (seq) {
+          const used: Card[] = [];
+          for (const v of seq) {
+            // Ace-low wheel uses Ace represented as 14
+            const pick = suitCards.find(
+              (c) => getRankValue(c) === v && !used.includes(c)
+            );
+            if (pick) used.push(pick);
+          }
+          if (used.length === 5) {
+            const high = seq[0]! === 14 ? 5 : seq[0]!;
+            return { rank: 8, value: high, name: "Straight Flush", used };
+          }
+        }
+      }
+    }
+  }
+
+  // Four of a Kind
+  {
+    const quads = [...rankCounts.entries()]
+      .filter(([, list]) => list.length === 4)
+      .map(([v, list]) => ({ v, list }))
+      .sort((a, b) => b.v - a.v);
+    if (quads.length > 0) {
+      const quad = quads[0]!;
+      const kickerValue = distinctValuesDesc.find((v) => v !== quad.v) ?? 0;
+      const kickerCard = sorted.find(
+        (c) => getRankValue(c) === kickerValue && !quad.list.includes(c)
+      );
+      const used = [...quad.list, ...(kickerCard ? [kickerCard] : [])].slice(
+        0,
+        5
+      );
+      return {
+        rank: 7,
+        value: pack([quad.v, kickerValue]),
+        name: "Four of a Kind",
+        used,
+      };
+    }
+  }
+
+  // Full House
+  {
+    const triples = [...rankCounts.entries()]
+      .filter(([, list]) => list.length >= 3)
+      .map(([v, list]) => ({ v, list }))
+      .sort((a, b) => b.v - a.v);
+    if (triples.length > 0) {
+      const primary = triples[0]!;
+      // Pair candidates from remaining ranks (pairs or other triples)
+      const pairCandidates = [...rankCounts.entries()]
+        .filter(([v, list]) => v !== primary.v && list.length >= 2)
+        .map(([v, list]) => ({ v, list }))
+        .sort((a, b) => b.v - a.v);
+      if (pairCandidates.length > 0) {
+        const pair = pairCandidates[0]!;
+        const used = [...primary.list.slice(0, 3), ...pair.list.slice(0, 2)];
+        return {
+          rank: 6,
+          value: pack([primary.v, pair.v]),
+          name: "Full House",
+          used,
+        };
+      }
+      if (triples.length >= 2) {
+        const pairFromTriple = triples[1]!;
+        const used = [
+          ...primary.list.slice(0, 3),
+          ...pairFromTriple.list.slice(0, 2),
+        ];
+        return {
+          rank: 6,
+          value: pack([primary.v, pairFromTriple.v]),
+          name: "Full House",
+          used,
+        };
+      }
+    }
+  }
+
+  // Flush
+  if (isFlush(cards)) {
+    for (const s of Suit.enumValues) {
+      const flushCards = sorted.filter((card) => getSuit(card) === s);
+      if (flushCards.length >= 5) {
+        const used = flushCards.slice(0, 5);
+        const top5 = used.map(getRankValue);
+        return { rank: 5, value: pack(top5), name: "Flush", used };
+      }
+    }
+  }
+
+  // Straight
+  {
+    const seq = straightSequence(values);
+    if (seq) {
+      const used: Card[] = [];
+      for (const v of seq) {
+        const pick = sorted.find(
+          (c) => getRankValue(c) === v && !used.includes(c)
+        );
+        if (pick) used.push(pick);
+      }
+      if (used.length === 5) {
+        const high = seq[0]! === 14 ? 5 : seq[0]!;
+        return { rank: 4, value: high, name: "Straight", used };
+      }
+    }
+  }
+
+  // Three of a Kind
+  {
+    const triples = [...rankCounts.entries()]
+      .filter(([, list]) => list.length === 3)
+      .map(([v, list]) => ({ v, list }))
+      .sort((a, b) => b.v - a.v);
+    if (triples.length > 0) {
+      const t = triples[0]!;
+      const kickers = distinctValuesDesc.filter((v) => v !== t.v).slice(0, 2);
+      const usedKickers: Card[] = [];
+      for (const kv of kickers) {
+        const kc = sorted.find(
+          (c) =>
+            getRankValue(c) === kv &&
+            !t.list.includes(c) &&
+            !usedKickers.includes(c)
+        );
+        if (kc) usedKickers.push(kc);
+      }
+      const used = [...t.list, ...usedKickers].slice(0, 5);
+      return {
+        rank: 3,
+        value: pack([t.v, ...kickers]),
+        name: "Three of a Kind",
+        used,
+      };
+    }
+  }
+
+  // Two Pair
+  {
+    const pairs = Array.from(rankCounts.entries())
+      .filter(([, list]) => list.length >= 2)
+      .map(([v, list]) => ({ v, list }))
+      .sort((a, b) => b.v - a.v);
+    if (pairs.length >= 2) {
+      const [p1, p2] = [pairs[0]!, pairs[1]!];
+      const kicker =
+        distinctValuesDesc.find((v) => v !== p1.v && v !== p2.v) ?? 0;
+      const kickerCard = sorted.find(
+        (c) =>
+          getRankValue(c) === kicker &&
+          !p1.list.includes(c) &&
+          !p2.list.includes(c)
+      );
+      const used = [
+        ...p1.list.slice(0, 2),
+        ...p2.list.slice(0, 2),
+        ...(kickerCard ? [kickerCard] : []),
+      ].slice(0, 5);
+      return {
+        rank: 2,
+        value: pack([p1.v, p2.v, kicker]),
+        name: "Two Pair",
+        used,
+      };
+    }
+  }
+
+  // One Pair
+  {
+    const pairs = Array.from(rankCounts.entries())
+      .filter(([, list]) => list.length >= 2)
+      .map(([v, list]) => ({ v, list }))
+      .sort((a, b) => b.v - a.v);
+    if (pairs.length === 1) {
+      const pair = pairs[0]!;
+      const kickVals = distinctValuesDesc
+        .filter((v) => v !== pair.v)
+        .slice(0, 3);
+      const usedKickers: Card[] = [];
+      for (const kv of kickVals) {
+        const kc = sorted.find(
+          (c) =>
+            getRankValue(c) === kv &&
+            !pair.list.includes(c) &&
+            !usedKickers.includes(c)
+        );
+        if (kc) usedKickers.push(kc);
+      }
+      const used = [...pair.list.slice(0, 2), ...usedKickers].slice(0, 5);
+      return {
+        rank: 1,
+        value: pack([pair.v, ...kickVals]),
+        name: "One Pair",
+        used,
+      };
+    }
+  }
+
+  // High card
+  const used = sorted.slice(0, 5);
+  return {
+    rank: 0,
+    value: pack(distinctValuesDesc.slice(0, 5)),
+    name: "High Card",
+    used,
   };
 }
 

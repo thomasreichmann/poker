@@ -14,6 +14,7 @@ interface PlayingCardProps {
   animationDelay?: number;
   className?: string;
   replaySeed?: number;
+  highlighted?: boolean;
 }
 
 export function PlayingCard({
@@ -22,6 +23,7 @@ export function PlayingCard({
   isVisible = true,
   animationDelay = 0,
   className,
+  highlighted = false,
 }: PlayingCardProps) {
   const sizeClasses = {
     sm: "w-10 h-14 text-xs",
@@ -42,15 +44,35 @@ export function PlayingCard({
   return (
     <motion.div
       key={motionKey}
-      className={baseClasses}
+      className={cn(baseClasses, "relative overflow-hidden")}
       initial={{ opacity: 0, y: 10, rotate: -1.5, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, rotate: 0, scale: 1 }}
+      animate={{
+        opacity: 1,
+        y: highlighted ? -6 : 0,
+        rotate: 0,
+        scale: 1,
+      }}
       transition={{
         duration: 0.33,
         ease: "easeInOut",
         delay: Math.max(0, animationDelay) / 1000,
       }}
+      style={
+        highlighted
+          ? { filter: "drop-shadow(0 0 10px rgba(245, 158, 11, 0.45))" }
+          : undefined
+      }
     >
+      {highlighted && (
+        <div
+          className="absolute inset-0 rounded pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(120% 90% at 50% 50%, rgba(245, 158, 11, 0.22) 0%, rgba(245, 158, 11, 0.10) 40%, rgba(245, 158, 11, 0) 75%)",
+            mixBlendMode: "screen",
+          }}
+        />
+      )}
       {isVisible ? (
         <>
           <div className={cn(getCardColor(card.suit), "text-base")}>

@@ -26,6 +26,7 @@ type PlayerSeatProps = {
   isYou: boolean;
   phase: string;
   cards: IPlayingCard[];
+  highlightIds?: Set<string>;
   positionStyle: React.CSSProperties;
   activeKey: string;
   isSmallBlind?: boolean;
@@ -40,6 +41,7 @@ export function PlayerSeat({
   isYou,
   phase,
   cards,
+  highlightIds,
   positionStyle,
   activeKey,
   isSmallBlind = false,
@@ -85,13 +87,16 @@ export function PlayerSeat({
       >
         <Card
           className={`bg-slate-800 border-2 transition-all duration-300 relative overflow-hidden ${
-            isCurrent
+            player.hasFolded
+              ? "border-slate-600 opacity-70 pointer-events-none saturate-50 brightness-90 contrast-90"
+              : isCurrent
               ? "border-emerald-400 shadow-lg shadow-emerald-400/20"
-              : player.hasFolded
-              ? "border-slate-500 opacity-50 pointer-events-none grayscale"
               : "border-slate-600"
           }`}
         >
+          {player.hasFolded && (
+            <div className="absolute inset-0 bg-slate-950/20 z-10 pointer-events-none" />
+          )}
           <CardContent
             className={`grid grid-cols-[auto_auto] items-start content-start gap-x-4 gap-y-2 ${
               player.hasFolded ? "text-slate-500" : ""
@@ -130,11 +135,19 @@ export function PlayerSeat({
                     ? player.displayName
                     : `Jogador ${player.seat}`}
                 </div>
-                <div className="text-xs text-emerald-400">
+                <div
+                  className={`text-xs ${
+                    player.hasFolded ? "text-slate-400" : "text-emerald-400"
+                  }`}
+                >
                   R$ {player.stack}
                 </div>
                 {(player.currentBet ?? 0) > 0 && (
-                  <div className="text-xs text-yellow-400">
+                  <div
+                    className={`text-xs ${
+                      player.hasFolded ? "text-slate-500" : "text-yellow-400"
+                    }`}
+                  >
                     Aposta: R$ {player.currentBet}
                   </div>
                 )}
@@ -148,7 +161,17 @@ export function PlayerSeat({
                       key={card.id}
                       card={card}
                       size="sm"
-                      isVisible={isYou || phase === "showdown"}
+                      isVisible={isYou || player.showCards === true}
+                      highlighted={Boolean(
+                        highlightIds && highlightIds.has(card.id)
+                      )}
+                      className={
+                        highlightIds
+                          ? highlightIds.has(card.id)
+                            ? undefined
+                            : "opacity-50"
+                          : undefined
+                      }
                       isAnimating={false}
                       animationDelay={cardIndex * 100}
                     />

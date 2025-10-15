@@ -4,11 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Game } from "@/db/schema/games";
 import { Player } from "@/db/schema/players";
+import { useLocalStorageState } from "@/hooks/useLocalStorageState";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
-import { useEffect, useState } from "react";
+// no hooks needed here beyond local storage state
 import { BoardPanel } from "./BoardPanel";
 import { MultiPlayerTestPanel } from "./MultiPlayerTestPanel";
+import RealtimePanel from "./RealtimePanel";
 import { SimulatorPanel } from "./SimulatorPanel";
 
 type DevToolsPanelProps = {
@@ -28,22 +30,10 @@ export function DevToolsPanel({
   floating = false,
   className,
 }: DevToolsPanelProps) {
-  const [open, setOpen] = useState(false);
   const tabStorageKey = `dev.panel.tab`;
-  const [tab, setTab] = useState<string>("multi");
-  useEffect(() => {
-    try {
-      const raw =
-        typeof window !== "undefined" && localStorage.getItem(tabStorageKey);
-      if (raw) setTab(raw);
-    } catch {}
-  }, [tabStorageKey]);
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined")
-        localStorage.setItem(tabStorageKey, tab);
-    } catch {}
-  }, [tab, tabStorageKey]);
+  const openStorageKey = `dev.panel.open`;
+  const [open, setOpen] = useLocalStorageState<boolean>(openStorageKey, false);
+  const [tab, setTab] = useLocalStorageState<string>(tabStorageKey, "multi");
   return (
     <Card
       className={cn(
@@ -82,8 +72,14 @@ export function DevToolsPanel({
         aria-hidden={!open}
       >
         <CardContent className={cn(open ? "p-3" : "p-0")}>
-          <Tabs value={tab} onValueChange={setTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 bg-slate-900 border border-slate-700">
+          <Tabs
+            value={tab === "sim" ? "multi" : tab}
+            onValueChange={(v) => {
+              if (v !== "sim") setTab(v);
+            }}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-4 bg-slate-900 border border-slate-700">
               <TabsTrigger
                 value="multi"
                 className="data-[state=active]:bg-slate-700"
@@ -92,6 +88,7 @@ export function DevToolsPanel({
               </TabsTrigger>
               <TabsTrigger
                 value="sim"
+                disabled
                 className="data-[state=active]:bg-slate-700"
               >
                 Simulator
@@ -101,6 +98,12 @@ export function DevToolsPanel({
                 className="data-[state=active]:bg-slate-700"
               >
                 Board
+              </TabsTrigger>
+              <TabsTrigger
+                value="realtime"
+                className="data-[state=active]:bg-slate-700"
+              >
+                Realtime
               </TabsTrigger>
             </TabsList>
             <TabsContent value="multi" className="pt-3">
@@ -127,6 +130,9 @@ export function DevToolsPanel({
             </TabsContent>
             <TabsContent value="board" className="pt-3">
               <BoardPanel embedded />
+            </TabsContent>
+            <TabsContent value="realtime" className="pt-3">
+              <RealtimePanel />
             </TabsContent>
           </Tabs>
         </CardContent>

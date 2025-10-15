@@ -9,9 +9,10 @@ import { useEffect, useMemo, useRef } from "react";
 type CommunityCardsProps = {
   cards: IPlayingCard[];
   isAnimating?: boolean;
+  highlightIds?: Set<string>;
 };
 
-export function CommunityCards({ cards }: CommunityCardsProps) {
+export function CommunityCards({ cards, highlightIds }: CommunityCardsProps) {
   const prevCount = useRef(0);
   const prevIdsRef = useRef<string[]>([]);
   const board = useBoardState();
@@ -52,6 +53,14 @@ export function CommunityCards({ cards }: CommunityCardsProps) {
             card={card}
             size="md"
             isVisible={true}
+            highlighted={Boolean(highlightIds && highlightIds.has(card.id))}
+            className={
+              highlightIds
+                ? highlightIds.has(card.id)
+                  ? undefined
+                  : "opacity-50"
+                : undefined
+            }
             animationDelay={
               index >= prevCount.current ? (index - prevCount.current) * 80 : 0
             }

@@ -1,14 +1,13 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/supabase/client";
-import { useEffect } from "react";
-import {
-  type CachedGameData,
-  normalizeCards,
-  removeById,
-  toCamelObject,
-  upsertById,
-} from "./realtime/applyBroadcastToCache";
+import { AUTH_SET_DEBOUNCE_MS } from "@/supabase/constants";
+import { debug } from "@/supabase/debug";
+import { acquireTopicChannel } from "@/supabase/realtimeHelpers";
+import { realtimeStatusStore } from "@/supabase/realtimeStatus";
+import { useEffect, useRef } from "react";
+import { type CachedGameData } from "./realtime/applyBroadcastToCache";
+import { applyBroadcastToCachedState } from "./realtime/reducers";
 
 type BroadcastPayload = {
   event: string;
@@ -31,30 +30,26 @@ export function useGameRealtime(
   onAuthToken?: (token: string) => void,
   onHandTransition?: () => void
 ) {
+  const onAuthTokenRef = useRef(onAuthToken);
+  const onHandTransitionRef = useRef(onHandTransition);
+  const setCacheRef = useRef(setCache);
+  onAuthTokenRef.current = onAuthToken;
+  onHandTransitionRef.current = onHandTransition;
+  setCacheRef.current = setCache;
+  const stoppedRef = useRef(false);
+  const retryDelayRef = useRef(1000);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  );
+  const socketListenersAttachedRef = useRef(false);
+  const lastAuthTokenRef = useRef<string | undefined>(undefined);
+  const lastSetAuthAtRef = useRef<number>(0);
+
   useEffect(() => {
     if (!id) return;
 
     const supabase = getSupabaseBrowserClient();
-
-    const unsubscribeAuth = () => {
-      authListener?.subscription.unsubscribe();
-    };
-    void supabase.auth.getSession().then(({ data }) => {
-      const token = data.session?.access_token;
-      if (token) {
-        supabase.realtime.setAuth(token);
-        onAuthToken?.(token);
-      }
-    });
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        const token = session?.access_token;
-        if (token) {
-          supabase.realtime.setAuth(token);
-          onAuthToken?.(token);
-        }
-      }
-    );
+    let authUnsub: (() => void) | undefined;
 
     function applyBroadcast(
       event: string,
@@ -62,103 +57,176 @@ export function useGameRealtime(
       newRow: Record<string, unknown>,
       oldRow: Record<string, unknown>
     ) {
-      setCache((prev) => {
+      setCacheRef.current?.((prev) => {
         if (!prev) return prev;
-        switch (table) {
-          case "poker_games": {
-            const game = newRow ?? oldRow;
-            const mapped = toCamelObject(game) as CachedGameData["game"];
-            const prevGame = prev.game;
-            const nextGame = { ...prevGame, ...mapped };
-            const transitionedToNewHand = prevGame.handId !== nextGame.handId;
-            if (transitionedToNewHand) {
-              try {
-                onHandTransition?.();
-              } catch {}
-              return {
-                ...prev,
-                game: nextGame,
-                cards: [],
-                players: prev.players.filter((p) => !p.leaveAfterHand),
-              };
-            }
-            return { ...prev, game: nextGame };
-          }
-          case "poker_players": {
-            if (event === "DELETE") {
-              const row = oldRow ?? newRow;
-              const idToRemove = row.id as string;
-              return { ...prev, players: removeById(prev.players, idToRemove) };
-            }
-            const mapped = toCamelObject(
-              newRow
-            ) as CachedGameData["players"][number];
-            return {
-              ...prev,
-              players: upsertById(prev.players, mapped).sort(
-                (a, b) => a.seat - b.seat
-              ),
-            };
-          }
-          case "poker_cards": {
-            if (event === "DELETE") {
-              const idToRemove = oldRow?.id as string;
-              const next = removeById(prev.cards, idToRemove);
-              return { ...prev, cards: normalizeCards(next) };
-            }
-            const mapped = toCamelObject(
-              newRow
-            ) as CachedGameData["cards"][number];
-            const next = upsertById(prev.cards, mapped);
-            return { ...prev, cards: normalizeCards(next) };
-          }
-          case "poker_actions": {
-            const mapped = toCamelObject(
-              newRow
-            ) as CachedGameData["actions"][number];
-            if (event === "INSERT") {
-              const next = [mapped, ...prev.actions].slice(0, 50);
-              return { ...prev, actions: next };
-            }
-            if (event === "UPDATE") {
-              return { ...prev, actions: upsertById(prev.actions, mapped) };
-            }
-            if (event === "DELETE") {
-              const idToRemove = oldRow?.id as string;
-              return { ...prev, actions: removeById(prev.actions, idToRemove) };
-            }
-            return prev;
-          }
-          default:
-            return prev;
-        }
+        return applyBroadcastToCachedState(
+          prev,
+          table as
+            | "poker_games"
+            | "poker_players"
+            | "poker_cards"
+            | "poker_actions",
+          event as "INSERT" | "UPDATE" | "DELETE",
+          newRow,
+          oldRow,
+          () => onHandTransitionRef.current?.()
+        );
       });
     }
 
     function onBroadcast(payload: BroadcastPayload) {
       const p = payload.payload;
-      console.log("Received payload", p);
+      debug.log("payload", p);
       if (p.schema !== "public") {
-        console.log("schema not public", p.schema);
+        debug.warn("schema not public", p.schema);
         return;
       }
       if (!p.table) {
-        console.log("table not found", p.table);
+        debug.warn("table not found", p.table);
         return;
       }
       applyBroadcast(payload.event, p.table, p.record, p.old_record);
     }
 
-    const channel = supabase
-      .channel(`topic:${id}`, { config: { private: true } })
-      .on("broadcast", { event: "INSERT" }, onBroadcast)
-      .on("broadcast", { event: "UPDATE" }, onBroadcast)
-      .on("broadcast", { event: "DELETE" }, onBroadcast)
-      .subscribe();
+    const topic = `topic:${id}`;
+
+    let removeChannel: (() => void) | undefined;
+
+    const removeExistingChannels = async () => {
+      try {
+        const s = supabase as unknown as {
+          getChannels?: () => Array<{ topic?: string }>;
+          removeChannel: (ch: { topic?: string }) => Promise<void> | void;
+        };
+        const existing = s.getChannels?.() ?? [];
+        for (const ch of existing) {
+          if (ch && ch.topic === topic) {
+            await s.removeChannel(ch);
+          }
+        }
+      } catch {}
+    };
+
+    const setupChannel = () =>
+      acquireTopicChannel(
+        supabase,
+        topic,
+        (status) => {
+          try {
+            realtimeStatusStore.recordLifecycle(topic, status);
+          } catch {}
+          if (status === "SUBSCRIBED") retryDelayRef.current = 1000;
+        },
+        (payload) => {
+          const p = (payload as BroadcastPayload).payload;
+          if (p?.table && typeof p.table === "string") {
+            try {
+              realtimeStatusStore.recordBroadcast(
+                (payload as BroadcastPayload).event,
+                p.table
+              );
+            } catch {}
+          }
+          onBroadcast(payload as BroadcastPayload);
+        }
+      );
+
+    const setup = async () => {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (token) {
+        const now = Date.now();
+        if (
+          lastAuthTokenRef.current !== token &&
+          now - lastSetAuthAtRef.current > AUTH_SET_DEBOUNCE_MS
+        ) {
+          lastAuthTokenRef.current = token;
+          lastSetAuthAtRef.current = now;
+          supabase.realtime.setAuth(token);
+        }
+        try {
+          onAuthTokenRef.current?.(token);
+        } catch {}
+      }
+      const authListener = supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          const t = session?.access_token;
+          if (t) {
+            const now = Date.now();
+            if (
+              lastAuthTokenRef.current !== t &&
+              now - lastSetAuthAtRef.current > AUTH_SET_DEBOUNCE_MS
+            ) {
+              lastAuthTokenRef.current = t;
+              lastSetAuthAtRef.current = now;
+              supabase.realtime.setAuth(t);
+            }
+            try {
+              onAuthTokenRef.current?.(t);
+            } catch {}
+          }
+        }
+      );
+      authUnsub = () => authListener.data?.subscription.unsubscribe();
+      await removeExistingChannels();
+      removeChannel = setupChannel();
+
+      // Attach socket-level listeners once for diagnostics
+      if (!socketListenersAttachedRef.current) {
+        socketListenersAttachedRef.current = true;
+        try {
+          const r = (
+            supabase as unknown as {
+              realtime: {
+                onOpen?: (cb: () => void) => void;
+                onClose?: (cb: (ev?: unknown) => void) => void;
+                onError?: (cb: (err?: unknown) => void) => void;
+              };
+            }
+          ).realtime;
+          r.onOpen?.(() => {
+            try {
+              realtimeStatusStore.recordLifecycle("socket", "OPEN");
+            } catch {}
+          });
+          r.onClose?.((ev) => {
+            try {
+              const details =
+                ev && typeof ev === "object"
+                  ? JSON.stringify(ev)
+                  : String(ev ?? "");
+              realtimeStatusStore.recordLifecycle("socket", `CLOSE:${details}`);
+            } catch {}
+          });
+          r.onError?.((err) => {
+            try {
+              const details =
+                err && typeof err === "object"
+                  ? JSON.stringify(err)
+                  : String(err ?? "");
+              realtimeStatusStore.recordLifecycle("socket", `ERROR:${details}`);
+            } catch {}
+          });
+        } catch {}
+      }
+    };
+
+    stoppedRef.current = false;
+    retryDelayRef.current = 1000;
+    void setup();
 
     return () => {
-      void supabase.removeChannel(channel);
-      unsubscribeAuth?.();
+      stoppedRef.current = true;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = undefined;
+      }
+      try {
+        removeChannel?.();
+      } catch {}
+      try {
+        authUnsub?.();
+      } catch {}
     };
-  }, [id, setCache, onAuthToken, onHandTransition]);
+  }, [id]);
 }

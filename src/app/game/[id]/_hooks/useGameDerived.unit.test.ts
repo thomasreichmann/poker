@@ -1,8 +1,9 @@
 import { describe, expect, test } from "vitest";
+import type { CachedGameData } from "./realtime/applyBroadcastToCache";
 import { computeGameViewModel } from "./useGameDerived";
 
-function makeSnapshot(overrides?: Partial<any>) {
-  const base = {
+function makeSnapshot(overrides?: Partial<CachedGameData>) {
+  const base: CachedGameData = {
     game: {
       id: "g",
       status: "active",
@@ -13,7 +14,7 @@ function makeSnapshot(overrides?: Partial<any>) {
       pot: 30,
       bigBlind: 20,
       smallBlind: 10,
-    },
+    } as unknown as CachedGameData["game"],
     players: [
       {
         id: "p1",
@@ -23,7 +24,7 @@ function makeSnapshot(overrides?: Partial<any>) {
         currentBet: 10,
         hasFolded: false,
         isButton: true,
-      },
+      } as unknown as CachedGameData["players"][number],
       {
         id: "p2",
         userId: "u2",
@@ -32,7 +33,7 @@ function makeSnapshot(overrides?: Partial<any>) {
         currentBet: 20,
         hasFolded: false,
         isButton: false,
-      },
+      } as unknown as CachedGameData["players"][number],
       {
         id: "p3",
         userId: "u3",
@@ -41,12 +42,12 @@ function makeSnapshot(overrides?: Partial<any>) {
         currentBet: 0,
         hasFolded: false,
         isButton: false,
-      },
-    ],
-    cards: [],
-    actions: [],
-  } as any;
-  return { ...base, ...overrides };
+      } as unknown as CachedGameData["players"][number],
+    ] as unknown as CachedGameData["players"],
+    cards: [] as unknown as CachedGameData["cards"],
+    actions: [] as unknown as CachedGameData["actions"],
+  };
+  return { ...base, ...overrides } as CachedGameData;
 }
 
 describe("computeGameViewModel", () => {

@@ -18,13 +18,13 @@ describe("applyBroadcastToCache helpers", () => {
   });
 
   test("toCamelObject preserves non-snake keys and values", () => {
-    const src = {
+    const src: Record<string, unknown> = {
       id: 1,
       foo: "bar",
       created_at: 123,
       nested_key: { a: 1 },
-    } as any;
-    const res = toCamelObject(src) as any;
+    };
+    const res = toCamelObject(src) as Record<string, unknown>;
     expect(res.id).toBe(1);
     expect(res.foo).toBe("bar");
     expect(res.createdAt).toBe(123);
@@ -150,9 +150,9 @@ describe("applyBroadcastToCache helpers", () => {
       { id: 12, gameId: "g", handId: 1, playerId: null, rank: "4", suit: "s" },
       { id: 13, gameId: "g", handId: 1, playerId: null, rank: "5", suit: "s" },
       { id: 14, gameId: "g", handId: 1, playerId: null, rank: "6", suit: "s" },
-    ] as any[];
-    const once = normalizeCards(cards as any);
-    const twice = normalizeCards(once as any);
+    ];
+    const once = normalizeCards(cards as unknown as Card[]);
+    const twice = normalizeCards(once as unknown as Card[]);
     expect(twice).toEqual(once);
   });
 });

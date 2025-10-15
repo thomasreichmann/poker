@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-// @ts-ignore: testing-library types may not be available in CI TS config
 import { renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { useTurnManagement, type TurnContext } from "./useTurnManagement";
 
 describe("useTurnManagement (hook)", () => {
@@ -11,7 +10,7 @@ describe("useTurnManagement (hook)", () => {
   afterEach(() => {
     vi.useRealTimers();
     // Restore Date.now
-    (Date.now as any) = realNow;
+    (Date.now as unknown as () => number) = realNow;
   });
 
   function makeCtx(overrides?: Partial<TurnContext>): TurnContext {

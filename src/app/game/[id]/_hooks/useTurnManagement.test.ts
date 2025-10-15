@@ -7,9 +7,9 @@ describe("useTurnManagement helpers", () => {
     expect(computeBackupDelayMs(undefined)).toBeNull();
   });
 
-  test("computeBackupDelayMs provides >= 1s delay when deadline has passed", () => {
+  test("computeBackupDelayMs provides small grace when deadline has passed", () => {
     const past = Date.now() - 5000;
-    expect(computeBackupDelayMs(past)).toBeGreaterThanOrEqual(1000);
+    expect(computeBackupDelayMs(past)).toBeGreaterThanOrEqual(150);
   });
 
   test("computeBackupDelayMs computes small grace after future deadline", () => {

@@ -676,7 +676,7 @@ export default function DashboardPage() {
         <ImpersonateDialog
           open={devOpen}
           onOpenChangeAction={setDevOpen}
-          onImpersonatedAction={() => router.refresh()}
+          onImpersonatedAction={() => router.push("/dashboard")}
         />
       )}
     </div>

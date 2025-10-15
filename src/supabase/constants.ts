@@ -1,0 +1,3 @@
+export const AUTH_SET_DEBOUNCE_MS = 60_000;
+export const RETRY_BACKOFF_INITIAL_MS = 1_000;
+export const RETRY_BACKOFF_MAX_MS = 10_000;

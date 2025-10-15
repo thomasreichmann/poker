@@ -2,12 +2,15 @@
 
 import { DevOnly } from "@/components/dev/DevOnly";
 import { DevToolsPanel } from "@/components/dev/DevToolsPanel";
+import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
+import { evaluateBestHandDetailed } from "@/lib/poker/cards";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActionPanel } from "./_components/ActionPanel";
 import { CommunityCards } from "./_components/CommunityCards";
 import { Header } from "./_components/Header";
 import { PlayerSeat } from "./_components/PlayerSeat";
+import { ShowdownBanner } from "./_components/ShowdownBanner";
 import { TableSurface } from "./_components/TableSurface";
 import { useGameData } from "./_hooks/useGameData";
 
@@ -18,6 +21,7 @@ export default function PokerGamePage() {
 
   const {
     dbGame,
+    dbCards,
     yourDbPlayer,
     isYourTurn,
     communityCards,
@@ -76,6 +80,7 @@ export default function PokerGamePage() {
   };
 
   const phase = dbGame?.currentRound ?? "pre-flop";
+  const isShowdown = phase === "showdown";
   const showActionPanel: boolean = !!(
     isYourTurn &&
     dbGame &&
@@ -123,6 +128,108 @@ export default function PokerGamePage() {
 
   const turnDurationMs = Math.max(1000, Number(dbGame?.turnMs ?? 30000));
 
+  // Compute highlight sets for showdown (winning cards only)
+  const { boardHighlightIds, holeHighlightIds } = useMemo(() => {
+    const empty = {
+      boardHighlightIds: undefined as Set<string> | undefined,
+      holeHighlightIds: new Map<string, Set<string>>(),
+    };
+    if (!isShowdown) return empty;
+
+    // Contested showdown only if multiple active players
+    const activePlayers = playersBySeat.filter((p) => !p.hasFolded);
+    if (activePlayers.length <= 1) return empty;
+
+    const communityDb = dbCards.filter((c) => c.playerId === null);
+    if (communityDb.length < 3) return empty;
+
+    // Build per-player ordered db cards (to mirror id generation used in UI)
+    const perPlayerOrdered = new Map<string, { list: typeof dbCards }>();
+    for (const c of dbCards) {
+      if (!c.playerId) continue;
+      const entry = perPlayerOrdered.get(c.playerId) ?? {
+        list: [] as typeof dbCards,
+      };
+      entry.list.push(c);
+      perPlayerOrdered.set(c.playerId, entry);
+    }
+
+    // Determine winners: prefer hasWon flags; otherwise compute among active players where hole cards are present
+    let winners = playersBySeat.filter((p) => p.hasWon);
+    if (winners.length === 0) {
+      const candidates = activePlayers.filter(
+        (p) => (perPlayerOrdered.get(p.id)?.list.length ?? 0) >= 2
+      );
+      const evals = candidates.map((p) => {
+        const hole = (perPlayerOrdered.get(p.id)?.list ?? []).slice(0, 2);
+        const ev = evaluateBestHandDetailed([...hole, ...communityDb]);
+        return { player: p, ev };
+      });
+      const bestRank = Math.max(...evals.map((e) => e.ev.rank));
+      const bestRanked = evals.filter((e) => e.ev.rank === bestRank);
+      const bestValue = Math.max(...bestRanked.map((e) => e.ev.value));
+      winners = bestRanked
+        .filter((e) => e.ev.value === bestValue)
+        .map((e) => e.player);
+    }
+
+    const boardSet = new Set<string>();
+    const holeSets = new Map<string, Set<string>>();
+
+    // Helper to map db community card to UI id
+    const findCommunityId = (
+      rank: IPlayingCard["rank"],
+      suit: IPlayingCard["suit"]
+    ): string | undefined => {
+      const idx = communityCards.findIndex(
+        (c) => c.rank === rank && c.suit === suit
+      );
+      return idx >= 0 ? communityCards[idx]!.id : undefined;
+    };
+
+    for (const w of winners) {
+      const playerCardsDb = (perPlayerOrdered.get(w.id)?.list ?? []).slice(
+        0,
+        2
+      );
+      if (playerCardsDb.length < 2) continue;
+      try {
+        const detailed = evaluateBestHandDetailed([
+          ...playerCardsDb,
+          ...communityDb,
+        ]);
+        // Board cards used
+        detailed.used
+          .filter((c) => c.playerId === null)
+          .forEach((c) => {
+            const cid = findCommunityId(c.rank, c.suit);
+            if (cid) boardSet.add(cid);
+          });
+        // Hole cards used
+        const holeUsed = detailed.used.filter((c) => c.playerId === w.id);
+        if (holeUsed.length > 0) {
+          const set = holeSets.get(w.id) ?? new Set<string>();
+          for (const hc of holeUsed) {
+            const ordered = perPlayerOrdered.get(w.id)?.list ?? [];
+            const index = ordered.findIndex(
+              (x) => x.rank === hc.rank && x.suit === hc.suit
+            );
+            if (index >= 0) {
+              const id = `${hc.rank}-${hc.suit}-${w.id}-${index}`;
+              set.add(id);
+            }
+          }
+          holeSets.set(w.id, set);
+        }
+      } catch {}
+    }
+
+    return {
+      boardHighlightIds: boardSet.size > 0 ? boardSet : undefined,
+      holeHighlightIds: holeSets,
+    };
+  }, [isShowdown, playersBySeat, dbCards, communityCards]);
+
   return (
     <div className="min-h-screen bg-slate-900 text-white relative overflow-hidden">
       <Header
@@ -155,7 +262,16 @@ export default function PokerGamePage() {
               currentHighestBet={dbGame?.currentHighestBet ?? 0}
               phaseLabel={phaseLabel}
             />
-            <CommunityCards cards={communityCards} isAnimating={false} />
+            <ShowdownBanner
+              game={dbGame}
+              players={playersBySeat}
+              cards={dbCards}
+            />
+            <CommunityCards
+              cards={communityCards}
+              isAnimating={false}
+              highlightIds={boardHighlightIds}
+            />
 
             {/* Players */}
             {playersByView.map((player, index) => {
@@ -210,6 +326,7 @@ export default function PokerGamePage() {
                   isYou={isYou}
                   phase={phase}
                   cards={playerCards}
+                  highlightIds={holeHighlightIds.get(player.id)}
                   positionStyle={position}
                   activeKey={`${dbGame?.id}-${activePlayerIndex}-${phase}`}
                   isSmallBlind={getIsSB(seatIndex)}
