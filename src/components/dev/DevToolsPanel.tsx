@@ -132,7 +132,7 @@ export function DevToolsPanel({
               <BoardPanel embedded />
             </TabsContent>
             <TabsContent value="realtime" className="pt-3">
-              <RealtimePanel />
+              <RealtimePanel gameId={tableId} />
             </TabsContent>
           </Tabs>
         </CardContent>

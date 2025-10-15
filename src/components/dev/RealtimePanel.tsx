@@ -6,10 +6,16 @@ import {
   realtimeStatusStore,
   useRealtimeStatus,
 } from "@/supabase/realtimeStatus";
+import { useTRPC } from "@/trpc/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Filter } from "lucide-react";
 import { useEffect, useState } from "react";
 
-export function RealtimePanel() {
+type RealtimePanelProps = {
+  gameId?: string;
+};
+
+export function RealtimePanel({ gameId }: RealtimePanelProps) {
   const status = useRealtimeStatus();
   const channels = status.channels;
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number>(Date.now());
@@ -17,6 +23,9 @@ export function RealtimePanel() {
   const [limit, setLimit] = useState<number>(50);
   const [showErrorsOnly, setShowErrorsOnly] = useState(false);
   const [topicFilter, setTopicFilter] = useState<string>("");
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [isFetching, setIsFetching] = useState(false);
 
   useEffect(() => {
     setLastUpdatedAt(Date.now());
@@ -73,6 +82,30 @@ export function RealtimePanel() {
           className="border border-slate-700"
         >
           Clear events
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={!gameId || isFetching}
+          onClick={async () => {
+            if (!gameId) return;
+            setIsFetching(true);
+            try {
+              const key = trpc.game.getById.queryKey({ id: gameId });
+              await queryClient.invalidateQueries({ queryKey: key });
+              await queryClient.refetchQueries({
+                queryKey: key,
+                type: "active",
+              });
+            } finally {
+              setIsFetching(false);
+              setLastUpdatedAt(Date.now());
+            }
+          }}
+          className="border border-slate-700"
+        >
+          {isFetching ? "Fetching…" : "Fetch state"}
         </Button>
         <div className="ml-auto flex items-center gap-2 text-xs text-slate-300">
           <span>Show</span>
