@@ -1,5 +1,6 @@
 "use client";
 
+import { TIMEOUT_CFG } from "@/lib/timeoutConfig";
 import { useTurnTimeout } from "@/lib/useTurnTimeout";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
@@ -12,6 +13,10 @@ export type TurnContext = {
   currentPlayerTurn?: string | null;
   turnMs?: number | null;
   turnTimeoutAt?: Date | string | number | null;
+  // Optional seating context for non-actor backoff
+  seatsCount?: number | null;
+  nextToActSeat?: number | null; // absolute seat number for currentPlayerTurn
+  mySeatNo?: number | null; // absolute seat number for me
 };
 
 export function computeBackupDelayMs(
@@ -31,8 +36,29 @@ export function computeBackupDelayMs(
   if (deadline == null) return null;
   const now = Date.now();
   // Small grace to let the primary (turn holder) win; keep UX snappy
-  const GRACE_MS = 300;
-  return Math.max(150, deadline - now + GRACE_MS);
+  return Math.max(150, deadline - now + TIMEOUT_CFG.observerGraceMs);
+}
+
+export function computeNonActorSlotDelayMs(
+  seatsCount?: number | null,
+  nextToActSeat?: number | null,
+  mySeatNo?: number | null
+) {
+  const totalSeats = seatsCount ?? 0;
+  if (!nextToActSeat || !mySeatNo || totalSeats <= 0) {
+    // Default to near-observer slot when unknown
+    const base = TIMEOUT_CFG.baseSlotMs;
+    const jitter = Math.floor(Math.random() * TIMEOUT_CFG.slotJitterMs);
+    return Math.min(base + jitter, TIMEOUT_CFG.maxDelayMs);
+  }
+  // Compute clockwise distance in seat numbers (1..N), map to [1..N-1]
+  const seatsN = totalSeats;
+  const delta = (mySeatNo - nextToActSeat + seatsN) % seatsN || 1;
+  const exp = Math.max(0, delta - 1);
+  const base = TIMEOUT_CFG.baseSlotMs * Math.pow(2, exp);
+  const jitter = Math.floor(Math.random() * TIMEOUT_CFG.slotJitterMs);
+  const slotMs = Math.min(base + jitter, TIMEOUT_CFG.maxDelayMs);
+  return slotMs;
 }
 
 export function useTurnManagement(
@@ -61,13 +87,23 @@ export function useTurnManagement(
     return base + 1_250;
   }, [ctx.turnTimeoutAt, ctx.turnMs]);
 
+  // Add seat-ordered backoff with jitter for non-actors to reduce herding
+  const backupDelayWithBackoffMs = useMemo(() => {
+    const slotMs = computeNonActorSlotDelayMs(
+      ctx.seatsCount,
+      ctx.nextToActSeat,
+      ctx.mySeatNo
+    );
+    return backupDelayMs + slotMs;
+  }, [backupDelayMs, ctx.seatsCount, ctx.nextToActSeat, ctx.mySeatNo]);
+
   useTurnTimeout({
     gameId: ctx.gameId,
     handId: ctx.handId,
     playerId: ctx.currentPlayerTurn ?? undefined,
     round: ctx.currentRound ?? undefined,
     enabled: Boolean(ctx.status === "active" && !isYourTurn),
-    durationMs: backupDelayMs,
+    durationMs: backupDelayWithBackoffMs,
     deadlineAt: null,
     onTimeoutAction: onTurnTimeout,
   });
@@ -99,7 +135,7 @@ export function useTurnManagement(
       deadlineMs = Number.isFinite(parsed) ? parsed : null;
     }
     if (deadlineMs == null) return;
-    if (now >= deadlineMs + 300) {
+    if (now >= deadlineMs + TIMEOUT_CFG.observerGraceMs) {
       if (lastCatchupKeyRef.current !== key) {
         lastCatchupKeyRef.current = key;
         void onTurnTimeout();

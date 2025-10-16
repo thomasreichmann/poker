@@ -98,6 +98,20 @@ export function useGameData(id: string) {
     return idx === -1 ? 0 : idx;
   }, [playersBySeat, yourDbPlayer?.id]);
 
+  // Seat context for timeout staggering
+  const seatsCount = useMemo(
+    () => playersBySeat.length,
+    [playersBySeat.length]
+  );
+  const nextToActSeat = useMemo(() => {
+    const p = playersBySeat.find((pl) => pl.id === dbGame?.currentPlayerTurn);
+    return p?.seat ?? null;
+  }, [playersBySeat, dbGame?.currentPlayerTurn]);
+  const mySeatNo = useMemo(
+    () => yourDbPlayer?.seat ?? null,
+    [yourDbPlayer?.seat]
+  );
+
   function rotateArray<T>(arr: T[], offset: number): T[] {
     const n = arr.length;
     if (n === 0) return arr;
@@ -435,6 +449,9 @@ export function useGameData(id: string) {
       currentPlayerTurn: dbGame?.currentPlayerTurn ?? null,
       turnMs: dbGame?.turnMs ?? null,
       turnTimeoutAt: dbGame?.turnTimeoutAt ?? null,
+      seatsCount,
+      nextToActSeat,
+      mySeatNo,
     },
     isYourTurn,
     onTurnTimeout

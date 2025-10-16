@@ -75,4 +75,45 @@ describe("useGameRealtime (hook)", () => {
     expect(cache.players.find((p) => p.leaveAfterHand)).toBeUndefined();
     expect(onHandTransition).toHaveBeenCalledTimes(1);
   });
+
+  test("propagates turnTimeoutAt through game UPDATE", async () => {
+    let cache: {
+      game: { id: string; handId: number; turnTimeoutAt?: string | null };
+      players: Array<{ id: string; leaveAfterHand?: boolean }>;
+      cards: Array<{ id: number }>;
+      actions: unknown[];
+    } = {
+      game: { id: "g", handId: 1, turnTimeoutAt: null },
+      players: [{ id: "p1" }],
+      cards: [{ id: 1 }],
+      actions: [],
+    };
+    const setCache = (updater: (prev: typeof cache) => typeof cache): void => {
+      cache = updater(cache);
+    };
+
+    renderHook(() =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      useGameRealtime("g", setCache as any)
+    );
+
+    const { getSupabaseBrowserClient } = await import("@/supabase/client");
+    const supa = getSupabaseBrowserClient() as unknown as {
+      __listeners: Record<string, (payload: unknown) => void>;
+    };
+
+    const iso = new Date(Date.now() + 5000).toISOString();
+    supa.__listeners.UPDATE({
+      event: "UPDATE",
+      payload: {
+        schema: "public",
+        table: "poker_games",
+        record: { id: "g", turn_timeout_at: iso },
+        old_record: { id: "g" },
+      },
+      type: "broadcast",
+    });
+
+    expect(cache.game.turnTimeoutAt).toBe(iso);
+  });
 });
