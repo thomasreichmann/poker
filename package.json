@@ -12,9 +12,11 @@
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config=drizzle.config.ts",
     "db:push:prod": "NODE_ENV=production drizzle-kit push --config=drizzle.config.ts",
+    "db:pull:prod": "NODE_ENV=production drizzle-kit pull --config=drizzle.config.ts",
     "db:generate:prod": "NODE_ENV=production drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate:prod": "NODE_ENV=production drizzle-kit migrate --config=drizzle.config.ts",
     "db:studio:prod": "NODE_ENV=production drizzle-kit studio --config=drizzle.config.ts",
+    "db:check:prod": "NODE_ENV=production drizzle-kit check --config=drizzle.config.ts",
     "test": "vitest run",
     "set-admin": "npx tsx --env-file=.env.local scripts/set-admin.ts",
     "set-admin:prod": "NODE_ENV=production npx tsx --env-file=.env.local scripts/set-admin.ts"

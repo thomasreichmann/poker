@@ -1,5 +1,12 @@
 import { relations } from "drizzle-orm";
-import { integer, pgTable, serial, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  integer,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { PgEnumAction, PgEnumActorSource } from "./actionTypes";
 import { games } from "./games";
@@ -23,7 +30,7 @@ export const actions = pgTable("poker_actions", {
   actorSource: PgEnumActorSource("actor_source").default("human").notNull(),
   botStrategy: text("bot_strategy"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}).enableRLS();
 
 export type Action = typeof actions.$inferSelect;
 

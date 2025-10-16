@@ -37,7 +37,7 @@ export const cards = pgTable("poker_cards", {
   revealAtShowdown: boolean("reveal_at_showdown").default(false),
   rank: Rank("rank").notNull(),
   suit: Suit("suit").notNull(),
-});
+}).enableRLS();
 
 export const cardsView = pgView("cards").as((qb) => qb.select().from(cards));
 

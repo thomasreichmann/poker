@@ -13,7 +13,7 @@ export const userRoles = pgTable("user_roles", {
   role: PgEnumUserRole("role").default("user").notNull(), // user, admin, dev
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}).enableRLS();
 
 export type UserRole = typeof userRoles.$inferSelect;
 export type NewUserRole = typeof userRoles.$inferInsert;

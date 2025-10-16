@@ -36,7 +36,7 @@ export const players = pgTable("poker_players", {
   handRank: integer("hand_rank"),
   handValue: integer("hand_value"),
   handName: text("hand_name"),
-});
+}).enableRLS();
 
 export type Player = typeof players.$inferSelect;
 export type InsertPlayer = typeof players.$inferInsert;

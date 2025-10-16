@@ -64,6 +64,13 @@
       "when": 1755374122923,
       "tag": "0008_create-user-roles-table",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1760575372293,
+      "tag": "0009_long_polaris",
+      "breakpoints": true
     }
   ]
 }

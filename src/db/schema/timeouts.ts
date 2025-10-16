@@ -9,7 +9,7 @@ export const timeouts = pgTable("poker_timeouts", {
   playerId: uuid("player_id").references(() => players.id),
   reportedBy: uuid("reported_by").references(() => players.id),
   timeoutAt: timestamp("timeout_at").defaultNow().notNull(),
-});
+}).enableRLS();
 
 export const timeoutsRelations = relations(timeouts, ({ one }) => ({
   game: one(games, {

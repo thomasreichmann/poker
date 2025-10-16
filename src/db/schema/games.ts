@@ -47,7 +47,7 @@ export const games = pgTable("poker_games", {
   lastAction: PgEnumAction("last_action").default("check"),
   lastBetAmount: integer("last_bet_amount").default(0),
   turnTimeoutAt: timestamp("turn_timeout_at"),
-});
+}).enableRLS();
 
 export type Game = typeof games.$inferSelect;
 
