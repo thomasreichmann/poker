@@ -34,3 +34,34 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Logging
+
+We use a structured logger based on Pino with request context.
+
+- Server/browser logger: `import { logger } from "@/logger"`
+- Request-scoped logger on server (tRPC, API routes): `import { getLoggerWithRequest } from "@/logger/request-context"`
+- Edge-safe logger for middleware: `import { edgeLogger } from "@/logger/edge"`
+
+Usage:
+
+```ts
+import { logger } from "@/logger";
+const log = logger.with({ component: "ActionPanel" });
+log.info({ playerId, action }, "player.action");
+```
+
+On server procedures/routes, use the contextual logger:
+
+```ts
+// tRPC resolver
+opts.ctx.log.info({ gameId }, "game.join");
+
+// API route
+import { getLoggerWithRequest } from "@/logger/request-context";
+getLoggerWithRequest().error({ error }, "admin.setUserRole_error");
+```
+
+Tracing:
+- Each request gets an `x-request-id` propagated in responses and included in log fields.
+- Dev: pretty-printed logs. Prod: newline-delimited JSON.
