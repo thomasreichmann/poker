@@ -2,7 +2,7 @@
 
 import { getSupabaseBrowserClient } from "@/supabase/client";
 import { AUTH_SET_DEBOUNCE_MS } from "@/supabase/constants";
-import { debug } from "@/supabase/debug";
+// import { debug } from "@/supabase/debug";
 import { logger } from "@/logger";
 import { acquireTopicChannel } from "@/supabase/realtimeHelpers";
 import { realtimeStatusStore } from "@/supabase/realtimeStatus";
@@ -77,6 +77,7 @@ export function useGameRealtime(
 
     function onBroadcast(payload: BroadcastPayload) {
       const p = payload.payload;
+      // keep lightweight logging only in dev
       if (process.env.NODE_ENV !== "production") {
         logger.debug({ payload: p }, "realtime.payload");
       }

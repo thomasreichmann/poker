@@ -24,24 +24,18 @@ const baseOptions: LoggerOptions = {
 
 export type LogFields = Record<string, unknown>;
 
-export type AppLogger = ReturnType<typeof pino> & {
-  with: (fields: LogFields) => AppLogger;
-};
+export type AppLogger = pino.Logger & { with: (fields: LogFields) => AppLogger };
+
+function attachWith(base: pino.Logger): AppLogger {
+  const withFn = (fields: LogFields): AppLogger => attachWith(base.child(fields));
+  return Object.assign(base, { with: withFn });
+}
 
 function createPinoLogger() {
   if (isBrowser()) {
     // Browser: use pino with pretty transport disabled, and map to console
     const logger = pino(baseOptions);
-    const withFn = (fields: LogFields): AppLogger => {
-      // In the browser, we just attach fields into messages via bindings
-      const child = logger.child(fields);
-      // @ts-expect-error extend
-      child.with = withFn as any;
-      return child as AppLogger;
-    };
-    // @ts-expect-error extend
-    (logger as any).with = withFn;
-    return logger as AppLogger;
+    return attachWith(logger);
   }
 
   // Node: pretty in dev, JSON in prod
@@ -57,15 +51,7 @@ function createPinoLogger() {
       };
 
   const logger = pino({ ...baseOptions, transport });
-  const withFn = (fields: LogFields): AppLogger => {
-    const child = logger.child(fields);
-    // @ts-expect-error extend
-    child.with = withFn as any;
-    return child as AppLogger;
-  };
-  // @ts-expect-error extend
-  (logger as any).with = withFn;
-  return logger as AppLogger;
+  return attachWith(logger);
 }
 
 export const logger: AppLogger = createPinoLogger();

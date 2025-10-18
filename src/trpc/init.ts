@@ -47,10 +47,11 @@ export const createTRPCContext = async () => {
     }
   }
 
+  const baseLog = getLoggerWithRequest().with({ userId: user?.id ?? null });
   return {
     user,
     supabase,
-    log: getLoggerWithRequest(),
+    log: baseLog,
   };
 };
 

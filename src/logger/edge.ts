@@ -20,8 +20,15 @@ function makeConsole(level: "info" | "warn" | "error" | "debug") {
     const payload = isDev() ? JSON.stringify(obj) : JSON.stringify(obj);
     // edge runtime compatible
     try {
-      // eslint-disable-next-line no-console
-      (console as any)[level](`${prefix}${payload}`);
+      const fn: (msg: string, ...rest: unknown[]) => void =
+        level === "info"
+          ? console.info
+          : level === "warn"
+            ? console.warn
+            : level === "error"
+              ? console.error
+              : console.debug;
+      fn(`${prefix}${payload}`);
     } catch {}
   };
 }

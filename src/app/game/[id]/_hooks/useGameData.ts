@@ -431,13 +431,7 @@ export function useGameData(id: string) {
       { fanout, playerId: dbGame.currentPlayerTurn, ok: succeeded, fail: failed },
       "timeout.fanout"
     );
-  }, [
-    dbGame?.id,
-    dbGame?.currentPlayerTurn,
-    timeoutMutation,
-    queryClient,
-    getByIdKey,
-  ]);
+  }, [dbGame?.id, dbGame?.currentPlayerTurn, timeoutMutation]);
 
   // Turn timeout management and proactive catch-up
   useTurnManagement(
