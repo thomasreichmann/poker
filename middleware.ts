@@ -1,9 +1,10 @@
 import { updateSession } from "@/supabase/middleware";
 import { type NextRequest } from "next/server";
+import { withLogging } from "@/logger/next-middleware";
 
-export async function middleware(request: NextRequest) {
+export const middleware = withLogging(async (request: NextRequest) => {
   return await updateSession(request);
-}
+});
 
 export const config = {
   matcher: [

@@ -12,23 +12,25 @@ function isDev() {
   }
 }
 
+import { logger } from "@/logger";
+
 export const debug: DebugSink = {
   log: (...args) => {
     if (!isDev()) return;
     try {
-      console.log("[rt]", ...args);
+      logger.debug({ args }, "rt.log");
     } catch {}
   },
   warn: (...args) => {
     if (!isDev()) return;
     try {
-      console.warn("[rt]", ...args);
+      logger.warn({ args }, "rt.warn");
     } catch {}
   },
   error: (...args) => {
     if (!isDev()) return;
     try {
-      console.error("[rt]", ...args);
+      logger.error({ args }, "rt.error");
     } catch {}
   },
 };

@@ -2,6 +2,7 @@ import { requireAdminAccess, setUserRole } from "@/lib/permissions";
 import { getSupabaseServerClient } from "@/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { getLoggerWithRequest } from "@/logger/request-context";
 
 const bodySchema = z.object({
   targetUserId: z.uuid(),
@@ -42,12 +43,13 @@ export async function POST(req: NextRequest) {
     // Update user role using permission system
     await setUserRole(targetUserId, role);
 
+    getLoggerWithRequest().info({ targetUserId, role }, "admin.setUserRole");
     return NextResponse.json({
       success: true,
       message: `User role updated to ${role}`,
     });
   } catch (error) {
-    console.error("Error setting user role:", error);
+    getLoggerWithRequest().error({ error }, "admin.setUserRole_error");
 
     if (error instanceof Error && error.message.includes("Unauthorized")) {
       return NextResponse.json(

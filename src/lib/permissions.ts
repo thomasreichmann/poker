@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { UserRoleEnum, userRoles } from "@/db/schema/userRoles";
 import { eq } from "drizzle-orm";
+import { logger } from "@/logger";
 
 export interface PermissionContext {
   userId: string;
@@ -25,7 +26,7 @@ export async function ensureUserRole(userId: string): Promise<void> {
       });
     }
   } catch (error) {
-    console.error("Error ensuring user role:", error);
+    logger.error({ error }, "permissions.ensureUserRole_error");
   }
 }
 
@@ -46,7 +47,7 @@ export async function getUserRole(userId: string): Promise<UserRoleEnum> {
     const role = result[0]?.role as UserRoleEnum;
     return role || "user";
   } catch (error) {
-    console.error("Error fetching user role:", error);
+    logger.error({ error }, "permissions.getUserRole_error");
     return "user"; // Default to lowest permission on error
   }
 }
@@ -130,7 +131,7 @@ export async function setUserRole(
       })
       .where(eq(userRoles.userId, userId));
   } catch (error) {
-    console.error("Error setting user role:", error);
+    logger.error({ error }, "permissions.setUserRole_error");
     throw new Error("Failed to set user role");
   }
 }

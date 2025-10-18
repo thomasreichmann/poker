@@ -5,6 +5,7 @@ import { initTRPC } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import superjson from "superjson";
+import { getLoggerWithRequest } from "@/logger/request-context";
 
 export const createTRPCContext = async () => {
   /**
@@ -49,6 +50,7 @@ export const createTRPCContext = async () => {
   return {
     user,
     supabase,
+    log: getLoggerWithRequest(),
   };
 };
 
@@ -57,7 +59,7 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
 });
 
 // Dev-only delay middleware to simulate network latency in tRPC calls
-const devDelayMiddleware = t.middleware(async ({ next }) => {
+const devDelayMiddleware = t.middleware(async ({ ctx, next }) => {
   if (process.env.NODE_ENV === "production") {
     return next();
   }
@@ -68,6 +70,7 @@ const devDelayMiddleware = t.middleware(async ({ next }) => {
     Math.floor(Math.random() * (max - min + 1)) + min
   );
   if (delayMs > 0) {
+    ctx.log.debug({ delayMs }, "trpc.devDelay");
     await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
   return next();

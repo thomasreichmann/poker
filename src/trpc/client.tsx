@@ -8,6 +8,7 @@ import { useState } from "react";
 import superjson from "superjson";
 import { makeQueryClient } from "./query-client";
 import type { AppRouter } from "./routers/_app";
+import { logger } from "@/logger";
 export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
 
 let browserQueryClient: QueryClient;
@@ -52,6 +53,25 @@ export function TRPCReactProvider(
             (process.env.NODE_ENV === "development" &&
               typeof window !== "undefined") ||
             (opts.direction === "down" && opts.result instanceof Error),
+          logger: (op, next) => {
+            const dir = op.direction;
+            const meta = {
+              direction: dir,
+              path: op.operation.path,
+              type: op.operation.type,
+            } as const;
+            if (dir === "up") {
+              // request
+              logger.debug({ meta, input: op.operation.input }, "trpc.request");
+            }
+            return next(op, (result) => {
+              if (result.ok) {
+                logger.debug({ meta }, "trpc.response");
+              } else {
+                logger.error({ meta, error: result.error }, "trpc.error");
+              }
+            });
+          },
         }),
         httpBatchLink({
           transformer: superjson,
