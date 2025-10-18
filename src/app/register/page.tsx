@@ -35,6 +35,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { logger } from "@/logger";
 import { useEffect, useState } from "react";
 
 export default function RegisterPage() {
@@ -146,7 +147,7 @@ export default function RegisterPage() {
         setIsLoading(false);
       }
     } catch (error) {
-      console.error("Registration error:", error);
+      logger.error({ error }, "auth.registration_error");
       setError("Ocorreu um erro inesperado. Tente novamente.");
       setIsLoading(false);
     }

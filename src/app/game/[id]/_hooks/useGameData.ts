@@ -9,6 +9,7 @@ import { useGameQuery } from "./useGameQuery";
 import { useGameRealtime } from "./useGameRealtime";
 import { useShowdownEffects } from "./useShowdownEffects";
 import { useTurnManagement } from "./useTurnManagement";
+import { logger } from "@/logger";
 
 import { PokerAction } from "@/db/schema/actionTypes";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
@@ -409,13 +410,12 @@ export function useGameData(id: string) {
     if (fanout <= 1) {
       try {
         const res = await timeoutMutation.mutateAsync(payload);
-        console.log(
-          `Timeout result for player ${dbGame.currentPlayerTurn}`,
-          res?.isValid,
-          res?.error
+        logger.info(
+          { playerId: dbGame.currentPlayerTurn, isValid: res?.isValid, error: res?.error },
+          "timeout.result"
         );
       } catch (err) {
-        console.error("Timeout request failed", err);
+        logger.error({ err }, "timeout.request_failed");
       }
       return;
     }
@@ -427,16 +427,11 @@ export function useGameData(id: string) {
     const results = await Promise.allSettled(requests);
     const succeeded = results.filter((r) => r.status === "fulfilled").length;
     const failed = results.length - succeeded;
-    console.log(
-      `Timeout fan-out x${fanout} for player ${dbGame.currentPlayerTurn} -> ok=${succeeded} fail=${failed}`
+    logger.info(
+      { fanout, playerId: dbGame.currentPlayerTurn, ok: succeeded, fail: failed },
+      "timeout.fanout"
     );
-  }, [
-    dbGame?.id,
-    dbGame?.currentPlayerTurn,
-    timeoutMutation,
-    queryClient,
-    getByIdKey,
-  ]);
+  }, [dbGame?.id, dbGame?.currentPlayerTurn, timeoutMutation]);
 
   // Turn timeout management and proactive catch-up
   useTurnManagement(

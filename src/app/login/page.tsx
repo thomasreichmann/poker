@@ -29,6 +29,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { logger } from "@/logger";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -108,7 +109,7 @@ export default function LoginPage() {
         setIsLoading(false);
       }
     } catch (error) {
-      console.error("Login error:", error);
+      logger.error({ error }, "auth.login_error");
       setError("Ocorreu um erro inesperado. Tente novamente.");
       setIsLoading(false);
     }

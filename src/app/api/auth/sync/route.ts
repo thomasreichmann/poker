@@ -1,12 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getLoggerWithRequest } from "@/logger/request-context";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
+  getLoggerWithRequest().info(
+    { hasAccess: Boolean(body?.accessToken), hasRefresh: Boolean(body?.refreshToken) },
+    "auth.sync"
+  );
   const accessToken = body?.accessToken as string | undefined;
   const refreshToken = body?.refreshToken as string | undefined;
 

@@ -2,7 +2,8 @@
 
 import { getSupabaseBrowserClient } from "@/supabase/client";
 import { AUTH_SET_DEBOUNCE_MS } from "@/supabase/constants";
-import { debug } from "@/supabase/debug";
+// import { debug } from "@/supabase/debug";
+import { logger } from "@/logger";
 import { acquireTopicChannel } from "@/supabase/realtimeHelpers";
 import { realtimeStatusStore } from "@/supabase/realtimeStatus";
 import { useEffect, useRef } from "react";
@@ -76,13 +77,20 @@ export function useGameRealtime(
 
     function onBroadcast(payload: BroadcastPayload) {
       const p = payload.payload;
-      debug.log("payload", p);
+      // keep lightweight logging only in dev
+      if (process.env.NODE_ENV !== "production") {
+        logger.debug({ payload: p }, "realtime.payload");
+      }
       if (p.schema !== "public") {
-        debug.warn("schema not public", p.schema);
+        if (process.env.NODE_ENV !== "production") {
+          logger.warn({ schema: p.schema }, "realtime.non_public_schema");
+        }
         return;
       }
       if (!p.table) {
-        debug.warn("table not found", p.table);
+        if (process.env.NODE_ENV !== "production") {
+          logger.warn({ table: p.table }, "realtime.missing_table");
+        }
         return;
       }
       applyBroadcast(payload.event, p.table, p.record, p.old_record);

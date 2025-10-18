@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { logger } from "@/logger";
 import { getTurnTimeoutRegistry, makeTurnKey } from "./utils";
 
 export type TurnTimeoutOptions = {
@@ -42,29 +43,15 @@ export function useTurnTimeout(options: TurnTimeoutOptions) {
 
   useEffect(() => {
     if (!enabled) {
-      console.debug("[turn-timeout] skip: disabled", {
-        gameId,
-        handId,
-        playerId,
-        round,
-      });
+      logger.debug({ gameId, handId, playerId, round }, "turn-timeout.skip:disabled");
       return;
     }
     if (!gameId || !playerId) {
-      console.debug("[turn-timeout] skip: missing ids", {
-        gameId,
-        handId,
-        playerId,
-        round,
-      });
+      logger.debug({ gameId, handId, playerId, round }, "turn-timeout.skip:missing-ids");
       return;
     }
     if (round === "showdown") {
-      console.debug("[turn-timeout] skip: showdown", {
-        gameId,
-        handId,
-        playerId,
-      });
+      logger.debug({ gameId, handId, playerId }, "turn-timeout.skip:showdown");
       return;
     }
 
