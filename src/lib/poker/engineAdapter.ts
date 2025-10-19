@@ -516,15 +516,15 @@ export async function resetGamePure(gameId: string): Promise<Game> {
     })),
   };
 
-  // Clear dealt cards
-  await db.delete(cardsTable).where(eq(cardsTable.gameId, gameId));
-  const updatedGame = await persistPureGameState(
-    resetGameState,
-    currentGameState
-  );
-
+  // If we have enough players, start the game immediately
   if (resetGameState.players.length >= 2) {
-    // Remove players who opted to leave after the hand BEFORE building next hand state
+    const startedGame = startNewGame(resetGameState);
+    const updatedGame = await persistPureGameState(
+      startedGame,
+      currentGameState
+    );
+
+    // Remove players who opted to leave after the hand
     await db
       .delete(playersTable)
       .where(
@@ -537,10 +537,19 @@ export async function resetGamePure(gameId: string): Promise<Game> {
     // Rebuild state after removals
     const gameWithPlayers = await dbGameToPureGame(gameId);
     if (gameWithPlayers.players.length >= 2) {
-      const startedGame = startNewGame(gameWithPlayers);
-      return await persistPureGameState(startedGame, gameWithPlayers);
+      const finalGame = startNewGame(gameWithPlayers);
+      return await persistPureGameState(finalGame, gameWithPlayers);
     }
+
+    return updatedGame;
   }
+
+  // Clear dealt cards
+  await db.delete(cardsTable).where(eq(cardsTable.gameId, gameId));
+  const updatedGame = await persistPureGameState(
+    resetGameState,
+    currentGameState
+  );
 
   return updatedGame;
 }

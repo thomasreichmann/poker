@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth-context";
+import { logger } from "@/logger/client";
 import {
   ArrowLeft,
   Calendar,
@@ -35,7 +36,6 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { logger } from "@/logger";
 import { useEffect, useState } from "react";
 
 export default function RegisterPage() {

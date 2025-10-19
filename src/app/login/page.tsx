@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { logger } from "@/logger/client";
 import { getSupabaseBrowserClient } from "@/supabase/client";
 import {
   ArrowLeft,
@@ -29,7 +30,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { logger } from "@/logger";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);

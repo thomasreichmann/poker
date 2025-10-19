@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast";
+import { logger } from "@/logger/client";
 import { useTRPC } from "@/trpc/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
@@ -9,7 +10,6 @@ import { useGameQuery } from "./useGameQuery";
 import { useGameRealtime } from "./useGameRealtime";
 import { useShowdownEffects } from "./useShowdownEffects";
 import { useTurnManagement } from "./useTurnManagement";
-import { logger } from "@/logger";
 
 import { PokerAction } from "@/db/schema/actionTypes";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
@@ -411,7 +411,11 @@ export function useGameData(id: string) {
       try {
         const res = await timeoutMutation.mutateAsync(payload);
         logger.info(
-          { playerId: dbGame.currentPlayerTurn, isValid: res?.isValid, error: res?.error },
+          {
+            playerId: dbGame.currentPlayerTurn,
+            isValid: res?.isValid,
+            error: res?.error,
+          },
           "timeout.result"
         );
       } catch (err) {
@@ -428,7 +432,12 @@ export function useGameData(id: string) {
     const succeeded = results.filter((r) => r.status === "fulfilled").length;
     const failed = results.length - succeeded;
     logger.info(
-      { fanout, playerId: dbGame.currentPlayerTurn, ok: succeeded, fail: failed },
+      {
+        fanout,
+        playerId: dbGame.currentPlayerTurn,
+        ok: succeeded,
+        fail: failed,
+      },
       "timeout.fanout"
     );
   }, [dbGame?.id, dbGame?.currentPlayerTurn, timeoutMutation]);

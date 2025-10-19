@@ -84,7 +84,7 @@ export function useTurnManagement(
     const fromDeadline = computeBackupDelayMs(ctx.turnTimeoutAt);
     if (fromDeadline != null) return fromDeadline;
     const base = Math.max(1_000, Number(ctx.turnMs ?? 30_000));
-    return base + 1_250;
+    return base + 50;
   }, [ctx.turnTimeoutAt, ctx.turnMs]);
 
   // Add seat-ordered backoff with jitter for non-actors to reduce herding

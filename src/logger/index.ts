@@ -1,4 +1,5 @@
 import pino, { LoggerOptions } from "pino";
+import "server-only";
 
 function isBrowser() {
   try {
@@ -24,10 +25,13 @@ const baseOptions: LoggerOptions = {
 
 export type LogFields = Record<string, unknown>;
 
-export type AppLogger = pino.Logger & { with: (fields: LogFields) => AppLogger };
+export type AppLogger = pino.Logger & {
+  with: (fields: LogFields) => AppLogger;
+};
 
 function attachWith(base: pino.Logger): AppLogger {
-  const withFn = (fields: LogFields): AppLogger => attachWith(base.child(fields));
+  const withFn = (fields: LogFields): AppLogger =>
+    attachWith(base.child(fields));
   return Object.assign(base, { with: withFn });
 }
 
@@ -38,20 +42,29 @@ function createPinoLogger() {
     return attachWith(logger);
   }
 
-  // Node: pretty in dev, JSON in prod
-  const transport = isProduction()
-    ? undefined
-    : {
-        target: "pino-pretty",
-        options: {
-          colorize: true,
-          translateTime: "SYS:standard",
-          singleLine: true,
-        },
-      };
+  // Node: pretty in dev (in-process stream), JSON in prod
+  if (!isProduction()) {
+    // Use in-process pretty stream to avoid worker/thread-stream issues in Next dev
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pretty = require("pino-pretty");
+    const prettyStream = pretty({
+      colorize: true,
+      translateTime: "SYS:standard",
+      singleLine: true,
+    });
+    const logger = pino(baseOptions, prettyStream);
+    return attachWith(logger);
+  }
 
-  const logger = pino({ ...baseOptions, transport });
+  const logger = pino(baseOptions);
   return attachWith(logger);
 }
 
-export const logger: AppLogger = createPinoLogger();
+declare global {
+  var __appLogger: AppLogger | undefined;
+}
+
+export const logger: AppLogger =
+  process.env.NODE_ENV !== "production"
+    ? globalThis.__appLogger ?? (globalThis.__appLogger = createPinoLogger())
+    : createPinoLogger();

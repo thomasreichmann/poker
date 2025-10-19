@@ -12,7 +12,7 @@ function isDev() {
   }
 }
 
-import { logger } from "@/logger";
+import { logger } from "@/logger/client";
 
 export const debug: DebugSink = {
   log: (...args) => {

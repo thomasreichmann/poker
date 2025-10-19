@@ -3,7 +3,7 @@
 import { getSupabaseBrowserClient } from "@/supabase/client";
 import { AUTH_SET_DEBOUNCE_MS } from "@/supabase/constants";
 // import { debug } from "@/supabase/debug";
-import { logger } from "@/logger";
+import { logger } from "@/logger/client";
 import { acquireTopicChannel } from "@/supabase/realtimeHelpers";
 import { realtimeStatusStore } from "@/supabase/realtimeStatus";
 import { useEffect, useRef } from "react";
