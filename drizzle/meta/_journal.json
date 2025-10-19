@@ -71,6 +71,13 @@
       "when": 1760575372293,
       "tag": "0009_long_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1760824777434,
+      "tag": "0010_supabase-broadcast-fixes",
+      "breakpoints": true
     }
   ]
 }

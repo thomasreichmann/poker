@@ -272,4 +272,4 @@ THEN
 	ALTER TABLE "user_roles" ADD CONSTRAINT "user_roles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE cascade ON UPDATE no action;
 END IF;
 END $$;--> statement-breakpoint
-CREATE OR REPLACE VIEW "public"."cards" AS (select "id", "hand_id", "game_id", "player_id", "reveal_at_showdown", "rank", "suit" from "poker_cards");
+-- CREATE OR REPLACE VIEW "public"."cards" AS (select "id", "hand_id", "game_id", "player_id", "reveal_at_showdown", "rank", "suit" from "poker_cards");
