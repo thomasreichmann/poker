@@ -2,7 +2,7 @@ import { updateSession } from "@/supabase/middleware";
 import { type NextRequest } from "next/server";
 import { withLogging } from "@/logger/next-middleware";
 
-export const middleware = withLogging(async (request: NextRequest) => {
+export const proxy = withLogging(async (request: NextRequest) => {
   return await updateSession(request);
 });
 
