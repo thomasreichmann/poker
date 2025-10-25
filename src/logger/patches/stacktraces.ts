@@ -135,6 +135,98 @@ if (!g.__stacktraceMapperInstalled) {
     return path.normalize(source);
   }
 
+  // ----- Code-frame helpers & formatting -----
+
+  function supportsColor(): boolean {
+    try {
+      if (process.env.STACKTRACE_COLOR === "0") return false;
+      if (process.env.FORCE_COLOR === "0") return false;
+      if (process.env.STACKTRACE_COLOR === "1") return true;
+      return !!process.stdout.isTTY;
+    } catch {
+      return false;
+    }
+  }
+
+  const color = (() => {
+    const on = supportsColor();
+    const wrap = (c: number) => (s: string) => (on ? `\x1b[${c}m${s}\x1b[0m` : s);
+    return {
+      dim: wrap(2),
+      gray: wrap(90),
+      red: wrap(31),
+      yellow: wrap(33),
+      cyan: wrap(36),
+      bold: wrap(1),
+    } as const;
+  })();
+
+  function safe<T>(fn: () => T, fallback: T): T {
+    try {
+      return fn();
+    } catch {
+      return fallback;
+    }
+  }
+
+  function buildCodeFrame(
+    file: string,
+    line: number,
+    col: number,
+    ctx: number = 2
+  ): string | null {
+    try {
+      const src = fs.readFileSync(file, "utf8");
+      const lines = src.split(/\r?\n/);
+      const i = Math.max(1, Math.min(line, lines.length));
+      const start = Math.max(1, i - ctx);
+      const end = Math.min(lines.length, i + ctx);
+      const width = String(end).length;
+
+      const out: string[] = [];
+      for (let n = start; n <= end; n++) {
+        const prefix =
+          n === i
+            ? color.red(">") + " " + String(n).padStart(width)
+            : "  " + String(n).padStart(width);
+        const sep = color.gray(" | ");
+        const text = lines[n - 1] ?? "";
+        out.push(`${prefix}${sep}${text}`);
+        if (n === i) {
+          const caretBase = (lines[n - 1] ?? "").slice(0, Math.max(0, col - 1));
+          const caretSpaces = caretBase.replace(/\t/g, "  ").length;
+          out.push(
+            " ".repeat(2 + width) +
+              color.gray(" | ") +
+              " ".repeat(Math.max(0, caretSpaces)) +
+              color.yellow("^")
+          );
+        }
+      }
+      return out.join("\n");
+    } catch {
+      return null;
+    }
+  }
+
+  function formatCallSiteShort(cs: CallSite): string {
+    const file = safe(
+      () => cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.(),
+      "<anonymous>"
+    );
+    const line = safe(() => cs.getLineNumber?.(), 0);
+    const col = safe(() => cs.getColumnNumber?.(), 0);
+    const fn =
+      safe(() => cs.getFunctionName?.(), null as string | null) ||
+      safe(() => cs.getMethodName?.(), null as string | null);
+    const isAsync = safe(() => (cs as unknown as { isAsync?: () => boolean }).isAsync?.() ?? false, false);
+
+    const shown = file === "<anonymous>" ? file : relToProject(file);
+    const loc = `${shown}:${line}:${col}`;
+    const label = (isAsync ? "async " : "") + (fn ?? "<unknown>");
+    return `${label ? label + " " : ""}(${loc})`;
+  }
+
   function shouldAttemptMap(file: string | null): boolean {
     if (!file) return false;
     const abs = toAbs(file);
@@ -284,7 +376,9 @@ if (!g.__stacktraceMapperInstalled) {
         }
         if (prop === "getLineNumber") return () => mapped.line;
         if (prop === "getColumnNumber") return () => mapped.col;
-        return Reflect.get(target, prop, receiver);
+        const v = Reflect.get(target, prop, receiver);
+        if (typeof v === "function") return v.bind(target);
+        return v;
       },
     });
   }
@@ -319,12 +413,32 @@ if (!g.__stacktraceMapperInstalled) {
 
       const rawLines: string[] = [];
       const kinds: FrameKind[] = [];
+      let codeFrame: string | null = null;
+      const ctxNum = Number(process.env.STACKTRACE_CODEFRAME_CONTEXT ?? "2");
+      const CODEFRAME_CONTEXT = isNaN(ctxNum) ? 2 : ctxNum;
+
       for (const cs of mapped) {
-        const file =
-          cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.() ?? null;
+        const file = safe(
+          () => cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.(),
+          null as string | null
+        );
+        const line = safe(() => cs.getLineNumber?.(), null as number | null);
+        const col = safe(() => cs.getColumnNumber?.(), null as number | null);
+
+        if (
+          codeFrame == null &&
+          file &&
+          file.startsWith(PROJECT_ROOT) &&
+          !file.includes(`${path.sep}.next${path.sep}`) &&
+          typeof line === "number" &&
+          typeof col === "number"
+        ) {
+          codeFrame = buildCodeFrame(file, line, col, CODEFRAME_CONTEXT);
+        }
+
         const kind = classifyFile(file);
         if (kind === "node" || kind === "internal" || kind === "next") continue;
-        rawLines.push(`    at ${formatCallSite(cs)}`);
+        rawLines.push(`    at ${formatCallSiteShort(cs)}`);
         kinds.push(kind);
       }
 
@@ -336,7 +450,13 @@ if (!g.__stacktraceMapperInstalled) {
         SHOW_VENDOR,
         isNaN(MAX_PROJECT) ? 10 : MAX_PROJECT
       );
-      return [`${err.name}: ${err.message}`, ...pretty].join("\n");
+
+      const lines: string[] = [`${err.name}: ${err.message}`, ...pretty];
+      if (codeFrame) {
+        lines.push("");
+        lines.push(color.bold(codeFrame));
+      }
+      return lines.join("\n");
     } catch {
       return `${err.name}: ${err.message}`;
     }
