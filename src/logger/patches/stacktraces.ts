@@ -52,6 +52,36 @@ if (!g.__stacktraceMapperInstalled) {
     bold: (s: string) => (COLOR_ON ? `\x1b[1m${s}\x1b[0m` : s),
   } as const;
 
+  // --- Lightweight JS/TS syntax colorizer for code-frames ---
+  const KW = /\b(await|break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|false|finally|for|from|function|if|import|in|instanceof|interface|let|new|null|of|return|super|switch|this|throw|true|try|typeof|var|void|while|with|yield)\b/g;
+  const TYPE_KW = /\b(abstract|as|asserts|declare|implements|keyof|namespace|never|private|protected|public|readonly|satisfies|static|type|unknown)\b/g;
+  const NUM = /\b(?:0[xX][\da-fA-F]+|0[bB][01]+|0[oO][0-7]+|\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/g;
+  const STR = /(['"`])(?:\\.|(?!\1).)*\1/g; // naive string match
+  const COMMENT = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
+  const PROP = /(?<=\.)[a-zA-Z_]\w*/g; // .prop
+  const IDENT_FN = /\b([A-Za-z_]\w*)\s*(?=\()/g; // foo(
+
+  function colorizeTs(line: string): string {
+    try {
+      let s = line;
+      const wrap = (re: RegExp, tint: (x: string) => string) => {
+        s = s.replace(re, (m) => `\u0000${tint(m)}\u0001`);
+      };
+
+      wrap(COMMENT, color.gray);
+      wrap(STR, color.cyan);
+      wrap(NUM, color.yellow);
+      wrap(KW, color.bold);
+      wrap(TYPE_KW, color.dim);
+      wrap(PROP, color.dim);
+      wrap(IDENT_FN, (m) => color.bold(m));
+
+      return s.replace(/\u0000|\u0001/g, "");
+    } catch {
+      return line;
+    }
+  }
+
   function relToProject(abs: string) {
     return abs.startsWith(PROJECT_ROOT + path.sep)
       ? abs.slice(PROJECT_ROOT.length + 1)
@@ -110,7 +140,7 @@ if (!g.__stacktraceMapperInstalled) {
         }
         if (extra > 0)
           out.push(
-            `    … ${extra} more project frame${extra > 1 ? "s" : ""} …`
+            `    ${color.dim(`… ${extra} more project frame${extra > 1 ? "s" : ""} …`)}`
           );
         continue;
       }
@@ -135,7 +165,7 @@ if (!g.__stacktraceMapperInstalled) {
           n++;
         }
         if (n > 0)
-          out.push(`    … ${n} frame${n > 1 ? "s" : ""} from dependencies …`);
+          out.push(`    ${color.dim(`… ${n} frame${n > 1 ? "s" : ""} from dependencies …`)}`);
         continue;
       }
       out.push(lines[i]);
@@ -337,30 +367,29 @@ if (!g.__stacktraceMapperInstalled) {
   // kept earlier for reference; classification now drives filtering
 
   function formatCallSiteShort(cs: CallSite): string {
-    const filePath = safe(
-      () => cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.() ?? "<anonymous>",
+    const fileAbs = safe(
+      () => cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.(),
       "<anonymous>"
     );
-    const ln = safe(() => cs.getLineNumber?.() ?? 0, 0);
-    const cl = safe(() => cs.getColumnNumber?.() ?? 0, 0);
+    const line = safe(() => cs.getLineNumber?.(), 0);
+    const col = safe(() => cs.getColumnNumber?.(), 0);
+    const fn =
+      safe(() => cs.getFunctionName?.(), null) ||
+      safe(() => cs.getMethodName?.(), null);
+    const isAsync = safe(
+      () => (cs as unknown as { isAsync?: () => boolean }).isAsync?.() ?? false,
+      false
+    );
 
-    const typeName = safe(() => cs.getTypeName?.() ?? null, null);
-    const methodName = safe(() => cs.getMethodName?.() ?? null, null);
-    const functionName = safe(() => cs.getFunctionName?.() ?? null, null);
-    const isAsync = safe(() => cs.isAsync?.() ?? false, false);
-    const isCtor = safe(() => cs.isConstructor?.() ?? false, false);
+    const fileShown =
+      typeof fileAbs === "string" && fileAbs.startsWith(PROJECT_ROOT + path.sep)
+        ? fileAbs.slice(PROJECT_ROOT.length + 1)
+        : fileAbs;
 
-    const shown = filePath === "<anonymous>" ? filePath : relToProject(filePath);
+    const where = `${color.cyan(String(fileShown))}${color.gray(`:${line}:${col}`)}`;
+    const label = [isAsync ? color.dim("async ") : "", fn ? color.bold(String(fn)) + " " : ""].join("");
 
-    let name: string | null = null;
-    if (typeName && methodName) name = `${typeName}.${methodName}`;
-    else if (functionName) name = functionName;
-    else if (methodName) name = methodName;
-
-    const prefix = `${isAsync ? "async " : ""}${isCtor ? "new " : ""}`;
-    const loc = `${shown}:${ln}:${cl}`;
-    if (name) return `${prefix}${name} (${loc})`;
-    return `${prefix}${loc}`;
+    return `${label}(${where})`;
   }
 
   function shouldHide(kind: FrameKind): boolean {
@@ -396,13 +425,14 @@ if (!g.__stacktraceMapperInstalled) {
         const marker = isTarget ? color.yellow(">") : " ";
         const numStr = String(i).padStart(width, " ");
         const pipe = color.dim(" | ");
-        const text = allLines[i - 1];
+        const textRaw = allLines[i - 1] ?? "";
+        const text = colorizeTs(textRaw);
         out.push(`${marker} ${color.dim(numStr)}${pipe}${text}`);
         if (isTarget) {
           const caretBase = `  ${" ".repeat(width)} | `; // matches spaces of non-marker line
-          const pre = text.slice(0, Math.max(0, col - 1));
+          const pre = textRaw.slice(0, Math.max(0, col - 1));
           const caretSpaces = pre.replace(/\t/g, "  ").length; // tabs → 2 spaces
-          out.push(`${color.dim(caretBase)}${" ".repeat(caretSpaces)}${color.red("^")}`);
+          out.push(`${color.dim(caretBase)}${" ".repeat(caretSpaces)}${color.yellow("^")}`);
         }
       }
 
@@ -456,7 +486,8 @@ if (!g.__stacktraceMapperInstalled) {
         isNaN(MAX_PROJECT) ? 10 : MAX_PROJECT
       );
 
-      const lines = [`${err.name}: ${err.message}`, ...pretty];
+      const head = `${color.red(err.name)}: ${color.bold(err.message)}`;
+      const lines = [head, ...pretty];
       if (codeFrame) {
         lines.push("");
         lines.push(color.bold(codeFrame));
