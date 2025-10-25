@@ -26,6 +26,32 @@ if (!g.__stacktraceMapperInstalled) {
     { file: string; line: number; col: number } | null
   >();
 
+  // --- Color utilities (TTY-aware, opt-out via env) ---
+  function supportsColor(): boolean {
+    try {
+      if (process.env.STACKTRACE_COLOR === '0') return false;
+      if (process.env.STACKTRACE_COLOR === '1') return true;
+      // Respect standard FORCE_COLOR=0 as opt-out if present
+      if (process.env.FORCE_COLOR === '0') return false;
+      // Default: on when stdout is a TTY
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const stdoutAny: any = typeof process !== 'undefined' ? (process as unknown as { stdout?: { isTTY?: boolean } }).stdout : undefined;
+      return !!stdoutAny?.isTTY;
+    } catch {
+      return false;
+    }
+  }
+
+  const COLOR_ON = supportsColor();
+  const color = {
+    dim: (s: string) => (COLOR_ON ? `\x1b[2m${s}\x1b[0m` : s),
+    gray: (s: string) => (COLOR_ON ? `\x1b[90m${s}\x1b[0m` : s),
+    red: (s: string) => (COLOR_ON ? `\x1b[31m${s}\x1b[0m` : s),
+    yellow: (s: string) => (COLOR_ON ? `\x1b[33m${s}\x1b[0m` : s),
+    cyan: (s: string) => (COLOR_ON ? `\x1b[36m${s}\x1b[0m` : s),
+    bold: (s: string) => (COLOR_ON ? `\x1b[1m${s}\x1b[0m` : s),
+  } as const;
+
   function relToProject(abs: string) {
     return abs.startsWith(PROJECT_ROOT + path.sep)
       ? abs.slice(PROJECT_ROOT.length + 1)
@@ -63,7 +89,6 @@ if (!g.__stacktraceMapperInstalled) {
     showVendor: boolean,
     maxProjectFrames: number
   ): string[] {
-    if (showVendor) return lines;
     const out: string[] = [];
     let i = 0;
     while (i < lines.length) {
@@ -90,6 +115,17 @@ if (!g.__stacktraceMapperInstalled) {
         continue;
       }
       if (kinds[i] === "vendor" || kinds[i] === "next") {
+        if (showVendor) {
+          // emit vendor/next frames individually
+          while (
+            i < lines.length &&
+            (kinds[i] === "vendor" || kinds[i] === "next")
+          ) {
+            out.push(lines[i]);
+            i++;
+          }
+          continue;
+        }
         let n = 0;
         while (
           i < lines.length &&
@@ -112,6 +148,14 @@ if (!g.__stacktraceMapperInstalled) {
 
   function toAbs(p: string) {
     return path.isAbsolute(p) ? p : path.resolve(p);
+  }
+
+  function safe<T>(fn: () => T, fallback: T): T {
+    try {
+      return fn();
+    } catch {
+      return fallback;
+    }
   }
 
   function normalizeSource(source: string): string {
@@ -284,48 +328,123 @@ if (!g.__stacktraceMapperInstalled) {
         }
         if (prop === "getLineNumber") return () => mapped.line;
         if (prop === "getColumnNumber") return () => mapped.col;
-        return Reflect.get(target, prop, receiver);
+        const v = Reflect.get(target, prop, receiver);
+        return typeof v === "function" ? v.bind(target) : v;
       },
     });
   }
 
   // kept earlier for reference; classification now drives filtering
 
-  function formatCallSite(cs: CallSite): string {
-    let filePath = "<anonymous>";
-    let ln = 0;
-    let cl = 0;
+  function formatCallSiteShort(cs: CallSite): string {
+    const filePath = safe(
+      () => cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.() ?? "<anonymous>",
+      "<anonymous>"
+    );
+    const ln = safe(() => cs.getLineNumber?.() ?? 0, 0);
+    const cl = safe(() => cs.getColumnNumber?.() ?? 0, 0);
+
+    const typeName = safe(() => cs.getTypeName?.() ?? null, null);
+    const methodName = safe(() => cs.getMethodName?.() ?? null, null);
+    const functionName = safe(() => cs.getFunctionName?.() ?? null, null);
+    const isAsync = safe(() => cs.isAsync?.() ?? false, false);
+    const isCtor = safe(() => cs.isConstructor?.() ?? false, false);
+
+    const shown = filePath === "<anonymous>" ? filePath : relToProject(filePath);
+
+    let name: string | null = null;
+    if (typeName && methodName) name = `${typeName}.${methodName}`;
+    else if (functionName) name = functionName;
+    else if (methodName) name = methodName;
+
+    const prefix = `${isAsync ? "async " : ""}${isCtor ? "new " : ""}`;
+    const loc = `${shown}:${ln}:${cl}`;
+    if (name) return `${prefix}${name} (${loc})`;
+    return `${prefix}${loc}`;
+  }
+
+  function shouldHide(kind: FrameKind): boolean {
+    if (kind === "node" || kind === "internal") return true;
+    if (kind === "next") return process.env.STACKTRACE_SHOW_VENDOR !== "1";
+    return false;
+  }
+
+  function buildCodeFrame(
+    file: string,
+    line: number,
+    col: number,
+    ctx = 2
+  ): string | null {
     try {
-      filePath =
-        cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.() ?? filePath;
-    } catch {}
-    try {
-      ln = cs.getLineNumber?.() ?? ln;
-    } catch {}
-    try {
-      cl = cs.getColumnNumber?.() ?? cl;
-    } catch {}
-    const shown =
-      filePath === "<anonymous>" ? filePath : relToProject(filePath);
-    return `${shown}:${ln}:${cl}`;
+      const abs = toAbs(file);
+      let contents: string;
+      try {
+        contents = fs.readFileSync(abs, "utf8");
+      } catch {
+        return null;
+      }
+      const allLines = contents.split(/\r?\n/);
+      if (line <= 0 || line > allLines.length) return null;
+
+      const start = Math.max(1, line - ctx);
+      const end = Math.min(allLines.length, line + ctx);
+      const width = String(end).length;
+
+      const out: string[] = [];
+      for (let i = start; i <= end; i++) {
+        const isTarget = i === line;
+        const marker = isTarget ? color.yellow(">") : " ";
+        const numStr = String(i).padStart(width, " ");
+        const pipe = color.dim(" | ");
+        const text = allLines[i - 1];
+        out.push(`${marker} ${color.dim(numStr)}${pipe}${text}`);
+        if (isTarget) {
+          const caretBase = `  ${" ".repeat(width)} | `; // matches spaces of non-marker line
+          const pre = text.slice(0, Math.max(0, col - 1));
+          const caretSpaces = pre.replace(/\t/g, "  ").length; // tabs → 2 spaces
+          out.push(`${color.dim(caretBase)}${" ".repeat(caretSpaces)}${color.red("^")}`);
+        }
+      }
+
+      return out.join("\n");
+    } catch {
+      return null;
+    }
   }
 
   Error.prepareStackTrace = (err, structured) => {
     try {
-      const frames = Array.isArray(structured)
-        ? (structured as CallSite[])
-        : [];
+      const frames = Array.isArray(structured) ? (structured as CallSite[]) : [];
       const mapped = frames.map(mapCallSite);
 
       const rawLines: string[] = [];
       const kinds: FrameKind[] = [];
+      let codeFrame: string | null = null;
+
       for (const cs of mapped) {
-        const file =
-          cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.() ?? null;
+        const file = safe(
+          () => cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.() ?? null,
+          null
+        );
         const kind = classifyFile(file);
-        if (kind === "node" || kind === "internal" || kind === "next") continue;
-        rawLines.push(`    at ${formatCallSite(cs)}`);
+        if (shouldHide(kind)) continue;
+
+        rawLines.push(`    at ${formatCallSiteShort(cs)}`);
         kinds.push(kind);
+
+        if (
+          !codeFrame &&
+          kind === "project" &&
+          file &&
+          typeof file === "string"
+        ) {
+          const ln = safe(() => cs.getLineNumber?.() ?? null, null);
+          const cl = safe(() => cs.getColumnNumber?.() ?? null, null);
+          if (typeof ln === "number" && typeof cl === "number") {
+            const ctx = Number(process.env.STACKTRACE_CODEFRAME_CONTEXT ?? "2");
+            codeFrame = buildCodeFrame(file, ln, cl, isNaN(ctx) ? 2 : ctx) ?? null;
+          }
+        }
       }
 
       const SHOW_VENDOR = process.env.STACKTRACE_SHOW_VENDOR === "1";
@@ -336,7 +455,13 @@ if (!g.__stacktraceMapperInstalled) {
         SHOW_VENDOR,
         isNaN(MAX_PROJECT) ? 10 : MAX_PROJECT
       );
-      return [`${err.name}: ${err.message}`, ...pretty].join("\n");
+
+      const lines = [`${err.name}: ${err.message}`, ...pretty];
+      if (codeFrame) {
+        lines.push("");
+        lines.push(color.bold(codeFrame));
+      }
+      return lines.join("\n");
     } catch {
       return `${err.name}: ${err.message}`;
     }
