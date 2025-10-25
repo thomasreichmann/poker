@@ -10,17 +10,14 @@ import { useEffect, useRef } from "react";
 import { type CachedGameData } from "./realtime/applyBroadcastToCache";
 import { applyBroadcastToCachedState } from "./realtime/reducers";
 
-type BroadcastPayload = {
-  event: string;
-  payload: {
-    id: string;
-    old_record: Record<string, unknown>;
-    operation: string;
-    record: Record<string, unknown>;
-    schema: string;
-    table: string;
+type BackendEventPayload = {
+  event: {
+    type: string;
+    gameId: string;
+    lastActionId: number | null;
+    updatedAt: string;
+    payload: Record<string, unknown>;
   };
-  type: string;
 };
 
 export function useGameRealtime(
@@ -75,24 +72,24 @@ export function useGameRealtime(
       });
     }
 
-    function onBroadcast(payload: BroadcastPayload) {
-      const p = payload.payload;
-      // keep lightweight logging only in dev
-      if (process.env.NODE_ENV !== "production") {
-        logger.debug({ payload: p }, "realtime.payload");
-      }
-      if (p.schema !== "public") {
+    function onBroadcast(payload: { payload: unknown; event: string }) {
+      const maybeBackend = payload?.payload as BackendEventPayload;
+      const event = maybeBackend?.event;
+      if (event && event.gameId === id) {
+        // Backend-driven event path: rely on summary payload
         if (process.env.NODE_ENV !== "production") {
-          logger.warn({ schema: p.schema }, "realtime.non_public_schema");
+          logger.debug({ event }, "realtime.backend_event");
         }
+        // Minimal application: just invalidate snapshot on hand transitions; otherwise let UI refetch when needed
+        setCacheRef.current?.((prev) => prev);
         return;
       }
-      if (!p.table) {
-        if (process.env.NODE_ENV !== "production") {
-          logger.warn({ table: p.table }, "realtime.missing_table");
-        }
-        return;
-      }
+
+      // Fallback: legacy DB-broadcast path (kept for shadow mode)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const p = payload?.payload as any;
+      if (!p) return;
+      if (p.schema !== "public" || !p.table) return;
       applyBroadcast(payload.event, p.table, p.record, p.old_record);
     }
 
@@ -126,16 +123,17 @@ export function useGameRealtime(
           if (status === "SUBSCRIBED") retryDelayRef.current = 1000;
         },
         (payload) => {
-          const p = (payload as BroadcastPayload).payload;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const p = (payload as any)?.payload;
           if (p?.table && typeof p.table === "string") {
             try {
-              realtimeStatusStore.recordBroadcast(
-                (payload as BroadcastPayload).event,
-                p.table
-              );
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const evt = (payload as any)?.event;
+              if (evt) realtimeStatusStore.recordBroadcast(evt, p.table);
             } catch {}
           }
-          onBroadcast(payload as BroadcastPayload);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onBroadcast(payload as any);
         }
       );
 

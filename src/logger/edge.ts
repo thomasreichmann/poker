@@ -24,10 +24,10 @@ function makeConsole(level: "info" | "warn" | "error" | "debug") {
         level === "info"
           ? console.info
           : level === "warn"
-            ? console.warn
-            : level === "error"
-              ? console.error
-              : console.debug;
+          ? console.warn
+          : level === "error"
+          ? console.error
+          : console.debug;
       fn(`${prefix}${payload}`);
     } catch {}
   };

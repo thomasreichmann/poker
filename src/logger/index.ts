@@ -1,4 +1,5 @@
 import pino, { LoggerOptions } from "pino";
+// import pretty from "pino-pretty";
 import "server-only";
 
 function isBrowser() {
@@ -35,7 +36,7 @@ function attachWith(base: pino.Logger): AppLogger {
   return Object.assign(base, { with: withFn });
 }
 
-function createPinoLogger() {
+async function createPinoLogger() {
   if (isBrowser()) {
     // Browser: use pino with pretty transport disabled, and map to console
     const logger = pino(baseOptions);
@@ -45,12 +46,16 @@ function createPinoLogger() {
   // Node: pretty in dev (in-process stream), JSON in prod
   if (!isProduction()) {
     // Use in-process pretty stream to avoid worker/thread-stream issues in Next dev
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pretty = require("pino-pretty");
+
+    const { default: pretty } = await import("pino-pretty");
     const prettyStream = pretty({
       colorize: true,
-      translateTime: "SYS:standard",
-      singleLine: true,
+      customPrettifiers: {
+        name: (name, key, log, { colors }) => {
+          const nameString = typeof name === "string" ? name : key;
+          return colors.blue(nameString);
+        },
+      },
     });
     const logger = pino(baseOptions, prettyStream);
     return attachWith(logger);
@@ -66,5 +71,6 @@ declare global {
 
 export const logger: AppLogger =
   process.env.NODE_ENV !== "production"
-    ? globalThis.__appLogger ?? (globalThis.__appLogger = createPinoLogger())
-    : createPinoLogger();
+    ? globalThis.__appLogger ??
+      (globalThis.__appLogger = await createPinoLogger())
+    : await createPinoLogger();

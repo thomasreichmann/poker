@@ -4,6 +4,7 @@ import { type PokerAction } from "@/db/schema/actionTypes";
 import { cards as cardsTable } from "@/db/schema/cards";
 import { games, type Game } from "@/db/schema/games";
 import { players as playersTable, type Player } from "@/db/schema/players";
+import { publishGameEvent, type GameEvent } from "@/lib/realtime/publisher";
 import { hasArrayChanges, shallowEqualByKeys } from "@/lib/utils";
 import { and, eq, inArray, not, sql } from "drizzle-orm";
 import { CardBase, generateDeck, getAvailableCards } from "./cards";
@@ -205,6 +206,29 @@ export async function persistPureGameState(
       })
       .where(eq(games.id, pureGameState.id))
       .returning();
+
+    // Build and emit backend-driven realtime event after commit
+    // Note: we derive lastActionId from latest action row for this game
+    try {
+      const [{ id: lastActionId } = { id: null as number | null }] = await tx
+        .select({ id: actions.id })
+        .from(actions)
+        .where(eq(actions.gameId, pureGameState.id))
+        .orderBy(sql`${actions.id} desc`)
+        .limit(1);
+
+      const event: GameEvent = {
+        type: "state-updated",
+        gameId: pureGameState.id,
+        lastActionId,
+        updatedAt: new Date().toISOString(),
+        payload: {
+          game: updated,
+        },
+      };
+      // Fire-and-forget; failures shouldn't break the transaction
+      void publishGameEvent(pureGameState.id, event);
+    } catch {}
 
     // Update only changed players when previous state is available
     const previousPlayersById = new Map(

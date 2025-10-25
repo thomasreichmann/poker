@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { logger } from "@/logger/client";
 import { getSupabaseBrowserClient } from "@/supabase/client";
+import { useTRPC } from "@/trpc/client";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   CheckCircle,
@@ -43,15 +45,18 @@ export default function LoginPage() {
   const [, setDevUsers] = useState<Array<{ id: string; email: string }>>([]);
   const [, setDevLoading] = useState(false);
 
+  const trpc = useTRPC();
+  const { error: trpcError, data: trpcData } = useQuery(
+    trpc.hello.queryOptions({ text: "test" }, { retry: false })
+  );
+  console.log(trpcError, trpcData);
+
   const supabase = getSupabaseBrowserClient();
   const router = useRouter();
 
   useEffect(() => {
     if (success) {
-      const timer = setTimeout(() => {
-        router.push("/dashboard");
-      }, 1500);
-      return () => clearTimeout(timer);
+      router.push("/dashboard");
     }
   }, [success, router]);
 

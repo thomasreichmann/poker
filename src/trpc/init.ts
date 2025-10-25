@@ -1,13 +1,16 @@
 import { db } from "@/db";
 import { users } from "@/db/schema/users";
+import { getLoggerWithRequest } from "@/logger/request-context";
 import { getSupabaseServerClient } from "@/supabase/server";
 import { initTRPC } from "@trpc/server";
 import { eq } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import superjson from "superjson";
-import { getLoggerWithRequest } from "@/logger/request-context";
 
-export const createTRPCContext = async () => {
+export const createTRPCContext = async (opts?: {
+  req?: Request;
+  requestId?: string;
+}) => {
   /**
    * @see: https://trpc.io/docs/server/context
    */
@@ -47,7 +50,17 @@ export const createTRPCContext = async () => {
     }
   }
 
-  const baseLog = getLoggerWithRequest().with({ userId: user?.id ?? null });
+  let baseLog = getLoggerWithRequest().child({
+    system: "trpc",
+    name: "trpc",
+    userId: user?.id ?? null,
+  });
+  if (opts?.requestId) {
+    baseLog = baseLog.child({ requestId: opts.requestId });
+  }
+  if (opts?.req) {
+    baseLog.info({ path: opts.req.url }, "trpc.request");
+  }
   return {
     user,
     supabase,
@@ -71,17 +84,36 @@ const devDelayMiddleware = t.middleware(async ({ ctx, next }) => {
     Math.floor(Math.random() * (max - min + 1)) + min
   );
   if (delayMs > 0) {
-    ctx.log.debug({ delayMs }, "trpc.devDelay");
+    ctx.log.trace({ delayMs }, "trpc.devDelay");
     await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
   return next();
+});
+
+// Logging middleware for all procedures
+const loggingMiddleware = t.middleware(async ({ path, type, ctx, next }) => {
+  const start = Date.now();
+  ctx.log.trace({ path, type }, "trpc.call.start");
+  const result = await next();
+  const durationMs = Date.now() - start;
+  if (result.ok) {
+    ctx.log.trace({ path, type, durationMs }, "trpc.call.ok");
+  } else {
+    ctx.log.error(
+      { path, type, durationMs, error: result.error },
+      "trpc.call.error"
+    );
+  }
+  return result;
 });
 
 // Base router and procedure helpers
 export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
 
-export const baseProcedure = t.procedure.use(devDelayMiddleware);
+export const baseProcedure = t.procedure
+  .use(devDelayMiddleware)
+  .use(loggingMiddleware);
 
 // Protected procedure that requires authentication
 export const protectedProcedure = baseProcedure.use(({ ctx, next }) => {

@@ -2,13 +2,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Next.js: debug full stack",
+      "name": "Full stack",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "/Users/thomas/.nodenv/shims/node",
-      "program": "${workspaceFolder}/node_modules/next/dist/bin/next",
-      "sourceMaps": true,
-      "runtimeArgs": ["--inspect"],
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "outputCapture": "std",
+      "env": { "FORCE_COLOR": "1", "NODE_OPTIONS": "--enable-source-maps" },
       "skipFiles": ["<node_internals>/**"],
       "serverReadyAction": {
         "action": "startDebugging",
