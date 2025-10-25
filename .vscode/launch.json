@@ -9,12 +9,7 @@
       "runtimeArgs": ["dev"],
       "outputCapture": "std",
       "env": { "FORCE_COLOR": "1", "NODE_OPTIONS": "--enable-source-maps" },
-      "skipFiles": ["<node_internals>/**"],
-      "serverReadyAction": {
-        "action": "startDebugging",
-        "name": "Launch Brave",
-        "pattern": "http://localhost:3000"
-      }
+      "skipFiles": ["<node_internals>/**"]
     },
     {
       "name": "Launch Brave",

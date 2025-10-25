@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "FORCE_COLOR=1 next dev",
+    "dev": "FORCE_COLOR=1 NODE_OPTIONS=\"--enable-source-maps\" next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

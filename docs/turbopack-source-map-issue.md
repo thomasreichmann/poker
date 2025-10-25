@@ -1,0 +1,88 @@
+# Enabling Source-Mapped Stack Traces in Pino Logs with Next.js Turbopack
+
+## Understanding the Issue
+
+When using **Next.js 15+ with Turbopack** and logging errors via Pino, you may notice stack traces pointing to compiled files (in the .next directory) instead of your original source code. For example, an error might show a frame like:
+
+Error: test  
+at createTRPCContext (.../.next/server/chunks/\[root-of-the-server\]\_\_d94062c4.\_.js:939:15)
+
+This is a minified stack trace referencing the bundled output. In an ideal scenario (with source-maps applied), that same frame would point to your actual source (e.g. a .tsx file and line number). In fact, a Next.js issue reproduces this: the "Current" stack shows a bundled .next/server/app/page.js:1:31591 reference, whereas the "Expected" (after fixing source-maps) shows the original src/app/page.tsx:4:30 location[\[1\]](https://github.com/vercel/next.js/issues/74646#:~:text=Current%3A%20The%20manual%20log%27s%20stack,file%20generated)[\[2\]](https://github.com/vercel/next.js/issues/74646#:~:text=Where%20am%20I%3A%20Error%20at,dom). Clearly, **Turbopack isn't applying source-maps to server-side error stacks by default**, making debugging in development harder.
+
+**Why does this happen?** In Next.js 15 (when Turbopack became the default dev bundler), the framework introduced a patch that deliberately **disables source-map integration for server errors**. Specifically, Next overrides Node's error stack formatter (Error.prepareStackTrace) to a custom function that _skips_ source-map resolution, resulting in the raw, bundled stack trace[\[3\]](https://github.com/vercel/next.js/issues/74646#:~:text=Expected%3A%20After%20commenting%20out%20this,line). This seems intended (possibly to avoid exposing source code in production or due to other constraints), but it affects development logs as well[\[4\]](https://github.com/vercel/next.js/issues/74646#:~:text=Additional%20context). The outcome is that even though sourcemap files are generated, Node is prevented from using them when printing error stacks. (Next's team has acknowledged this as a confirmed bug[\[5\]](https://github.com/vercel/next.js/issues/74646#:~:text=This%20behavior%20is%20causing%20maintenance,our%20ability%20to%20troubleshoot%20issues).)
+
+Notably, Node.js _can_ map stack traces to original sources if source-maps are enabled - for example, using the --enable-source-maps flag will make Node output original file paths/lines in errors[\[6\]](https://stackoverflow.com/questions/74295514/next-js-use-source-maps-for-errors-during-build-pre-render#:~:text=This%20will%20ensure%20Next,maps%20next%20build). **However, Next's override trumps this**. According to Node's documentation, _overriding_ Error.prepareStackTrace will prevent the built-in source-map support from modifying the stack trace[\[7\]](https://nodejs.org/api/cli.html#:~:text=report%20stack%20traces%20relative%20to,the%20original%20source%20file). That is exactly what Next.js is doing (overriding it without applying maps), so by default you get the unmapped (minified) stack.
+
+## Solutions: Getting Source-Mapped Stack Traces in Dev
+
+Until Next.js provides an official fix or option for this, you can apply some workarounds to restore readable stack traces during development. The goal is to re-enable source-map handling for error stacks **while continuing to use Turbopack**. Below are several approaches (you can combine some of them):
+
+**However,** as mentioned, Next's custom prepareStackTrace currently _blocks_ this. The Node docs note that overriding Error.prepareStackTrace can prevent the source-map mechanism from working[\[7\]](https://nodejs.org/api/cli.html#:~:text=report%20stack%20traces%20relative%20to,the%20original%20source%20file) - which is exactly our case. So, just enabling this flag alone may not immediately fix the issue, but it sets the stage for the next step. (It ensures Node has the maps available in its cache, even if the default printing is hijacked.)
+
+- **Use the source-map-support library (in development)** - The quickest way to counteract Next's override is to apply your own error stack handler that _does_ utilize source maps. The [**source-map-support**](https://www.npmjs.com/package/source-map-support) package is a convenient solution for Node apps. Here's how to use it:
+- Install the package (as a dev dependency): npm install --save-dev source-map-support.
+- **Import and install it at runtime, as early as possible.** For example, in your custom logger setup file or a bootstrap script that runs before your routes, add:
+
+- import 'source-map-support/register';  
+   // or:  
+   import sourceMapSupport from 'source-map-support';  
+   sourceMapSupport.install();
+- This module patches Error.prepareStackTrace internally to hook into Node's V8 stack trace API[\[7\]](https://nodejs.org/api/cli.html#:~:text=report%20stack%20traces%20relative%20to,the%20original%20source%20file), so that whenever an Error's stack is generated, it will look for an associated .map file and translate the file/line numbers back to your original code. Essentially, it mimics what the --enable-source-maps flag does (and uses the same underlying mechanism), but implements it in user-land.
+
+- **Ensure it runs after Next.js has loaded but before any errors are thrown.** Typically, if you put it in your Next app's entry point (e.g. in pages/\_app.tsx for older pages router, or in your root layout.tsx or a custom import in the App Router server code), that should be sufficient. Once this is in place, any new Error stack will be processed through source-map-support. So when Pino logs an error, the error.stack it prints will now contain original source references.
+- **Development only:** It's wise to include this only in development builds. You can guard it with if (process.env.NODE_ENV !== 'production') sourceMapSupport.install();. In production, you might not want to expose file paths or incur the slight performance hit of mapping. (And as you noted, it's not crucial for prod - focusing on dev.)
+- After doing this, test it out. Trigger an error in dev and observe the console/log output from Pino - you should see file paths and line numbers from your source code (e.g. .tsx files) instead of the .next/server/... paths.
+
+**Why this works:** By installing source-map-support, you override the Next.js patch with your own. Since your app code runs after the Next server is initialized, your call to Error.prepareStackTrace takes precedence for errors that happen subsequently. This effectively re-enables source-map usage in the stack traces. (If Node's internal source-map cache was enabled via the flag in step 2, source-map-support can even leverage that; if not, it can load the .map files itself from disk. Either way, the result is mapped stacks.)
+
+- **Advanced: Custom Stack Trace Mapping via Node APIs** (optional) - If you prefer not to use an external library, you can implement source-map mapping yourself using Node's **Module SourceMap** API. Node provides a module.findSourceMap(filePath) method that returns a SourceMap object for a given compiled file, if a source map exists[\[11\]](https://nodejs.org/api/module.html#:~:text=). You can then call sourceMap.findEntry(line, column) or findOrigin(...) to get the original position for a given generated line/column[\[12\]](https://nodejs.org/api/module.html#:~:text=). Using these primitives:
+- You could write a custom function to format error stacks: call the original Error.prepareStackTrace (or use V8's CallSite objects) to get the structured stack, then **for each frame that points to a transpiled file** (e.g. something in .next/server/... or node_modules/next/dist/...), use module.findSourceMap to resolve it to your source. You might also strip out internal Next/turbopack frames if needed.
+- Finally, assemble the stack trace string with the mapped locations and assign that to the error (or simply log it directly).
+- This is essentially what would happen if Next.js allowed source mapping. In fact, a Next.js team member noted that _"manually sourcemapping is pretty straightforward with Node.js APIs"_ and hinted that the logic in patch-error-inspect.ts (Next's internal file for this) contains the pieces you'd need - you can skip over the bundler's internal paths and utilize Node's Module.SourceMap instead of a third-party source-map library to do the resolution[\[4\]](https://github.com/vercel/next.js/issues/74646#:~:text=Additional%20context). In other words, Node's built-in support (which source-map-support also uses) is available for you to leverage.
+- If you go this route, you might do it by setting your own Error.prepareStackTrace. For example, you can store the original Error.prepareStackTrace (if any), then assign a custom function that uses the Node module APIs and finally calls the original formatter. The Node docs suggest this pattern when customizing stack traces with source-maps: call the original prepareStackTrace after adjusting the stack frames[\[13\]](https://nodejs.org/api/cli.html#:~:text=Overriding%20%60Error.prepareStackTrace%60%20may%20prevent%20%60,stack%20trace%20with%20source%20maps). By doing so, you integrate the mapping but still get a nicely formatted output.
+- This approach requires more coding, but it gives you flexibility (for instance, you could format the stack in a specific way for logs). The downside is maintenance overhead - you'll be reproducing logic that the library or Node runtime normally handles. For most cases, using source-map-support.install() is simpler and reliably achieves the same goal. But it's good to know that **Node's core API** can do this if needed (especially since it can be configured to include or exclude maps for node_modules code, etc.[\[14\]](https://nodejs.org/api/module.html#:~:text=Added%20in%3A%20v23)).
+- **Fallback: Use Webpack Dev Server (as a Last Resort)** - If none of the above solutions are satisfactory and you absolutely need correct stack traces immediately, you can temporarily disable Turbopack in favor of the old Webpack dev bundler. Simply run next dev _without_ --turbo (or set NEXT_FORCE_WEBPACK=1). In Next 13/14 and early 15, when using Webpack, the issue of suppressed source-maps did not occur - errors during SSR or API routes would typically show proper file/line references (Webpack plus the built-in source-map-support that Next used gave readable stacks). By falling back to Webpack, you sidestep the Turbopack-specific bug. Of course, you lose Turbopack's speed benefits, so this is truly a "last resort" if you find the development experience unacceptable otherwise.
+
+The good news is that the Next.js team is aware of the problem and will likely address it in a future release (the issue is tracked and marked confirmed on their GitHub[\[5\]](https://github.com/vercel/next.js/issues/74646#:~:text=This%20behavior%20is%20causing%20maintenance,our%20ability%20to%20troubleshoot%20issues)). Turbopack is evolving, so you might not need this workaround for long. If you do use it, keep an eye on the Next.js release notes or the issue thread for a fix, so you can return to Turbopack once source-mapped logging is fixed.
+
+## Additional Notes
+
+- **Production vs Development:** You've indicated you only care about sourcemapped traces in development, which is wise. In production, it's usually best _not_ to expose or ship source maps (unless you have a private error tracking process). Enabling server-side source maps in prod could inadvertently reveal your source code or cause performance overhead[\[15\]](https://github.com/vercel/next.js/discussions/71957#:~:text=Thanks%2C%20this%20works%21%20Setting%20,doesn%27t%20effect%20the%20dev%20environment). The above solutions (Node flag, source-map-support, custom mapping) should be applied to your dev environment only. For example, you might load the source-map-support module conditionally when process.env.NODE_ENV !== 'production'. This way, production logs remain unaffected (they'll show the compiled paths, which is fine for internal debugging if needed, or you can use other logging/monitoring solutions for prod).
+- **productionBrowserSourceMaps:** Just to clarify, Next.js's productionBrowserSourceMaps: true setting in next.config.js **only affects front-end/browser JS source maps for production builds**. It does not impact Node.js stack traces or dev mode at all[\[15\]](https://github.com/vercel/next.js/discussions/71957#:~:text=Thanks%2C%20this%20works%21%20Setting%20,doesn%27t%20effect%20the%20dev%20environment). Several developers mistakenly tried turning it on hoping to fix dev stack traces - but as one commenter noted, it _"doesn't affect the dev environment"_[\[15\]](https://github.com/vercel/next.js/discussions/71957#:~:text=Thanks%2C%20this%20works%21%20Setting%20,doesn%27t%20effect%20the%20dev%20environment) and would just expose source code in your production bundle if left enabled. So, you can leave that setting off (or on, as you prefer for debugging client-side code), but know that it's unrelated to the Pino logging issue on the server side.
+
+By implementing the above, you should be able to keep using Turbopack for its performance benefits _and_ get nicely source-mapped error logs from Pino during development. For example, after installing source-map-support, an error in your app logged by Pino might show something like:
+
+Error: test  
+at createTRPCContext (src/server/trpc/context.ts:42:15)  
+at handler (src/pages/api/example.ts:10:5)  
+... etc
+
+instead of the cryptic .next/server/... paths. This will make debugging much more pleasant while you build your Next.js app. Good luck, and keep an eye on the upstream fix in Next.js - once they resolve the issue (perhaps by making their stack trace patch optional in dev), you might be able to remove these workarounds[\[5\]](https://github.com/vercel/next.js/issues/74646#:~:text=This%20behavior%20is%20causing%20maintenance,our%20ability%20to%20troubleshoot%20issues) and have source-mapped logs by default.
+
+**Sources:**
+
+- Next.js issue discussing turbopack stack traces and the prepareStackTrace patch[\[3\]](https://github.com/vercel/next.js/issues/74646#:~:text=Expected%3A%20After%20commenting%20out%20this,line)[\[4\]](https://github.com/vercel/next.js/issues/74646#:~:text=Additional%20context)
+- Node.js documentation on enabling source maps and how custom stack trace formatting interferes[\[7\]](https://nodejs.org/api/cli.html#:~:text=report%20stack%20traces%20relative%20to,the%20original%20source%20file)
+- Stack Overflow and Next.js discussions on enabling source maps in development[\[6\]](https://stackoverflow.com/questions/74295514/next-js-use-source-maps-for-errors-during-build-pre-render#:~:text=This%20will%20ensure%20Next,maps%20next%20build)[\[8\]](https://github.com/vercel/next.js/discussions/71957#:~:text=%2F%2F%20tsconfig.json%20%7B%20,)
+- Comments on why productionBrowserSourceMaps isn't relevant for dev logs[\[15\]](https://github.com/vercel/next.js/discussions/71957#:~:text=Thanks%2C%20this%20works%21%20Setting%20,doesn%27t%20effect%20the%20dev%20environment)
+- Node.js Module SourceMap API reference (for manual mapping approach)[\[11\]\[12\]](https://nodejs.org/api/module.html#:~:text=)
+
+[\[1\]](https://github.com/vercel/next.js/issues/74646#:~:text=Current%3A%20The%20manual%20log%27s%20stack,file%20generated) [\[2\]](https://github.com/vercel/next.js/issues/74646#:~:text=Where%20am%20I%3A%20Error%20at,dom) [\[3\]](https://github.com/vercel/next.js/issues/74646#:~:text=Expected%3A%20After%20commenting%20out%20this,line) [\[4\]](https://github.com/vercel/next.js/issues/74646#:~:text=Additional%20context) [\[5\]](https://github.com/vercel/next.js/issues/74646#:~:text=This%20behavior%20is%20causing%20maintenance,our%20ability%20to%20troubleshoot%20issues) \[SourceMap\] \`prepareStackTrace\` patch minifies server stack trace · Issue #74646 · vercel/next.js · GitHub
+
+<https://github.com/vercel/next.js/issues/74646>
+
+[\[6\]](https://stackoverflow.com/questions/74295514/next-js-use-source-maps-for-errors-during-build-pre-render#:~:text=This%20will%20ensure%20Next,maps%20next%20build) stack trace - Next.js: Use source maps for errors during build/pre-render - Stack Overflow
+
+<https://stackoverflow.com/questions/74295514/next-js-use-source-maps-for-errors-during-build-pre-render>
+
+[\[7\]](https://nodejs.org/api/cli.html#:~:text=report%20stack%20traces%20relative%20to,the%20original%20source%20file) [\[10\]](https://nodejs.org/api/cli.html#:~:text=When%20using%20a%20transpiler%2C%20such,to%20the%20original%20source%20file) [\[13\]](https://nodejs.org/api/cli.html#:~:text=Overriding%20%60Error.prepareStackTrace%60%20may%20prevent%20%60,stack%20trace%20with%20source%20maps) Command-line API | Node.js v25.0.0 Documentation
+
+<https://nodejs.org/api/cli.html>
+
+[\[8\]](https://github.com/vercel/next.js/discussions/71957#:~:text=%2F%2F%20tsconfig.json%20%7B%20,) [\[9\]](https://github.com/vercel/next.js/discussions/71957#:~:text=4) [\[15\]](https://github.com/vercel/next.js/discussions/71957#:~:text=Thanks%2C%20this%20works%21%20Setting%20,doesn%27t%20effect%20the%20dev%20environment) Turbopack - Failed to get source map: \[Error: Unknown url scheme\] { code: 'GenericFailure' } · vercel next.js · Discussion #71957 · GitHub
+
+<https://github.com/vercel/next.js/discussions/71957>
+
+[\[11\]](https://nodejs.org/api/module.html#:~:text=) [\[12\]](https://nodejs.org/api/module.html#:~:text=) [\[14\]](https://nodejs.org/api/module.html#:~:text=Added%20in%3A%20v23) Modules: node:module API | Node.js v25.0.0 Documentation
+
+<https://nodejs.org/api/module.html>

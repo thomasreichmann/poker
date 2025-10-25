@@ -74,3 +74,15 @@ export const logger: AppLogger =
     ? globalThis.__appLogger ??
       (globalThis.__appLogger = await createPinoLogger())
     : await createPinoLogger();
+
+export function freshStack<T extends Error>(e: T): T {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (e as any).stack;
+  } catch {}
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    void (e as any).stack;
+  } catch {}
+  return e;
+}
