@@ -104,13 +104,6 @@ if (!g.__stacktraceMapperInstalled) {
       : abs;
   }
 
-  type FrameKind =
-    | "project"
-    | "vendor"
-    | "next"
-    | "node"
-    | "internal"
-    | "unknown";
 
   function classifyFile(file: string | null): FrameKind {
     if (!file) return "unknown";
