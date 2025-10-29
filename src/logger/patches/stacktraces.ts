@@ -29,13 +29,16 @@ if (!g.__stacktraceMapperInstalled) {
   // --- Color utilities (TTY-aware, opt-out via env) ---
   function supportsColor(): boolean {
     try {
-      if (process.env.STACKTRACE_COLOR === '0') return false;
-      if (process.env.STACKTRACE_COLOR === '1') return true;
+      if (process.env.STACKTRACE_COLOR === "0") return false;
+      if (process.env.STACKTRACE_COLOR === "1") return true;
       // Respect standard FORCE_COLOR=0 as opt-out if present
-      if (process.env.FORCE_COLOR === '0') return false;
+      if (process.env.FORCE_COLOR === "0") return false;
       // Default: on when stdout is a TTY
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const stdoutAny: any = typeof process !== 'undefined' ? (process as unknown as { stdout?: { isTTY?: boolean } }).stdout : undefined;
+      const stdoutAny: any =
+        typeof process !== "undefined"
+          ? (process as unknown as { stdout?: { isTTY?: boolean } }).stdout
+          : undefined;
       return !!stdoutAny?.isTTY;
     } catch {
       return false;
@@ -53,9 +56,12 @@ if (!g.__stacktraceMapperInstalled) {
   } as const;
 
   // --- Lightweight JS/TS syntax colorizer for code-frames ---
-  const KW = /\b(await|break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|false|finally|for|from|function|if|import|in|instanceof|interface|let|new|null|of|return|super|switch|this|throw|true|try|typeof|var|void|while|with|yield)\b/g;
-  const TYPE_KW = /\b(abstract|as|asserts|declare|implements|keyof|namespace|never|private|protected|public|readonly|satisfies|static|type|unknown)\b/g;
-  const NUM = /\b(?:0[xX][\da-fA-F]+|0[bB][01]+|0[oO][0-7]+|\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/g;
+  const KW =
+    /\b(await|break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|false|finally|for|from|function|if|import|in|instanceof|interface|let|new|null|of|return|super|switch|this|throw|true|try|typeof|var|void|while|with|yield)\b/g;
+  const TYPE_KW =
+    /\b(abstract|as|asserts|declare|implements|keyof|namespace|never|private|protected|public|readonly|satisfies|static|type|unknown)\b/g;
+  const NUM =
+    /\b(?:0[xX][\da-fA-F]+|0[bB][01]+|0[oO][0-7]+|\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/g;
   const STR = /(['"`])(?:\\.|(?!\1).)*\1/g; // naive string match
   const COMMENT = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
   const PROP = /(?<=\.)[a-zA-Z_]\w*/g; // .prop
@@ -140,7 +146,9 @@ if (!g.__stacktraceMapperInstalled) {
         }
         if (extra > 0)
           out.push(
-            `    ${color.dim(`… ${extra} more project frame${extra > 1 ? "s" : ""} …`)}`
+            `    ${color.dim(
+              `… ${extra} more project frame${extra > 1 ? "s" : ""} …`
+            )}`
           );
         continue;
       }
@@ -165,7 +173,9 @@ if (!g.__stacktraceMapperInstalled) {
           n++;
         }
         if (n > 0)
-          out.push(`    ${color.dim(`… ${n} frame${n > 1 ? "s" : ""} from dependencies …`)}`);
+          out.push(
+            `    ${color.dim(`… ${n} frame${n > 1 ? "s" : ""} hidden …`)}`
+          );
         continue;
       }
       out.push(lines[i]);
@@ -367,12 +377,13 @@ if (!g.__stacktraceMapperInstalled) {
   // kept earlier for reference; classification now drives filtering
 
   function formatCallSiteShort(cs: CallSite): string {
-    const fileAbs = safe(
-      () => cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.(),
-      "<anonymous>"
-    );
-    const line = safe(() => cs.getLineNumber?.(), 0);
-    const col = safe(() => cs.getColumnNumber?.(), 0);
+    const fileAbs =
+      safe(
+        () => cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.(),
+        "<anonymous>"
+      ) ?? "<anonymous>";
+    const line = safe(() => cs.getLineNumber?.() ?? null, null) ?? 0;
+    const col = safe(() => cs.getColumnNumber?.() ?? null, null) ?? 0;
     const fn =
       safe(() => cs.getFunctionName?.(), null) ||
       safe(() => cs.getMethodName?.(), null);
@@ -384,10 +395,15 @@ if (!g.__stacktraceMapperInstalled) {
     const fileShown =
       typeof fileAbs === "string" && fileAbs.startsWith(PROJECT_ROOT + path.sep)
         ? fileAbs.slice(PROJECT_ROOT.length + 1)
-        : fileAbs;
+        : fileAbs ?? "<anonymous>";
 
-    const where = `${color.cyan(String(fileShown))}${color.gray(`:${line}:${col}`)}`;
-    const label = [isAsync ? color.dim("async ") : "", fn ? color.bold(String(fn)) + " " : ""].join("");
+    const where = `${color.cyan(String(fileShown))}${color.gray(
+      `:${line}:${col}`
+    )}`;
+    const label = [
+      isAsync ? color.dim("async ") : "",
+      fn ? color.bold(String(fn)) + " " : "",
+    ].join("");
 
     return `${label}(${where})`;
   }
@@ -432,7 +448,11 @@ if (!g.__stacktraceMapperInstalled) {
           const caretBase = `  ${" ".repeat(width)} | `; // matches spaces of non-marker line
           const pre = textRaw.slice(0, Math.max(0, col - 1));
           const caretSpaces = pre.replace(/\t/g, "  ").length; // tabs → 2 spaces
-          out.push(`${color.dim(caretBase)}${" ".repeat(caretSpaces)}${color.yellow("^")}`);
+          out.push(
+            `${color.dim(caretBase)}${" ".repeat(caretSpaces)}${color.yellow(
+              "^"
+            )}`
+          );
         }
       }
 
@@ -444,7 +464,9 @@ if (!g.__stacktraceMapperInstalled) {
 
   Error.prepareStackTrace = (err, structured) => {
     try {
-      const frames = Array.isArray(structured) ? (structured as CallSite[]) : [];
+      const frames = Array.isArray(structured)
+        ? (structured as CallSite[])
+        : [];
       const mapped = frames.map(mapCallSite);
 
       const rawLines: string[] = [];
@@ -456,6 +478,8 @@ if (!g.__stacktraceMapperInstalled) {
           () => cs.getFileName?.() ?? cs.getScriptNameOrSourceURL?.() ?? null,
           null
         );
+        // Skip frames with null file - they're not useful for debugging
+        if (!file) continue;
         const kind = classifyFile(file);
         if (shouldHide(kind)) continue;
 
@@ -472,7 +496,8 @@ if (!g.__stacktraceMapperInstalled) {
           const cl = safe(() => cs.getColumnNumber?.() ?? null, null);
           if (typeof ln === "number" && typeof cl === "number") {
             const ctx = Number(process.env.STACKTRACE_CODEFRAME_CONTEXT ?? "2");
-            codeFrame = buildCodeFrame(file, ln, cl, isNaN(ctx) ? 2 : ctx) ?? null;
+            codeFrame =
+              buildCodeFrame(file, ln, cl, isNaN(ctx) ? 2 : ctx) ?? null;
           }
         }
       }
