@@ -7,10 +7,26 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Re-exported type and helpers for reuse by logger/source.ts
+export type FrameKind =
+  | "project"
+  | "vendor"
+  | "next"
+  | "node"
+  | "internal"
+  | "unknown";
+
 type CallSite = NodeJS.CallSite;
 
 const g = globalThis as typeof globalThis & {
   __stacktraceMapperInstalled?: boolean;
+  // Internal bridge so other modules can reuse mapping/classification
+  __stacktraceUtils?: {
+    mapCallSite: (cs: NodeJS.CallSite) => NodeJS.CallSite;
+    classifyFile: (file: string | null) => FrameKind;
+    toAbs: (p: string) => string;
+    projectRoot: string;
+  };
 };
 
 if (!g.__stacktraceMapperInstalled) {
@@ -88,13 +104,6 @@ if (!g.__stacktraceMapperInstalled) {
       : abs;
   }
 
-  type FrameKind =
-    | "project"
-    | "vendor"
-    | "next"
-    | "node"
-    | "internal"
-    | "unknown";
 
   function classifyFile(file: string | null): FrameKind {
     if (!file) return "unknown";
@@ -497,4 +506,53 @@ if (!g.__stacktraceMapperInstalled) {
       return `${err.name}: ${err.message}`;
     }
   };
+
+  // Provide utilities for other modules to reuse mapping/classification in dev
+  try {
+    g.__stacktraceUtils = {
+      mapCallSite,
+      classifyFile,
+      toAbs,
+      projectRoot: PROJECT_ROOT,
+    };
+  } catch {}
 }
+
+// Expose minimal API for reuse (dev-only; no-op fallbacks in prod)
+export function mapStructuredStack(frames: NodeJS.CallSite[]): NodeJS.CallSite[] {
+  try {
+    const utils = g.__stacktraceUtils;
+    if (utils?.mapCallSite) return frames.map(utils.mapCallSite);
+  } catch {}
+  return frames;
+}
+
+export function classifyFile(file: string | null): FrameKind {
+  try {
+    const utils = g.__stacktraceUtils;
+    if (utils?.classifyFile) return utils.classifyFile(file);
+  } catch {}
+  if (!file) return "unknown";
+  if (file.startsWith("node:")) return "node";
+  const abs = path.isAbsolute(file) ? file : path.resolve(file);
+  const cwd = process.cwd();
+  if (abs.includes(`${path.sep}node_modules${path.sep}`)) return "vendor";
+  if (abs.startsWith(cwd)) return "project";
+  if (
+    abs.includes(`${path.sep}node${path.sep}internal${path.sep}`) ||
+    abs.includes(`${path.sep}internal${path.sep}`)
+  )
+    return "internal";
+  if (abs.includes(`${path.sep}.next${path.sep}`)) return "vendor";
+  return "unknown";
+}
+
+export function toAbs(p: string): string {
+  try {
+    const utils = g.__stacktraceUtils;
+    if (utils?.toAbs) return utils.toAbs(p);
+  } catch {}
+  return path.isAbsolute(p) ? p : path.resolve(p);
+}
+
+export const PROJECT_ROOT: string = process.cwd();
