@@ -49,7 +49,6 @@ export default function LoginPage() {
   const { error: trpcError, data: trpcData } = useQuery(
     trpc.hello.queryOptions({ text: "test" }, { retry: false })
   );
-  console.log(trpcError, trpcData);
 
   const supabase = getSupabaseBrowserClient();
   const router = useRouter();
