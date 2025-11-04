@@ -11,20 +11,17 @@ export function withLogging(
         : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
     const userId = req.headers.get("x-user-id") || null;
 
-    const start = Date.now();
     // edgeLogger.info({ requestId, method: req.method, url: req.nextUrl.pathname }, "request:start");
     try {
       const res = await next(req);
-      const ms = Date.now() - start;
-      // edgeLogger.info({ requestId, status: res.status, durationMs: ms }, "request:end");
+      // edgeLogger.info({ requestId, status: res.status, durationMs: Date.now() - start }, "request:end");
       try {
         res.headers.set("x-request-id", requestId);
         if (userId) res.headers.set("x-user-id", userId);
       } catch {}
       return res;
     } catch (err) {
-      const ms = Date.now() - start;
-      // edgeLogger.error({ requestId, err, durationMs: ms }, "request:error");
+      // edgeLogger.error({ requestId, err, durationMs: Date.now() - start }, "request:error");
       throw err;
     }
   };

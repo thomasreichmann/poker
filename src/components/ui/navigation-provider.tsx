@@ -42,7 +42,8 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
 
   useEffect(() => {
-    setIsNavigating(false);
+    const timeout = setTimeout(() => setIsNavigating(false), 0);
+    return () => clearTimeout(timeout);
   }, [pathname]);
 
   return (

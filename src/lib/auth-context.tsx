@@ -31,6 +31,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const transformUser = (supabaseUser: SupabaseUser): User => ({
+    id: supabaseUser.id,
+    email: supabaseUser.email!,
+    user_metadata: supabaseUser.user_metadata,
+  });
+
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     // Get initial session
@@ -51,12 +57,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const transformUser = (supabaseUser: SupabaseUser): User => ({
-    id: supabaseUser.id,
-    email: supabaseUser.email!,
-    user_metadata: supabaseUser.user_metadata,
-  });
 
   const signUp = async (email: string, password: string, metadata?: object) => {
     try {

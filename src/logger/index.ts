@@ -6,6 +6,7 @@ import { captureLogOrigin } from "./source";
 // It will still be checked by Next.js during bundling
 try {
   if (typeof process !== "undefined" && process.env.NEXT_RUNTIME) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     require("server-only");
   }
 } catch {

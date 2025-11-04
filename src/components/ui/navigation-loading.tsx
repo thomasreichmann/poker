@@ -8,7 +8,7 @@ export function NavigationLoading({ isPending }: { isPending: boolean }) {
 
   useEffect(() => {
     if (isPending) {
-      setProgress(30);
+      const timeout = setTimeout(() => setProgress(30), 0);
       const interval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 90) return prev;
@@ -17,13 +17,17 @@ export function NavigationLoading({ isPending }: { isPending: boolean }) {
       }, 200);
 
       return () => {
+        clearTimeout(timeout);
         clearInterval(interval);
         setProgress(0);
       };
     } else {
-      setProgress(100);
-      const timeout = setTimeout(() => setProgress(0), 200);
-      return () => clearTimeout(timeout);
+      const timeout1 = setTimeout(() => setProgress(100), 0);
+      const timeout2 = setTimeout(() => setProgress(0), 200);
+      return () => {
+        clearTimeout(timeout1);
+        clearTimeout(timeout2);
+      };
     }
   }, [isPending]);
 

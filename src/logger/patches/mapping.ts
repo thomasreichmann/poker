@@ -29,14 +29,6 @@ function toAbs(p: string): string {
   return path.isAbsolute(p) ? p : path.resolve(p);
 }
 
-function safe<T>(fn: () => T, fallback: T): T {
-  try {
-    return fn();
-  } catch {
-    return fallback;
-  }
-}
-
 function normalizeSource(source: string): string {
   if (source.startsWith("file://")) {
     try {

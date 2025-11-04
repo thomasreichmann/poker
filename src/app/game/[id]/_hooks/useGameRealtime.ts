@@ -30,9 +30,12 @@ export function useGameRealtime(
   const onAuthTokenRef = useRef(onAuthToken);
   const onHandTransitionRef = useRef(onHandTransition);
   const setCacheRef = useRef(setCache);
-  onAuthTokenRef.current = onAuthToken;
-  onHandTransitionRef.current = onHandTransition;
-  setCacheRef.current = setCache;
+  
+  useEffect(() => {
+    onAuthTokenRef.current = onAuthToken;
+    onHandTransitionRef.current = onHandTransition;
+    setCacheRef.current = setCache;
+  }, [onAuthToken, onHandTransition, setCache]);
   const stoppedRef = useRef(false);
   const retryDelayRef = useRef(1000);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(

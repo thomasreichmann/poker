@@ -27,17 +27,20 @@ export const useGameLogic = () => {
   // Visual turn timer: counts down from 30s without auto-fold side effects
   useEffect(() => {
     // Reset timer on phase or player change
-    setTimeLeft(30);
+    const timeout = setTimeout(() => setTimeLeft(30), 0);
 
     if (gameState.phase === "waiting" || gameState.phase === "showdown") {
-      return;
+      return () => clearTimeout(timeout);
     }
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(timer);
+    };
   }, [gameState.activePlayerIndex, gameState.phase]);
 
   // Update raise amount baseline when betting context changes
@@ -50,7 +53,8 @@ export const useGameLogic = () => {
       );
       const call = gameState.currentBet - (currentPlayer?.currentBet || 0);
       const baseline = gameState.currentBet > 0 ? call : minRaiseTotal;
-      setRaiseAmount(baseline);
+      const timeout = setTimeout(() => setRaiseAmount(baseline), 0);
+      return () => clearTimeout(timeout);
     }
   }, [
     gameState.currentBet,

@@ -4,7 +4,7 @@ import { PlayingCard } from "@/components/ui/playing-card";
 import { useBoardState } from "@/lib/dev/board";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
 import { motion } from "motion/react";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type CommunityCardsProps = {
   cards: IPlayingCard[];
@@ -15,6 +15,7 @@ type CommunityCardsProps = {
 export function CommunityCards({ cards, highlightIds }: CommunityCardsProps) {
   const prevCount = useRef(0);
   const prevIdsRef = useRef<string[]>([]);
+  const [prevCountValue, setPrevCountValue] = useState(0);
   const board = useBoardState();
   const displayCards = useMemo<IPlayingCard[]>(() => {
     const overrideCards = (board.cards as IPlayingCard[]) || [];
@@ -22,13 +23,11 @@ export function CommunityCards({ cards, highlightIds }: CommunityCardsProps) {
     return cards;
   }, [board.enabled, board.cards, cards]);
 
-  // Debug logging to diagnose rendering vs data flow
-  // Remove debug
-
   useEffect(() => {
     if (displayCards.length > prevCount.current) {
       // no-op now; animation handled declaratively
     }
+    setPrevCountValue(prevCount.current);
     prevCount.current = displayCards.length;
     prevIdsRef.current = displayCards.map((c) => c.id);
   }, [displayCards]);
@@ -62,7 +61,7 @@ export function CommunityCards({ cards, highlightIds }: CommunityCardsProps) {
                 : undefined
             }
             animationDelay={
-              index >= prevCount.current ? (index - prevCount.current) * 80 : 0
+              index >= prevCountValue ? (index - prevCountValue) * 80 : 0
             }
           />
         ))}

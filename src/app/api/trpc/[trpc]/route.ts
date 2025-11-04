@@ -15,7 +15,7 @@ const handler = (req: Request) => {
       req,
       router: appRouter,
       createContext: async () => createTRPCContext({ req, requestId: id }),
-      onError({ error, path, type, ctx }) {
+      onError({ error, ctx }) {
         const logger = ctx?.log ?? getLoggerWithRequest();
         logger.error(error);
       },

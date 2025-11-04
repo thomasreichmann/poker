@@ -177,12 +177,6 @@ if (!g.__stacktraceMapperInstalled) {
     }
   }
 
-  function relToProject(abs: string) {
-    return abs.startsWith(PROJECT_ROOT + path.sep)
-      ? abs.slice(PROJECT_ROOT.length + 1)
-      : abs;
-  }
-
   function toAbs(p: string) {
     return path.isAbsolute(p) ? p : path.resolve(p);
   }

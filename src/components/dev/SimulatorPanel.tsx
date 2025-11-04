@@ -72,16 +72,19 @@ export function SimulatorPanel({
   useEffect(() => {
     // Preserve selections, add new players, prune removed
     if (!players || players.length === 0) return;
-    setPerSeat((prev) => {
-      const next: Record<string, StrategyId | ""> = { ...prev };
-      for (const p of players) {
-        if (!(p.id in next)) next[p.id] = "";
-      }
-      for (const key of Object.keys(next)) {
-        if (!players.find((p) => p.id === key)) delete next[key];
-      }
-      return next;
-    });
+    const timeout = setTimeout(() => {
+      setPerSeat((prev) => {
+        const next: Record<string, StrategyId | ""> = { ...prev };
+        for (const p of players) {
+          if (!(p.id in next)) next[p.id] = "";
+        }
+        for (const key of Object.keys(next)) {
+          if (!players.find((p) => p.id === key)) delete next[key];
+        }
+        return next;
+      });
+    }, 0);
+    return () => clearTimeout(timeout);
   }, [players]);
 
   // NOTE: hooks must remain unconditional; we gate rendering below
@@ -102,7 +105,10 @@ export function SimulatorPanel({
       const raw = localStorage.getItem(enabledStorageKey);
       if (raw != null) {
         const parsed = JSON.parse(raw);
-        if (typeof parsed === "boolean") setEnabled(parsed);
+        if (typeof parsed === "boolean") {
+          const timeout = setTimeout(() => setEnabled(parsed), 0);
+          return () => clearTimeout(timeout);
+        }
       }
     } catch {}
   }, [enabledStorageKey]);
@@ -118,6 +124,7 @@ export function SimulatorPanel({
 
   // hydrate per-seat overrides from storage
   useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
     try {
       const raw =
         typeof window !== "undefined" &&
@@ -125,11 +132,16 @@ export function SimulatorPanel({
       if (raw) {
         const parsed = JSON.parse(raw) as Record<string, StrategyId | "">;
         if (parsed && typeof parsed === "object") {
-          setPerSeat(parsed);
+          timeout = setTimeout(() => {
+            setPerSeat(parsed);
+            setPerSeatHydrated(true);
+          }, 0);
+          return () => clearTimeout(timeout);
         }
       }
     } catch {}
-    setPerSeatHydrated(true);
+    timeout = setTimeout(() => setPerSeatHydrated(true), 0);
+    return () => clearTimeout(timeout);
   }, [perSeatStorageKey]);
 
   // persist per-seat overrides whenever they change
@@ -145,7 +157,10 @@ export function SimulatorPanel({
   // hydrate default strategy from storage
   useEffect(() => {
     try {
-      if (typeof window === "undefined") return;
+      if (typeof window === "undefined") {
+        const timeout = setTimeout(() => setDefaultStrategyHydrated(true), 0);
+        return () => clearTimeout(timeout);
+      }
       const raw = localStorage.getItem(defaultStrategyStorageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
@@ -157,11 +172,16 @@ export function SimulatorPanel({
           parsed === "loose_passive" ||
           parsed === "scripted"
         ) {
-          setDefaultStrategy(parsed);
+          const timeout = setTimeout(() => {
+            setDefaultStrategy(parsed);
+            setDefaultStrategyHydrated(true);
+          }, 0);
+          return () => clearTimeout(timeout);
         }
       }
     } catch {}
-    setDefaultStrategyHydrated(true);
+    const timeout = setTimeout(() => setDefaultStrategyHydrated(true), 0);
+    return () => clearTimeout(timeout);
   }, [defaultStrategyStorageKey]);
 
   // persist default strategy when it changes
@@ -210,8 +230,7 @@ export function SimulatorPanel({
       deck: [],
       handId: dbGame.handId ?? 0,
       turnMs: dbGame.turnMs ?? 30_000,
-      turnTimeoutAt:
-        dbGame.turnTimeoutAt ?? new Date(Date.now() + dbGame.turnMs),
+      turnTimeoutAt: dbGame.turnTimeoutAt ?? null,
     };
     return state;
   }, [dbGame, dbPlayers]);

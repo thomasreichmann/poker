@@ -46,7 +46,7 @@ export default function LoginPage() {
   const [, setDevLoading] = useState(false);
 
   const trpc = useTRPC();
-  const { error: trpcError, data: trpcData } = useQuery(
+  useQuery(
     trpc.hello.queryOptions({ text: "test" }, { retry: false })
   );
 
