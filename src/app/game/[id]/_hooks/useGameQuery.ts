@@ -10,7 +10,11 @@ export function useGameQuery(gameId: string) {
 
   const { data: me } = useQuery(trpc.auth.me.queryOptions());
   const gameQueryOptions = trpc.game.getById.queryOptions({ id: gameId });
-  const { data: gameData } = useQuery({
+  const {
+    data: gameData,
+    isLoading,
+    isError,
+  } = useQuery({
     ...gameQueryOptions,
     staleTime: Infinity,
     refetchOnWindowFocus: false,
@@ -27,7 +31,17 @@ export function useGameQuery(gameId: string) {
       }
     : null;
 
+  const isNotFound = !isLoading && !isError && gameData === null;
+
   // Use the actual tRPC query key to ensure cache updates hit the right entry
   const getByIdKey = trpc.game.getById.queryKey({ id: gameId });
-  return { me, snapshot, queryClient, trpc, getByIdKey } as const;
+  return {
+    me,
+    snapshot,
+    queryClient,
+    trpc,
+    getByIdKey,
+    isLoading,
+    isNotFound,
+  } as const;
 }

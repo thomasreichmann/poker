@@ -22,11 +22,12 @@ export function useGameData(id: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { me, snapshot, getByIdKey } = useGameQuery(id);
+  const { me, snapshot, getByIdKey, isLoading, isNotFound } = useGameQuery(id);
 
-  const getHoleCards = useQuery(
-    trpc.game.getHoleCards.queryOptions({ gameId: id })
-  );
+  const getHoleCards = useQuery({
+    ...trpc.game.getHoleCards.queryOptions({ gameId: id }),
+    enabled: !isLoading && !isNotFound && !!snapshot?.game,
+  });
 
   // Merge helper: ensure private hole cards are present for the current hand
   const ensureHoleCardsMerged = useCallback(
@@ -339,7 +340,7 @@ export function useGameData(id: string) {
 
   // Ensure we fetch your current-hand hole cards after a hand change or initial mount
   useEffect(() => {
-    if (!dbGame || !yourDbPlayer) return;
+    if (isNotFound || isLoading || !dbGame || !yourDbPlayer) return;
     const myCurrentHandCount = dbCards.filter(
       (c) => c.playerId === yourDbPlayer.id && c.handId === dbGame.handId
     ).length;
@@ -347,18 +348,26 @@ export function useGameData(id: string) {
       void refetchHoleCardsWithRetry();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dbGame?.handId, yourDbPlayer?.id]);
+  }, [isNotFound, isLoading, dbGame?.handId, yourDbPlayer?.id]);
 
   useEffect(() => {
-    if (!getHoleCards.data) return;
+    if (isNotFound || isLoading || !getHoleCards.data) return;
     queryClient.setQueryData(getByIdKey, (prev) => {
       return ensureHoleCardsMerged(prev as CachedGameData | null);
     });
-  }, [getHoleCards.data, getByIdKey, queryClient, ensureHoleCardsMerged]);
+  }, [
+    isNotFound,
+    isLoading,
+    getHoleCards.data,
+    getByIdKey,
+    queryClient,
+    ensureHoleCardsMerged,
+  ]);
 
   // Realtime subscription and cache updates via helper hook
+  // Only subscribe if game exists (hook checks id internally)
   useGameRealtime(
-    id,
+    !isLoading && !isNotFound && snapshot?.game ? id : "",
     (updater) => {
       queryClient.setQueryData<CachedGameData | null>(getByIdKey, (prev) => {
         if (!prev) return prev;
@@ -377,12 +386,13 @@ export function useGameData(id: string) {
 
   // Also re-merge any time the snapshot hand changes and we have private cards cached
   useEffect(() => {
+    if (isNotFound || isLoading) return;
     queryClient.setQueryData(getByIdKey, (prev) => {
       if (!prev) return prev;
       return ensureHoleCardsMerged(prev as CachedGameData);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot?.game?.handId]);
+  }, [isNotFound, isLoading, snapshot?.game?.handId]);
 
   // Stable timeout handler to avoid effect churn in the hook
   const onTurnTimeout = useCallback(async () => {
@@ -491,5 +501,7 @@ export function useGameData(id: string) {
     isResetting,
     isLeaving,
     isTimingOut,
+    isLoading,
+    isNotFound,
   } as const;
 }

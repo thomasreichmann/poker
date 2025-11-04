@@ -2,6 +2,15 @@
 
 import { DevOnly } from "@/components/dev/DevOnly";
 import { DevToolsPanel } from "@/components/dev/DevToolsPanel";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { AppLink } from "@/components/ui/link";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
 import { evaluateBestHandDetailed } from "@/lib/poker/cards";
 import { useParams } from "next/navigation";
@@ -42,6 +51,8 @@ export default function PokerGamePage() {
     isJoining,
     isLeaving,
     isResetting,
+    isLoading,
+    isNotFound,
   } = useGameData(id);
 
   useEffect(() => {
@@ -229,6 +240,73 @@ export default function PokerGamePage() {
       holeHighlightIds: holeSets,
     };
   }, [isShowdown, playersBySeat, dbCards, communityCards]);
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-slate-900 text-white flex items-center justify-center p-4">
+        <Card className="bg-slate-800 border-slate-700 shadow-xl max-w-md w-full">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+            <CardTitle className="text-white text-xl">Carregando...</CardTitle>
+            <CardDescription className="text-slate-400 mt-2">
+              Carregando informações do jogo
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isNotFound) {
+    return (
+      <div className="fixed inset-0 bg-slate-900 text-white flex items-center justify-center p-4">
+        <Card className="bg-slate-800 border-slate-700 shadow-xl max-w-md w-full">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
+                <svg
+                  className="w-8 h-8 text-red-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </div>
+            </div>
+            <CardTitle className="text-white text-xl">
+              Jogo não encontrado
+            </CardTitle>
+            <CardDescription className="text-slate-400 mt-2">
+              O jogo que você está procurando não existe ou foi removido.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-4">
+              <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+                <p className="text-slate-400 text-xs mb-1">ID do jogo</p>
+                <code className="text-slate-300 text-xs font-mono break-all">
+                  {id}
+                </code>
+              </div>
+              <AppLink href="/dashboard">
+                <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+                  Voltar para o Dashboard
+                </Button>
+              </AppLink>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-white relative overflow-hidden">

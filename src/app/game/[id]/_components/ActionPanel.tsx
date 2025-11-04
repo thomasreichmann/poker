@@ -97,9 +97,9 @@ export function ActionPanel({
   };
 
   return (
-    <div className="fixed right-4 bottom-4 z-40 w-full max-w-md md:max-w-lg">
-      <Card className="bg-slate-800 border-slate-600 shadow-2xl py-0">
-        <CardContent className="p-3">
+    <div className="fixed left-0 right-0 sm:left-auto sm:right-4 bottom-0 sm:bottom-4 z-40 w-full sm:w-auto sm:max-w-md md:max-w-lg px-2 sm:px-0 pb-safe sm:pb-0">
+      <Card className="bg-slate-800 border-slate-600 shadow-2xl py-0 rounded-t-xl sm:rounded-xl">
+        <CardContent className="p-3 sm:p-4">
           <div className="space-y-2">
             <div className="flex flex-wrap gap-2">
               <Button

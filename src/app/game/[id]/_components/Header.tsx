@@ -65,24 +65,25 @@ export function Header({
   const { setNavigating } = useNavigation();
   return (
     <header className="absolute top-0 left-0 right-0 z-50 border-b border-slate-800 bg-slate-900/95 backdrop-blur">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <div className="container mx-auto px-2 sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
+        <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 min-w-0 flex-1">
           <Button
             variant="ghost"
             size="sm"
-            className="text-slate-300 hover:text-white flex items-center space-x-2"
+            className="text-slate-300 hover:text-white flex items-center space-x-1 sm:space-x-2 px-1 sm:px-2 h-8 sm:h-9"
             onClick={() => {
               setNavigating(true);
               router.push("/dashboard");
             }}
           >
-            <span>Início</span>
+            <ArrowLeft className="h-4 w-4 sm:hidden" />
+            <span className="hidden sm:inline">Início</span>
           </Button>
           {canLeave ? (
             <Button
               variant="ghost"
               size="sm"
-              className="text-slate-300 hover:text-white flex items-center space-x-2"
+              className="text-slate-300 hover:text-white flex items-center space-x-1 sm:space-x-2 px-1 sm:px-2 h-8 sm:h-9 text-xs sm:text-sm"
               isLoading={isLeaving}
               loadingText="Saindo..."
               onClick={async () => {
@@ -94,29 +95,31 @@ export function Header({
                 }
               }}
             >
-              Sair da Mesa
+              <span className="hidden sm:inline">Sair da Mesa</span>
+              <span className="sm:hidden">Sair</span>
             </Button>
           ) : (
             <AppLink
               href="/dashboard"
-              className="flex items-center space-x-2 text-slate-300 hover:text-white transition-colors"
+              className="flex items-center space-x-1 sm:space-x-2 text-slate-300 hover:text-white transition-colors px-1 sm:px-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              <span>Voltar</span>
+              <span className="hidden sm:inline">Voltar</span>
             </AppLink>
           )}
-          <div className="text-sm text-slate-400">
-            Mesa {String(tableId).slice(0, 8)} • R$ {smallBlind}/{bigBlind}
+          <div className="text-xs sm:text-sm text-slate-400 truncate ml-1 sm:ml-0">
+            <span className="hidden md:inline">Mesa {String(tableId).slice(0, 8)} • </span>
+            R$ {smallBlind}/{bigBlind}
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 text-sm">
-            <Trophy className="h-4 w-4 text-yellow-400" />
-            <span>{phaseLabel}</span>
+        <div className="flex items-center space-x-1 sm:space-x-2 md:space-x-4 flex-shrink-0">
+          <div className="hidden sm:flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm">
+            <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-400" />
+            <span className="hidden md:inline">{phaseLabel}</span>
           </div>
-          <div className="flex items-center space-x-2 text-sm">
-            <Users className="h-4 w-4 text-blue-400" />
+          <div className="flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm">
+            <Users className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />
             <span>
               {connectedCount}/{totalPlayers}
             </span>
@@ -125,7 +128,7 @@ export function Header({
             variant="ghost"
             size="sm"
             onClick={onToggleSoundAction}
-            className="text-slate-400 hover:text-white"
+            className="text-slate-400 hover:text-white p-1 sm:p-2 h-8 sm:h-9 w-8 sm:w-9"
           >
             {soundEnabled ? (
               <Volume2 className="h-4 w-4" />
@@ -136,7 +139,7 @@ export function Header({
           <Button
             variant="ghost"
             size="sm"
-            className="text-slate-400 hover:text-white"
+            className="text-slate-400 hover:text-white p-1 sm:p-2 h-8 sm:h-9 w-8 sm:w-9"
             asChild
           >
             <DropdownMenu>
@@ -144,7 +147,7 @@ export function Header({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-slate-400 hover:text-white"
+                  className="text-slate-400 hover:text-white p-1 sm:p-2 h-8 sm:h-9 w-8 sm:w-9"
                 >
                   <Settings className="h-4 w-4" />
                 </Button>
@@ -181,12 +184,13 @@ export function Header({
           {canJoin && (
             <Button
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 px-2 sm:px-4 text-xs sm:text-sm"
               onClick={onJoinAction}
               isLoading={isJoining}
               loadingText="Entrando..."
             >
-              Entrar
+              <span className="hidden sm:inline">Entrar</span>
+              <span className="sm:hidden">+</span>
             </Button>
           )}
         </div>
