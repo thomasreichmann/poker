@@ -34,7 +34,7 @@ import {
   User,
 } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { AppLink } from "@/components/ui/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -223,13 +223,13 @@ export default function RegisterPage() {
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900/95 backdrop-blur">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link
+          <AppLink
             href="/"
             className="flex items-center space-x-2 text-slate-300 hover:text-white transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Voltar</span>
-          </Link>
+          </AppLink>
           <div className="flex items-center space-x-2">
             <Image
               src="/all-in.svg"
@@ -646,12 +646,12 @@ export default function RegisterPage() {
                           className="text-sm text-slate-300 cursor-pointer leading-relaxed"
                         >
                           Eu li e aceito os{" "}
-                          <Link
+                          <AppLink
                             href="/terms"
                             className="text-emerald-400 hover:text-emerald-300 underline"
                           >
                             Termos de Uso
-                          </Link>{" "}
+                          </AppLink>{" "}
                           da plataforma *
                         </Label>
                       </div>
@@ -670,12 +670,12 @@ export default function RegisterPage() {
                           className="text-sm text-slate-300 cursor-pointer leading-relaxed"
                         >
                           Eu aceito a{" "}
-                          <Link
+                          <AppLink
                             href="/privacy"
                             className="text-emerald-400 hover:text-emerald-300 underline"
                           >
                             Política de Privacidade
-                          </Link>{" "}
+                          </AppLink>{" "}
                           *
                         </Label>
                       </div>
@@ -808,12 +808,12 @@ export default function RegisterPage() {
               <div className="text-center mt-6 pt-6 border-t border-slate-600">
                 <p className="text-slate-300">
                   Já tem uma conta?{" "}
-                  <Link
+                  <AppLink
                     href="/login"
                     className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors"
                   >
                     Fazer login
-                  </Link>
+                  </AppLink>
                 </p>
               </div>
             </CardContent>

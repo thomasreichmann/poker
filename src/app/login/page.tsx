@@ -124,13 +124,13 @@ export default function LoginPage() {
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900/95 backdrop-blur">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link
+          <AppLink
             href="/"
             className="flex items-center space-x-2 text-slate-300 hover:text-white transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Voltar</span>
-          </Link>
+          </AppLink>
           <div className="flex items-center space-x-2">
             <Image
               src="/all-in.svg"
@@ -235,12 +235,12 @@ export default function LoginPage() {
                       Lembrar de mim
                     </Label>
                   </div>
-                  <Link
+                  <AppLink
                     href="/forgot-password"
                     className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
                   >
                     Esqueceu a senha?
-                  </Link>
+                  </AppLink>
                 </div>
 
                 {/* Error and Success Messages */}
@@ -292,12 +292,12 @@ export default function LoginPage() {
               <div className="text-center">
                 <p className="text-slate-300">
                   Não tem uma conta?{" "}
-                  <Link
+                  <AppLink
                     href="/register"
                     className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors"
                   >
                     Criar conta grátis
-                  </Link>
+                  </AppLink>
                 </p>
               </div>
             </CardContent>

@@ -78,10 +78,10 @@ export default function PokerLandingPage() {
                 className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-3"
                 asChild
               >
-                <Link href="/register">
+                <AppLink href="/register">
                   <UserPlus className="mr-2 h-5 w-5" />
                   Criar Conta Grátis
-                </Link>
+                </AppLink>
               </Button>
               <Button
                 size="lg"
@@ -89,10 +89,10 @@ export default function PokerLandingPage() {
                 className="border-slate-600 text-slate-300 hover:bg-slate-800 text-lg px-8 py-3 bg-transparent"
                 asChild
               >
-                <Link href="/login">
+                <AppLink href="/login">
                   <Play className="mr-2 h-5 w-5" />
                   Jogar Agora
-                </Link>
+                </AppLink>
               </Button>
             </div>
           </div>
@@ -160,7 +160,7 @@ export default function PokerLandingPage() {
                   className="w-full bg-emerald-600 hover:bg-emerald-700"
                   asChild
                 >
-                  <Link href="/login">Entrar nas Mesas</Link>
+                  <AppLink href="/login">Entrar nas Mesas</AppLink>
                 </Button>
               </CardContent>
             </Card>
@@ -208,7 +208,7 @@ export default function PokerLandingPage() {
                   className="w-full bg-yellow-600 hover:bg-yellow-700"
                   asChild
                 >
-                  <Link href="/login">Ver Cronograma</Link>
+                  <AppLink href="/login">Ver Cronograma</AppLink>
                 </Button>
               </CardContent>
             </Card>
@@ -331,10 +331,10 @@ export default function PokerLandingPage() {
                 className="bg-emerald-600 hover:bg-emerald-700 text-lg px-8 py-3"
                 asChild
               >
-                <Link href="/register">
+                <AppLink href="/register">
                   <UserPlus className="mr-2 h-5 w-5" />
                   Criar Conta Grátis
-                </Link>
+                </AppLink>
               </Button>
               <Button
                 size="lg"
@@ -370,24 +370,24 @@ export default function PokerLandingPage() {
               <h4 className="font-semibold mb-4 text-white">Jogos</h4>
               <ul className="space-y-2 text-sm text-slate-400">
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Cash Games
-                  </Link>
+                  </AppLink>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Torneios
-                  </Link>
+                  </AppLink>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Sit & Go
-                  </Link>
+                  </AppLink>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Cronograma
-                  </Link>
+                  </AppLink>
                 </li>
               </ul>
             </div>
@@ -396,24 +396,24 @@ export default function PokerLandingPage() {
               <h4 className="font-semibold mb-4 text-white">Suporte</h4>
               <ul className="space-y-2 text-sm text-slate-400">
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Central de Ajuda
-                  </Link>
+                  </AppLink>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Chat 24/7
-                  </Link>
+                  </AppLink>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Regras do Jogo
-                  </Link>
+                  </AppLink>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Jogo Responsável
-                  </Link>
+                  </AppLink>
                 </li>
               </ul>
             </div>
@@ -422,24 +422,24 @@ export default function PokerLandingPage() {
               <h4 className="font-semibold mb-4 text-white">Legal</h4>
               <ul className="space-y-2 text-sm text-slate-400">
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Termos de Uso
-                  </Link>
+                  </AppLink>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Política de Privacidade
-                  </Link>
+                  </AppLink>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Licenças
-                  </Link>
+                  </AppLink>
                 </li>
                 <li>
-                  <Link href="#" className="hover:text-emerald-400">
+                  <AppLink href="#" className="hover:text-emerald-400">
                     Contato
-                  </Link>
+                  </AppLink>
                 </li>
               </ul>
             </div>
