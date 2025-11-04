@@ -1,3 +1,4 @@
+import { NavigationProvider } from "@/components/ui/navigation-provider";
 import { ToastProvider } from "@/components/ui/toast";
 import { AuthProvider } from "@/lib/auth-context";
 import { TRPCReactProvider } from "@/trpc/client";
@@ -32,7 +33,9 @@ export default function RootLayout({
       >
         <AuthProvider>
           <ToastProvider>
-            <TRPCReactProvider>{children}</TRPCReactProvider>
+            <TRPCReactProvider>
+              <NavigationProvider>{children}</NavigationProvider>
+            </TRPCReactProvider>
           </ToastProvider>
         </AuthProvider>
       </body>

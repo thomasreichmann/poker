@@ -3,7 +3,6 @@
 import { getSupabaseBrowserClient } from "@/supabase/client";
 import { AUTH_SET_DEBOUNCE_MS } from "@/supabase/constants";
 // import { debug } from "@/supabase/debug";
-import { logger } from "@/logger/client";
 import { acquireTopicChannel } from "@/supabase/realtimeHelpers";
 import { realtimeStatusStore } from "@/supabase/realtimeStatus";
 import { useEffect, useRef } from "react";
@@ -76,12 +75,6 @@ export function useGameRealtime(
       const maybeBackend = payload?.payload as BackendEventPayload;
       const event = maybeBackend?.event;
       if (event && event.gameId === id) {
-        // Backend-driven event path: rely on summary payload
-        if (process.env.NODE_ENV !== "production") {
-          logger.debug({ event }, "realtime.backend_event");
-        }
-        // Minimal application: just invalidate snapshot on hand transitions; otherwise let UI refetch when needed
-        setCacheRef.current?.((prev) => prev);
         return;
       }
 

@@ -87,7 +87,8 @@ async function createPinoLogger() {
 
     const prettyStream = pretty({
       colorize: true,
-      ignore: "origin,system", // Hide the origin key from output (it's only used for formatting)
+      ignore: "origin,system",
+      singleLine: false,
       customPrettifiers: {
         name: (name, key, log, { colors }) => {
           const nameString = typeof name === "string" ? name : key;
@@ -163,7 +164,8 @@ declare global {
 }
 
 // Module-level state
-let loggerInstance: AppLogger | undefined;
+// Initialize from global first (for hot-reload scenarios)
+let loggerInstance: AppLogger | undefined = globalThis.__appLogger;
 
 // Initialize the logger immediately when the module loads
 const loggerInitPromise: Promise<AppLogger> =
@@ -176,21 +178,43 @@ const loggerInitPromise: Promise<AppLogger> =
     return logger;
   }));
 
+// For production or browser, initialize synchronously if possible
+if (!loggerInstance && (isBrowser() || isProduction())) {
+  try {
+    const syncLogger = pino(baseOptions);
+    loggerInstance = attachWith(syncLogger);
+    if (process.env.NODE_ENV !== "production") {
+      globalThis.__appLogger = loggerInstance;
+    }
+  } catch {
+    // Fallback to async initialization
+  }
+}
+
 // Export a Proxy that provides access to the logger
-// The logger initializes immediately on module load, so by the time
-// application code runs, it should be ready
 export const logger = new Proxy({} as AppLogger, {
   get(_target, prop) {
-    if (!loggerInstance) {
-      throw new Error(
-        `Logger not yet initialized. Tried to access property: ${String(
-          prop
-        )}. ` +
-          `For standalone scripts, use: await initLogger() before accessing logger.`
-      );
+    // Use loggerInstance if available (from global, sync init, or async init)
+    let instance = loggerInstance;
+
+    // Fallback to global logger (critical for hot-reload scenarios)
+    // During hot-reload, loggerInstance is reset but global persists
+    if (!instance && globalThis.__appLogger) {
+      instance = globalThis.__appLogger;
+      loggerInstance = instance; // Update module-level state
     }
-    const value = loggerInstance[prop as keyof AppLogger];
-    return typeof value === "function" ? value.bind(loggerInstance) : value;
+
+    if (instance) {
+      const value = instance[prop as keyof AppLogger];
+      return typeof value === "function" ? value.bind(instance) : value;
+    }
+
+    throw new Error(
+      `Logger not yet initialized. Tried to access property: ${String(
+        prop
+      )}. ` +
+        `For standalone scripts, use: await initLogger() before accessing logger.`
+    );
   },
 });
 

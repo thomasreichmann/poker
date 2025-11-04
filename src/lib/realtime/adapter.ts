@@ -15,11 +15,6 @@ export async function broadcastViaRest(
   event: string,
   payload: unknown
 ): Promise<void> {
-  console.log("test");
-  logger.info("test");
-  logger.warn("test");
-  logger.error("test");
-  logger.debug("test");
   if (!supabaseUrl || !serviceRoleKey) {
     logger.error(
       { error: "Supabase URL or service role key is not set" },
@@ -52,10 +47,7 @@ export async function broadcastViaRest(
     },
     body,
   }).catch((error) => {
-    logger.error(
-      { error: error.message },
-      "realtime.broadcastViaRest.fetchError"
-    );
+    logger.error(error, "realtime.broadcastViaRest.fetchError");
   });
 }
 

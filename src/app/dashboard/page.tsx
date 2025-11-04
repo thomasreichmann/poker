@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AppLink } from "@/components/ui/link";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTRPC } from "@/trpc/client";
@@ -42,7 +43,6 @@ import {
   Wallet,
 } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -188,7 +188,7 @@ export default function DashboardPage() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-6">
             {devLoading && <div>Loading...</div>}
-            <Link href="/" className="flex items-center space-x-2">
+            <AppLink href="/" className="flex items-center space-x-2">
               <Image
                 src="/all-in.svg"
                 alt="ALL IN"
@@ -196,30 +196,33 @@ export default function DashboardPage() {
                 height={64}
                 priority
               />
-            </Link>
+            </AppLink>
 
             <nav className="hidden md:flex items-center space-x-6">
-              <Link href="/dashboard" className="text-emerald-400 font-medium">
+              <AppLink
+                href="/dashboard"
+                className="text-emerald-400 font-medium"
+              >
                 Dashboard
-              </Link>
-              <Link
+              </AppLink>
+              <AppLink
                 href="/tables"
                 className="text-slate-300 hover:text-white transition-colors"
               >
                 Mesas
-              </Link>
-              <Link
+              </AppLink>
+              <AppLink
                 href="/tournaments"
                 className="text-slate-300 hover:text-white transition-colors"
               >
                 Torneios
-              </Link>
-              <Link
+              </AppLink>
+              <AppLink
                 href="/history"
                 className="text-slate-300 hover:text-white transition-colors"
               >
                 Histórico
-              </Link>
+              </AppLink>
             </nav>
           </div>
 
@@ -471,14 +474,14 @@ export default function DashboardPage() {
                         </div>
 
                         <div className="flex items-center space-x-2">
-                          <Link href={`/game/${table.id}`}>
+                          <AppLink href={`/game/${table.id}`}>
                             <Button
                               size="sm"
                               className="bg-emerald-600 hover:bg-emerald-700"
                             >
                               Entrar
                             </Button>
-                          </Link>
+                          </AppLink>
                         </div>
                       </div>
                     </div>

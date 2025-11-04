@@ -18,8 +18,8 @@ import {
   Users,
 } from "lucide-react";
 
+import { AppLink } from "@/components/ui/link";
 import Image from "next/image";
-import Link from "next/link";
 
 export default function PokerLandingPage() {
   return (
@@ -43,14 +43,14 @@ export default function PokerLandingPage() {
               className="text-slate-300 hover:bg-slate-800 hover:text-white"
               asChild
             >
-              <Link href="/login">Entrar</Link>
+              <AppLink href="/login">Entrar</AppLink>
             </Button>
             <Button
               size="sm"
               className="bg-emerald-600 hover:bg-emerald-700"
               asChild
             >
-              <Link href="/register">Registrar</Link>
+              <AppLink href="/register">Registrar</AppLink>
             </Button>
           </div>
         </div>

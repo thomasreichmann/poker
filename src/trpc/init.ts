@@ -15,8 +15,8 @@ export const createTRPCContext = async (opts?: {
    * @see: https://trpc.io/docs/server/context
    */
   const supabase = await getSupabaseServerClient();
-  const { data: userData } = await supabase.auth.getUser();
-  let user = userData.user;
+  const userData = await supabase.auth.getUser();
+  let user = userData?.data.user;
 
   // Dev-only impersonation (header takes precedence per-tab; cookie fallback)
   if (process.env.NODE_ENV !== "production") {
@@ -59,7 +59,7 @@ export const createTRPCContext = async (opts?: {
     baseLog = baseLog.child({ requestId: opts.requestId });
   }
   if (opts?.req) {
-    baseLog.info({ path: opts.req.url }, "trpc.request");
+    baseLog.trace({ path: opts.req.url }, "trpc.request");
   }
   return {
     user,
@@ -97,12 +97,7 @@ const loggingMiddleware = t.middleware(async ({ path, type, ctx, next }) => {
   const result = await next();
   const durationMs = Date.now() - start;
   if (result.ok) {
-    ctx.log.trace({ path, type, durationMs }, "trpc.call.ok");
-  } else {
-    ctx.log.error(
-      { path, type, durationMs, error: result.error },
-      "trpc.call.error"
-    );
+    ctx.log.info({ path, type, durationMs }, "trpc.call.ok");
   }
   return result;
 });

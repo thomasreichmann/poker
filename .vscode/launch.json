@@ -7,9 +7,18 @@
       "request": "launch",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
+      "console": "integratedTerminal",
       "outputCapture": "std",
-      "env": { "FORCE_COLOR": "1", "NODE_OPTIONS": "--enable-source-maps" },
-      "skipFiles": ["<node_internals>/**"]
+      "env": {
+        "FORCE_COLOR": "1",
+        "NODE_OPTIONS": "--enable-source-maps --inspect"
+      },
+      "skipFiles": ["<node_internals>/**"],
+      "serverReadyAction": {
+        "action": "startDebugging",
+        "name": "Launch Brave",
+        "pattern": "http://localhost:3000"
+      }
     },
     {
       "name": "Launch Brave",

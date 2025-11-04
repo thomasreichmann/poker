@@ -29,7 +29,7 @@ import {
   Shield,
 } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import { AppLink } from "@/components/ui/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -315,19 +315,19 @@ export default function LoginPage() {
           <div className="mt-8 text-center space-y-2">
             <p className="text-slate-400 text-sm">Precisa de ajuda?</p>
             <div className="flex justify-center space-x-4 text-sm">
-              <Link
+              <AppLink
                 href="/support"
                 className="text-emerald-400 hover:text-emerald-300 transition-colors"
               >
                 Suporte 24/7
-              </Link>
+              </AppLink>
               <span className="text-slate-600">•</span>
-              <Link
+              <AppLink
                 href="/help"
                 className="text-emerald-400 hover:text-emerald-300 transition-colors"
               >
                 Central de Ajuda
-              </Link>
+              </AppLink>
             </div>
           </div>
 

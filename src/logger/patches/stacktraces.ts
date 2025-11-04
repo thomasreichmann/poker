@@ -3,7 +3,6 @@ import path from "node:path";
 import {
   classifyFile,
   getProjectRoot,
-  mapCallSite,
   mapStructuredStack,
   type FrameKind,
 } from "./mapping";
@@ -50,19 +49,73 @@ if (!g.__stacktraceMapperInstalled) {
     bold: (s: string) => (COLOR_ON ? `\x1b[1m${s}\x1b[0m` : s),
   } as const;
 
-  // --- Lightweight JS/TS syntax colorizer for code-frames ---
-  const KW =
-    /\b(await|break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|false|finally|for|from|function|if|import|in|instanceof|interface|let|new|null|of|return|super|switch|this|throw|true|try|typeof|var|void|while|with|yield)\b/g;
-  const TYPE_KW =
-    /\b(abstract|as|asserts|declare|implements|keyof|namespace|never|private|protected|public|readonly|satisfies|static|type|unknown)\b/g;
-  const NUM =
-    /\b(?:0[xX][\da-fA-F]+|0[bB][01]+|0[oO][0-7]+|\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/g;
-  const STR = /(['"`])(?:\\.|(?!\1).)*\1/g; // naive string match
-  const COMMENT = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
-  const PROP = /(?<=\.)[a-zA-Z_]\w*/g; // .prop
-  const IDENT_FN = /\b([A-Za-z_]\w*)\s*(?=\()/g; // foo(
+  // --- Syntax highlighting using shiki ---
+  let cachedHighlighter: Awaited<
+    ReturnType<typeof import("shiki").createHighlighter>
+  > | null = null;
+  let highlighterReady = false;
+  let highlighterInitializing = false;
 
-  function colorizeTs(line: string): string {
+  function initHighlighter() {
+    if (highlighterInitializing || highlighterReady) return;
+    highlighterInitializing = true;
+
+    import("shiki")
+      .then((shiki) =>
+        shiki.createHighlighter({
+          themes: ["github-dark"],
+          langs: ["typescript", "javascript", "tsx", "jsx"],
+        })
+      )
+      .then((highlighter) => {
+        cachedHighlighter = highlighter;
+        highlighterReady = true;
+      })
+      .catch(() => {
+        highlighterReady = true;
+      })
+      .finally(() => {
+        highlighterInitializing = false;
+      });
+  }
+
+  initHighlighter();
+
+  function hexToAnsi(hex: string): string {
+    if (!COLOR_ON || !hex) return "";
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `\x1b[38;2;${r};${g};${b}m`;
+  }
+
+  function tokenToAnsi(token: {
+    content: string;
+    color?: string;
+    fontStyle?: number;
+  }): string {
+    if (!COLOR_ON || !token.color) return token.content;
+    const ansi = hexToAnsi(token.color);
+    const bold = token.fontStyle && token.fontStyle & 1 ? "\x1b[1m" : "";
+    const italic = token.fontStyle && token.fontStyle & 2 ? "\x1b[3m" : "";
+    const reset = "\x1b[0m";
+    return `${bold}${italic}${ansi}${token.content}${reset}`;
+  }
+
+  function colorizeTsRegex(line: string): string {
+    if (!COLOR_ON) return line;
+
+    const KW =
+      /\b(await|break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|false|finally|for|from|function|if|import|in|instanceof|interface|let|new|null|of|return|super|switch|this|throw|true|try|typeof|var|void|while|with|yield)\b/g;
+    const TYPE_KW =
+      /\b(abstract|as|asserts|declare|implements|keyof|namespace|never|private|protected|public|readonly|satisfies|static|type|unknown)\b/g;
+    const NUM =
+      /\b(?:0[xX][\da-fA-F]+|0[bB][01]+|0[oO][0-7]+|\d+(?:\.\d+)?(?:e[+-]?\d+)?)\b/g;
+    const STR = /(['"`])(?:\\.|(?!\1).)*\1/g;
+    const COMMENT = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
+    const PROP = /(?<=\.)[a-zA-Z_]\w*/g;
+    const IDENT_FN = /\b([A-Za-z_]\w*)\s*(?=\()/g;
+
     try {
       let s = line;
       const wrap = (re: RegExp, tint: (x: string) => string) => {
@@ -80,6 +133,47 @@ if (!g.__stacktraceMapperInstalled) {
       return s.replace(/\u0000|\u0001/g, "");
     } catch {
       return line;
+    }
+  }
+
+  function detectLanguage(
+    filePath: string
+  ): "typescript" | "javascript" | "tsx" | "jsx" {
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === ".tsx") return "tsx";
+    if (ext === ".jsx") return "jsx";
+    if (ext === ".ts") return "typescript";
+    if (ext === ".js") return "javascript";
+    return "typescript";
+  }
+
+  function colorizeTs(line: string, filePath?: string): string {
+    if (!COLOR_ON) return line;
+
+    if (!highlighterReady || !cachedHighlighter) {
+      return colorizeTsRegex(line);
+    }
+
+    try {
+      const lang = filePath ? detectLanguage(filePath) : "typescript";
+      const result = cachedHighlighter.codeToTokens(line, {
+        lang,
+        theme: "github-dark",
+      });
+
+      return result.tokens
+        .flatMap(
+          (
+            lineTokens: Array<{
+              content: string;
+              color?: string;
+              fontStyle?: number;
+            }>
+          ) => lineTokens.map((token) => tokenToAnsi(token))
+        )
+        .join("");
+    } catch {
+      return colorizeTsRegex(line);
     }
   }
 
@@ -234,7 +328,7 @@ if (!g.__stacktraceMapperInstalled) {
         const numStr = String(i).padStart(width, " ");
         const pipe = color.dim(" | ");
         const textRaw = allLines[i - 1] ?? "";
-        const text = colorizeTs(textRaw);
+        const text = colorizeTs(textRaw, abs);
         out.push(`${marker} ${color.dim(numStr)}${pipe}${text}`);
         if (isTarget) {
           const caretBase = `  ${" ".repeat(width)} | `; // matches spaces of non-marker line
