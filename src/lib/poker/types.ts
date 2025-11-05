@@ -69,7 +69,7 @@ export interface GameState {
   communityCards: Card[];
   deck: Card[];
   handId: number;
-  turnTimeoutAt: Date;
+  turnTimeoutAt: Date | null;
   turnMs: number;
 }
 
