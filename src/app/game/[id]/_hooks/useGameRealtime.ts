@@ -3,21 +3,16 @@
 import { getSupabaseBrowserClient } from "@/supabase/client";
 import { AUTH_SET_DEBOUNCE_MS } from "@/supabase/constants";
 // import { debug } from "@/supabase/debug";
+import {
+  RealtimeEventData,
+  isCustomBroadcast,
+  isLegacyDbBroadcast,
+} from "@/app/game/[id]/_hooks/types";
 import { acquireTopicChannel } from "@/supabase/realtimeHelpers";
 import { realtimeStatusStore } from "@/supabase/realtimeStatus";
 import { useEffect, useRef } from "react";
 import { type CachedGameData } from "./realtime/applyBroadcastToCache";
 import { applyBroadcastToCachedState } from "./realtime/reducers";
-
-type BackendEventPayload = {
-  event: {
-    type: string;
-    gameId: string;
-    lastActionId: number | null;
-    updatedAt: string;
-    payload: Record<string, unknown>;
-  };
-};
 
 export function useGameRealtime(
   id: string,
@@ -30,7 +25,7 @@ export function useGameRealtime(
   const onAuthTokenRef = useRef(onAuthToken);
   const onHandTransitionRef = useRef(onHandTransition);
   const setCacheRef = useRef(setCache);
-  
+
   useEffect(() => {
     onAuthTokenRef.current = onAuthToken;
     onHandTransitionRef.current = onHandTransition;
@@ -74,19 +69,25 @@ export function useGameRealtime(
       });
     }
 
-    function onBroadcast(payload: { payload: unknown; event: string }) {
-      const maybeBackend = payload?.payload as BackendEventPayload;
-      const event = maybeBackend?.event;
-      if (event && event.gameId === id) {
+    function onBroadcast(data: RealtimeEventData) {
+      if (isLegacyDbBroadcast(data)) {
+        applyBroadcast(
+          data.payload.event,
+          data.payload.table,
+          data.payload.record,
+          data.payload.old_record
+        );
         return;
       }
 
-      // Fallback: legacy DB-broadcast path (kept for shadow mode)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const p = payload?.payload as any;
-      if (!p) return;
-      if (p.schema !== "public" || !p.table) return;
-      applyBroadcast(payload.event, p.table, p.record, p.old_record);
+      if (isCustomBroadcast(data)) {
+        // TODO: Implement custom broadcast handling
+        // const gameEvent = data.payload.event;
+        // Handle gameEvent.type, gameEvent.gameId, etc.
+        return;
+      }
+
+      throw new Error(`Unknown broadcast type: ${JSON.stringify(data)}`);
     }
 
     const topic = `topic:${id}`;
@@ -118,18 +119,17 @@ export function useGameRealtime(
           } catch {}
           if (status === "SUBSCRIBED") retryDelayRef.current = 1000;
         },
-        (payload) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const p = (payload as any)?.payload;
-          if (p?.table && typeof p.table === "string") {
+        (d) => {
+          const data = d as RealtimeEventData;
+          if (isLegacyDbBroadcast(data)) {
             try {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const evt = (payload as any)?.event;
-              if (evt) realtimeStatusStore.recordBroadcast(evt, p.table);
+              realtimeStatusStore.recordBroadcast(
+                data.event,
+                data.payload.table
+              );
             } catch {}
           }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          onBroadcast(payload as any);
+          onBroadcast(data);
         }
       );
 
