@@ -19,6 +19,10 @@ import {
 import { buildGameDerivedState } from "../data/selectors";
 import { createGameDataClient } from "../data/client";
 import type { GameDataTransportKind } from "../data/types";
+import {
+  ensureLiveTransportAction,
+  isMockTransport,
+} from "../data/guards";
 import { useGameActions } from "./useGameActions";
 import { useGameQuery } from "./useGameQuery";
 import { useShowdownEffects } from "./useShowdownEffects";
@@ -39,6 +43,7 @@ function resolveTransportKind(
 
 export function useGameData(id: string, options?: UseGameDataOptions) {
   const transportKind = resolveTransportKind(options?.dataSource);
+  const mockMode = isMockTransport(transportKind);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -67,6 +72,7 @@ export function useGameData(id: string, options?: UseGameDataOptions) {
   );
 
   useEffect(() => {
+    if (mockMode) return;
     if (!snapshot) {
       if (!isLoading && snapshot === null) {
         client.clearSnapshot();
@@ -74,7 +80,7 @@ export function useGameData(id: string, options?: UseGameDataOptions) {
       return;
     }
     client.hydrate(snapshot as CachedGameData);
-  }, [client, snapshot, isLoading]);
+  }, [client, snapshot, isLoading, mockMode]);
 
   const subscribe = useCallback(
     (listener: () => void) => client.subscribe(listener),
@@ -126,7 +132,7 @@ export function useGameData(id: string, options?: UseGameDataOptions) {
   const mySeatNo = yourDbPlayer?.seat ?? null;
 
   const holeCardsEnabled =
-    transportKind !== "mock" &&
+    !mockMode &&
     !isLoading &&
     !isNotFound &&
     (!!snapshot?.game || !!dbGame);
@@ -193,13 +199,18 @@ export function useGameData(id: string, options?: UseGameDataOptions) {
   ]);
 
   useEffect(() => {
-    if (isNotFound || isLoading) return;
+    if (isNotFound || isLoading || mockMode) return;
     queryClient.setQueryData(getByIdKey, (prev) => {
       if (!prev) return prev;
       return ensureHoleCardsMerged(prev as CachedGameData);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNotFound, isLoading, snapshot?.game?.handId]);
+  }, [isNotFound, isLoading, snapshot?.game?.handId, mockMode]);
+
+  useEffect(() => {
+    if (!cachedData || mockMode) return;
+    queryClient.setQueryData(getByIdKey, cachedData);
+  }, [cachedData, mockMode, queryClient, getByIdKey]);
 
   const { mutations, isPending } = useGameActions();
   const joinMutation = mutations.joinMutation;
@@ -232,6 +243,9 @@ export function useGameData(id: string, options?: UseGameDataOptions) {
     },
     action: () => Promise<void>
   ) => {
+    if (!ensureLiveTransportAction({ isMock: mockMode, notify: showError })) {
+      return;
+    }
     if (requiresGame && !dbGame) {
       showError("Mesa inválida ou não encontrada.");
       return;
@@ -308,6 +322,7 @@ export function useGameData(id: string, options?: UseGameDataOptions) {
   };
 
   const refetchHoleCardsWithRetry = useCallback(async () => {
+    if (mockMode) return;
     try {
       const currentHandId = dbGame?.handId;
       const myId = yourDbPlayer?.id;
@@ -336,10 +351,11 @@ export function useGameData(id: string, options?: UseGameDataOptions) {
     } catch {
       // ignore transient errors
     }
-  }, [getHoleCards, yourDbPlayer?.id, dbGame?.handId, dbCards]);
+  }, [getHoleCards, yourDbPlayer?.id, dbGame?.handId, dbCards, mockMode]);
 
   useEffect(() => {
-    if (isNotFound || isLoading || !dbGame || !yourDbPlayer) return;
+    if (mockMode || isNotFound || isLoading || !dbGame || !yourDbPlayer)
+      return;
     const myCurrentHandCount = dbCards.filter(
       (c) => c.playerId === yourDbPlayer.id && c.handId === dbGame.handId
     ).length;
@@ -347,18 +363,19 @@ export function useGameData(id: string, options?: UseGameDataOptions) {
       void refetchHoleCardsWithRetry();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNotFound, isLoading, dbGame?.handId, yourDbPlayer?.id]);
+  }, [mockMode, isNotFound, isLoading, dbGame?.handId, yourDbPlayer?.id]);
 
   useEffect(() => {
     const unsubscribe = client.onHandTransition(() => {
+      if (mockMode) return;
       void queryClient.invalidateQueries({ queryKey: getByIdKey });
       void refetchHoleCardsWithRetry();
     });
     return unsubscribe;
-  }, [client, queryClient, getByIdKey, refetchHoleCardsWithRetry]);
+  }, [client, mockMode, queryClient, getByIdKey, refetchHoleCardsWithRetry]);
 
   const onTurnTimeout = useCallback(async () => {
-    if (!dbGame?.id || !dbGame.currentPlayerTurn) return;
+    if (mockMode || !dbGame?.id || !dbGame.currentPlayerTurn) return;
     let fanout = 1;
     if (process.env.NODE_ENV !== "production") {
       try {
@@ -410,7 +427,7 @@ export function useGameData(id: string, options?: UseGameDataOptions) {
       },
       "timeout.fanout"
     );
-  }, [dbGame?.id, dbGame?.currentPlayerTurn, timeoutMutation]);
+  }, [mockMode, dbGame?.id, dbGame?.currentPlayerTurn, timeoutMutation]);
 
   useTurnManagement(
     {
@@ -432,10 +449,8 @@ export function useGameData(id: string, options?: UseGameDataOptions) {
 
   useShowdownEffects(dbGame, dbPlayers, dbCards, () => actions.advance());
 
-  const effectiveIsLoading =
-    transportKind === "mock" && cachedData ? false : isLoading;
-  const effectiveIsNotFound =
-    transportKind === "mock" && cachedData ? false : isNotFound;
+  const effectiveIsLoading = mockMode && cachedData ? false : isLoading;
+  const effectiveIsNotFound = mockMode && cachedData ? false : isNotFound;
 
   return {
     me,
