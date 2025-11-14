@@ -4,32 +4,138 @@ import { useToast } from "@/components/ui/toast";
 import { logger } from "@/logger/client";
 import { useTRPC } from "@/trpc/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo } from "react";
-import { useGameActions } from "./useGameActions";
-import { useGameQuery } from "./useGameQuery";
-import { useGameRealtime } from "./useGameRealtime";
-import { useShowdownEffects } from "./useShowdownEffects";
-import { useTurnManagement } from "./useTurnManagement";
-
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 import { PokerAction } from "@/db/schema/actionTypes";
-import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
 import {
   normalizeCards,
   type CachedGameData,
 } from "./realtime/applyBroadcastToCache";
+import { buildGameDerivedState } from "../data/selectors";
+import { createGameDataClient } from "../data/client";
+import type { GameDataTransportKind } from "../data/types";
+import { useGameActions } from "./useGameActions";
+import { useGameQuery } from "./useGameQuery";
+import { useShowdownEffects } from "./useShowdownEffects";
+import { useTurnManagement } from "./useTurnManagement";
 
-export function useGameData(id: string) {
+type UseGameDataOptions = {
+  dataSource?: GameDataTransportKind;
+};
+
+function resolveTransportKind(
+  override?: GameDataTransportKind | null
+): GameDataTransportKind {
+  if (override) return override;
+  const env = process.env
+    .NEXT_PUBLIC_GAME_DATA_SOURCE as GameDataTransportKind | undefined;
+  return env ?? "supabase";
+}
+
+export function useGameData(id: string, options?: UseGameDataOptions) {
+  const transportKind = resolveTransportKind(options?.dataSource);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { me, snapshot, getByIdKey, isLoading, isNotFound } = useGameQuery(id);
 
+  const clientRef = useRef<ReturnType<typeof createGameDataClient> | null>(null);
+  if (!clientRef.current || clientRef.current.kind !== transportKind) {
+    clientRef.current?.dispose();
+    clientRef.current = createGameDataClient(transportKind);
+  }
+  const client = clientRef.current;
+
+  useEffect(() => {
+    if (!id) return;
+    client.connect(id);
+    return () => {
+      client.disconnect();
+    };
+  }, [client, id]);
+
+  useEffect(
+    () => () => {
+      client.dispose();
+    },
+    [client]
+  );
+
+  useEffect(() => {
+    if (!snapshot) {
+      if (!isLoading && snapshot === null) {
+        client.clearSnapshot();
+      }
+      return;
+    }
+    client.hydrate(snapshot as CachedGameData);
+  }, [client, snapshot, isLoading]);
+
+  const subscribe = useCallback(
+    (listener: () => void) => client.subscribe(listener),
+    [client]
+  );
+  const getSnapshot = useCallback(() => client.getSnapshot(), [client]);
+  const storeSnapshot = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getSnapshot
+  );
+
+  const cachedData =
+    storeSnapshot ?? ((snapshot as CachedGameData | null) ?? null);
+  const dbGame = cachedData?.game ?? null;
+  const dbPlayers = cachedData?.players ?? [];
+  const dbCards = cachedData?.cards ?? [];
+
+  const derived = useMemo(
+    () => buildGameDerivedState(cachedData, me?.id ?? null),
+    [cachedData, me?.id]
+  );
+
+  const {
+    yourDbPlayer,
+    isYourTurn,
+    communityCards,
+    playersBySeat,
+    playersByView,
+    activePlayerIndex,
+    activePlayerIndexByView,
+    phaseLabel,
+    callAmount,
+    minRaiseTotal,
+    maxRaiseTotal,
+    canCheck,
+    canCall,
+    connectedCount,
+    playerIdToCards,
+  } = derived;
+
+  const seatsCount = playersBySeat.length;
+  const nextToActSeat = useMemo(() => {
+    const player = playersBySeat.find(
+      (p) => p.id === dbGame?.currentPlayerTurn
+    );
+    return player?.seat ?? null;
+  }, [playersBySeat, dbGame?.currentPlayerTurn]);
+  const mySeatNo = yourDbPlayer?.seat ?? null;
+
+  const holeCardsEnabled =
+    transportKind !== "mock" &&
+    !isLoading &&
+    !isNotFound &&
+    (!!snapshot?.game || !!dbGame);
+
   const getHoleCards = useQuery({
     ...trpc.game.getHoleCards.queryOptions({ gameId: id }),
-    enabled: !isLoading && !isNotFound && !!snapshot?.game,
+    enabled: holeCardsEnabled,
   });
 
-  // Merge helper: ensure private hole cards are present for the current hand
   const ensureHoleCardsMerged = useCallback(
     (prevIn: CachedGameData | null): CachedGameData | null => {
       if (!prevIn) return prevIn;
@@ -58,146 +164,42 @@ export function useGameData(id: string) {
     [getHoleCards.data, me?.id]
   );
 
-  const dbGame = useMemo(() => snapshot?.game ?? null, [snapshot?.game]);
-  const dbPlayers = useMemo(() => snapshot?.players ?? [], [snapshot?.players]);
-  const dbCards = useMemo(() => snapshot?.cards ?? [], [snapshot?.cards]);
+  useEffect(() => {
+    if (!holeCardsEnabled || !getHoleCards.data) return;
+    queryClient.setQueryData(getByIdKey, (prev) => {
+      return ensureHoleCardsMerged(prev as CachedGameData | null);
+    });
+  }, [
+    holeCardsEnabled,
+    getHoleCards.data,
+    getByIdKey,
+    queryClient,
+    ensureHoleCardsMerged,
+  ]);
 
-  const yourDbPlayer = useMemo(
-    () => dbPlayers.find((p) => p.userId === me?.id) || null,
-    [dbPlayers, me?.id]
-  );
+  useEffect(() => {
+    if (!holeCardsEnabled) return;
+    client.mergePrivateCards({
+      userId: me?.id,
+      handId: dbGame?.handId ?? null,
+      cards: Array.isArray(getHoleCards.data) ? getHoleCards.data : [],
+    });
+  }, [
+    client,
+    dbGame?.handId,
+    getHoleCards.data,
+    holeCardsEnabled,
+    me?.id,
+  ]);
 
-  const isYourTurn = useMemo(() => {
-    if (!dbGame || !yourDbPlayer) return false;
-    return dbGame.currentPlayerTurn === yourDbPlayer.id;
-  }, [dbGame, yourDbPlayer]);
-
-  const communityCards = useMemo(
-    () =>
-      dbCards
-        .filter((c) => c.playerId === null)
-        .map((c, idx) => ({
-          suit: c.suit as IPlayingCard["suit"],
-          rank: c.rank as IPlayingCard["rank"],
-          id: `${c.rank}-${c.suit}-${idx}`,
-        })),
-    [dbCards]
-  );
-
-  const playersBySeat = useMemo(() => {
-    return [...dbPlayers].sort((a, b) => a.seat - b.seat);
-  }, [dbPlayers]);
-
-  const activePlayerIndex = useMemo(() => {
-    const idx = playersBySeat.findIndex(
-      (p) => p.id === dbGame?.currentPlayerTurn
-    );
-    return idx === -1 ? 0 : idx;
-  }, [playersBySeat, dbGame?.currentPlayerTurn]);
-
-  const selfSeatIndex = useMemo(() => {
-    const idx = playersBySeat.findIndex((p) => p.id === yourDbPlayer?.id);
-    return idx === -1 ? 0 : idx;
-  }, [playersBySeat, yourDbPlayer?.id]);
-
-  // Seat context for timeout staggering
-  const seatsCount = useMemo(
-    () => playersBySeat.length,
-    [playersBySeat.length]
-  );
-  const nextToActSeat = useMemo(() => {
-    const p = playersBySeat.find((pl) => pl.id === dbGame?.currentPlayerTurn);
-    return p?.seat ?? null;
-  }, [playersBySeat, dbGame?.currentPlayerTurn]);
-  const mySeatNo = useMemo(
-    () => yourDbPlayer?.seat ?? null,
-    [yourDbPlayer?.seat]
-  );
-
-  function rotateArray<T>(arr: T[], offset: number): T[] {
-    const n = arr.length;
-    if (n === 0) return arr;
-    const k = ((offset % n) + n) % n;
-    return arr.slice(k).concat(arr.slice(0, k));
-  }
-
-  const playersByView = useMemo(
-    () => rotateArray(playersBySeat, selfSeatIndex),
-    [playersBySeat, selfSeatIndex]
-  );
-
-  const activePlayerIndexByView = useMemo(() => {
-    if (playersBySeat.length === 0) return 0;
-    return (
-      (activePlayerIndex - selfSeatIndex + playersBySeat.length) %
-      playersBySeat.length
-    );
-  }, [activePlayerIndex, selfSeatIndex, playersBySeat.length]);
-
-  const connectedCount = useMemo(
-    () => playersBySeat.filter((p) => p.isConnected).length,
-    [playersBySeat]
-  );
-
-  const playerIdToCards = useMemo(() => {
-    const map = new Map<string, IPlayingCard[]>();
-    const counters = new Map<string, number>();
-    for (const c of dbCards) {
-      if (!c.playerId) continue;
-      const idx = (counters.get(c.playerId) ?? 0) + 1;
-      counters.set(c.playerId, idx);
-      const arr = map.get(c.playerId) ?? [];
-      arr.push({
-        suit: c.suit as IPlayingCard["suit"],
-        rank: c.rank as IPlayingCard["rank"],
-        id: `${c.rank}-${c.suit}-${c.playerId}-${idx - 1}`,
-      });
-      map.set(c.playerId, arr);
-    }
-    return map;
-  }, [dbCards]);
-
-  const phaseLabel = useMemo(() => {
-    const map: Record<string, string> = {
-      "pre-flop": "Pré-flop",
-      flop: "Flop",
-      turn: "Turn",
-      river: "River",
-      showdown: "Showdown",
-    };
-    return dbGame ? map[dbGame.currentRound ?? "pre-flop"] ?? "Pré-flop" : "";
-  }, [dbGame]);
-
-  const callAmount = useMemo(() => {
-    if (!dbGame || !yourDbPlayer) return 0;
-    const diff =
-      (dbGame.currentHighestBet ?? 0) - (yourDbPlayer.currentBet ?? 0);
-    return Math.max(0, Math.min(diff, yourDbPlayer.stack));
-  }, [dbGame, yourDbPlayer]);
-
-  const minRaiseTotal = useMemo(() => {
-    if (!dbGame) return 0;
-    const tableBet = dbGame.currentHighestBet ?? 0;
-    return tableBet === 0
-      ? dbGame.bigBlind
-      : Math.max(tableBet * 2, dbGame.bigBlind);
-  }, [dbGame]);
-
-  const maxRaiseTotal = useMemo(() => {
-    if (!yourDbPlayer) return 0;
-    return (yourDbPlayer.currentBet ?? 0) + (yourDbPlayer.stack ?? 0);
-  }, [yourDbPlayer]);
-
-  const canCheck = useMemo(() => {
-    if (!dbGame || !yourDbPlayer) return false;
-    return (dbGame.currentHighestBet ?? 0) <= (yourDbPlayer.currentBet ?? 0);
-  }, [dbGame, yourDbPlayer]);
-
-  const canCall = useMemo(() => {
-    if (!dbGame || !yourDbPlayer) return false;
-    const tableBet = dbGame.currentHighestBet ?? 0;
-    return tableBet > (yourDbPlayer.currentBet ?? 0) && yourDbPlayer.stack > 0;
-  }, [dbGame, yourDbPlayer]);
+  useEffect(() => {
+    if (isNotFound || isLoading) return;
+    queryClient.setQueryData(getByIdKey, (prev) => {
+      if (!prev) return prev;
+      return ensureHoleCardsMerged(prev as CachedGameData);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNotFound, isLoading, snapshot?.game?.handId]);
 
   const { mutations, isPending } = useGameActions();
   const joinMutation = mutations.joinMutation;
@@ -262,11 +264,10 @@ export function useGameData(id: string) {
     },
     act: async (action: PokerAction, totalAmount?: number) => {
       if (!dbGame || !yourDbPlayer) return;
-      const payload: { gameId: string; action: PokerAction; amount?: number } =
-        {
-          gameId: dbGame.id,
-          action,
-        };
+      const payload: { gameId: string; action: PokerAction; amount?: number } = {
+        gameId: dbGame.id,
+        action,
+      };
       if (action === "raise" || action === "bet") {
         const targetTotal = Math.max(
           minRaiseTotal,
@@ -306,16 +307,15 @@ export function useGameData(id: string) {
     },
   };
 
-  // Robustly refetch your hole cards with retry/backoff until current-hand cards are present
   const refetchHoleCardsWithRetry = useCallback(async () => {
     try {
-      // If we already have current-hand hole cards in the cache, skip refetching
       const currentHandId = dbGame?.handId;
       const myId = yourDbPlayer?.id;
       if (!currentHandId || !myId) return;
       const haveTwoAlready =
-        dbCards.filter((c) => c.playerId === myId && c.handId === currentHandId)
-          .length >= 2;
+        dbCards.filter(
+          (c) => c.playerId === myId && c.handId === currentHandId
+        ).length >= 2;
       if (haveTwoAlready) return;
 
       let attempt = 0;
@@ -334,11 +334,10 @@ export function useGameData(id: string) {
         attempt += 1;
       }
     } catch {
-      // swallow; subsequent broadcasts/effects will still populate
+      // ignore transient errors
     }
   }, [getHoleCards, yourDbPlayer?.id, dbGame?.handId, dbCards]);
 
-  // Ensure we fetch your current-hand hole cards after a hand change or initial mount
   useEffect(() => {
     if (isNotFound || isLoading || !dbGame || !yourDbPlayer) return;
     const myCurrentHandCount = dbCards.filter(
@@ -351,53 +350,15 @@ export function useGameData(id: string) {
   }, [isNotFound, isLoading, dbGame?.handId, yourDbPlayer?.id]);
 
   useEffect(() => {
-    if (isNotFound || isLoading || !getHoleCards.data) return;
-    queryClient.setQueryData(getByIdKey, (prev) => {
-      return ensureHoleCardsMerged(prev as CachedGameData | null);
-    });
-  }, [
-    isNotFound,
-    isLoading,
-    getHoleCards.data,
-    getByIdKey,
-    queryClient,
-    ensureHoleCardsMerged,
-  ]);
-
-  // Realtime subscription and cache updates via helper hook
-  // Only subscribe if game exists (hook checks id internally)
-  useGameRealtime(
-    !isLoading && !isNotFound && snapshot?.game ? id : "",
-    (updater) => {
-      queryClient.setQueryData<CachedGameData | null>(getByIdKey, (prev) => {
-        if (!prev) return prev;
-        const next = updater(prev);
-        // Re-apply private hole cards after public updates
-        return ensureHoleCardsMerged(next as CachedGameData | null);
-      });
-    },
-    undefined,
-    () => {
-      // Force a fast re-fetch of full game snapshot right after hand transition
+    const unsubscribe = client.onHandTransition(() => {
       void queryClient.invalidateQueries({ queryKey: getByIdKey });
       void refetchHoleCardsWithRetry();
-    }
-  );
-
-  // Also re-merge any time the snapshot hand changes and we have private cards cached
-  useEffect(() => {
-    if (isNotFound || isLoading) return;
-    queryClient.setQueryData(getByIdKey, (prev) => {
-      if (!prev) return prev;
-      return ensureHoleCardsMerged(prev as CachedGameData);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNotFound, isLoading, snapshot?.game?.handId]);
+    return unsubscribe;
+  }, [client, queryClient, getByIdKey, refetchHoleCardsWithRetry]);
 
-  // Stable timeout handler to avoid effect churn in the hook
   const onTurnTimeout = useCallback(async () => {
     if (!dbGame?.id || !dbGame.currentPlayerTurn) return;
-    // Do not pre-filter by local cache; server validation will reject if stale
     let fanout = 1;
     if (process.env.NODE_ENV !== "production") {
       try {
@@ -434,7 +395,6 @@ export function useGameData(id: string) {
       return;
     }
 
-    // Launch N parallel timeout requests for analysis
     const requests = Array.from({ length: fanout }, () =>
       timeoutMutation.mutateAsync(payload)
     );
@@ -452,7 +412,6 @@ export function useGameData(id: string) {
     );
   }, [dbGame?.id, dbGame?.currentPlayerTurn, timeoutMutation]);
 
-  // Turn timeout management and proactive catch-up
   useTurnManagement(
     {
       meId: me?.id,
@@ -471,8 +430,12 @@ export function useGameData(id: string) {
     onTurnTimeout
   );
 
-  // Showdown effects
   useShowdownEffects(dbGame, dbPlayers, dbCards, () => actions.advance());
+
+  const effectiveIsLoading =
+    transportKind === "mock" && cachedData ? false : isLoading;
+  const effectiveIsNotFound =
+    transportKind === "mock" && cachedData ? false : isNotFound;
 
   return {
     me,
@@ -501,7 +464,8 @@ export function useGameData(id: string) {
     isResetting,
     isLeaving,
     isTimingOut,
-    isLoading,
-    isNotFound,
+    isLoading: effectiveIsLoading,
+    isNotFound: effectiveIsNotFound,
+    dataSource: transportKind,
   } as const;
 }

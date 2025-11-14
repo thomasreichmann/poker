@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { TIMEOUT_CFG } from "@/lib/timeoutConfig";
 import {
   computeBackupDelayMs,
   computeNonActorSlotDelayMs,
@@ -27,23 +28,26 @@ describe("useTurnManagement helpers", () => {
     expect(delay).toBeGreaterThanOrEqual(1000);
   });
 
-  test("computeNonActorSlotDelayMs increases exponentially by seat distance with jitter", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0); // no jitter
-    const seats = 6;
-    const nextSeat = 3; // current actor seat
-    const myNear = 4; // distance 1 -> baseSlot
-    const myFar = 6; // distance 3 -> baseSlot * 4
-    const near = computeNonActorSlotDelayMs(seats, nextSeat, myNear);
-    const far = computeNonActorSlotDelayMs(seats, nextSeat, myFar);
-    expect(far).toBeGreaterThan(near);
-  });
+    test("computeNonActorSlotDelayMs increases exponentially by seat distance with jitter", () => {
+      vi.spyOn(Math, "random").mockReturnValue(0); // no jitter
+      const seats = 6;
+      const nextSeat = 3; // current actor seat
+      const myNear = 4; // distance 1 -> baseSlot
+      const myFar = 6; // distance 3 -> baseSlot * 4
+      const near = computeNonActorSlotDelayMs(seats, nextSeat, myNear);
+      const far = computeNonActorSlotDelayMs(seats, nextSeat, myFar);
+      expect(far).toBeGreaterThan(near);
+    });
 
-  test("computeNonActorSlotDelayMs applies jitter", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99); // near max jitter
-    const seats = 9;
-    const nextSeat = 1;
-    const mySeat = 2; // distance 1
-    const val = computeNonActorSlotDelayMs(seats, nextSeat, mySeat);
-    expect(val).toBeGreaterThanOrEqual(120); // base
-  });
+    test("computeNonActorSlotDelayMs applies jitter", () => {
+      vi.spyOn(Math, "random").mockReturnValue(0.99); // near max jitter
+      const seats = 9;
+      const nextSeat = 1;
+      const mySeat = 2; // distance 1
+      const val = computeNonActorSlotDelayMs(seats, nextSeat, mySeat);
+      expect(val).toBeGreaterThanOrEqual(TIMEOUT_CFG.baseSlotMs);
+      expect(val).toBeLessThanOrEqual(
+        TIMEOUT_CFG.baseSlotMs + TIMEOUT_CFG.slotJitterMs
+      );
+    });
 });

@@ -13,7 +13,7 @@ import {
 import { AppLink } from "@/components/ui/link";
 import type { PlayingCard as IPlayingCard } from "@/lib/gameTypes";
 import { evaluateBestHandDetailed } from "@/lib/poker/cards";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ActionPanel } from "./_components/ActionPanel";
 import { CommunityCards } from "./_components/CommunityCards";
@@ -25,6 +25,14 @@ import { useGameData } from "./_hooks/useGameData";
 
 export default function PokerGamePage() {
   const { id } = useParams() as { id: string };
+  const searchParams = useSearchParams();
+  const dataSourceParam = searchParams.get("dataSource");
+  const dataSource =
+    dataSourceParam === "mock"
+      ? "mock"
+      : dataSourceParam === "supabase"
+      ? "supabase"
+      : undefined;
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [raiseAmount, setRaiseAmount] = useState<number>(0);
 
@@ -53,7 +61,7 @@ export default function PokerGamePage() {
     isResetting,
     isLoading,
     isNotFound,
-  } = useGameData(id);
+  } = useGameData(id, { dataSource });
 
   useEffect(() => {
     // Reset baseline when turn or round changes
