@@ -153,14 +153,13 @@ export const gameRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const rows = await db
+      const [player] = await db
         .select()
         .from(players)
         .where(
           and(eq(players.gameId, input.gameId), eq(players.userId, ctx.user.id))
         )
         .limit(1);
-      const player = rows[0];
       if (!player) throw new Error("Player not found in this game");
       return await handleActionPure({
         ...input,
